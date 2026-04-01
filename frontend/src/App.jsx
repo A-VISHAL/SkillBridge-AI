@@ -722,6 +722,7 @@ const ResumeAnalyzer = () => {
   const [fileName, setFileName] = useState("");
   const [fileSize, setFileSize] = useState("");
   const [resumeId, setResumeId] = useState(null);
+  const [resumeData, setResumeData] = useState(null);
   const [atsScore, setAtsScore] = useState(0);
   const [scoreBreakdown, setScoreBreakdown] = useState({
     formatting_score: 0,
@@ -757,6 +758,7 @@ const ResumeAnalyzer = () => {
         const uploadData = await uploadResponse.json();
         const resumeId = uploadData.resume_id;
         setResumeId(resumeId);
+        setResumeData(uploadData.resume); // Store parsed resume data
         
         // Analyze resume
         const analyzeFormData = new FormData();
@@ -844,6 +846,7 @@ const ResumeAnalyzer = () => {
       setFileName("Sample_Resume.pdf");
       setFileSize("245 KB");
       setResumeId(sampleData.resume_id);
+      setResumeData(sampleData.resume); // Store parsed resume data
       
       // Analyze sample resume
       const analyzeFormData = new FormData();
@@ -959,70 +962,112 @@ const ResumeAnalyzer = () => {
               </Card>
 
               {/* Extracted Information */}
-              <Card style={{ marginTop: 14 }}>
-                <div style={{ fontSize: 13.5, fontWeight: 650, color: "var(--gray-900)", marginBottom: 16 }}>Extracted Information</div>
-                
-                {/* Personal Info */}
-                <div style={{ marginBottom: 20, paddingBottom: 16, borderBottom: "1px solid var(--gray-100)" }}>
-                  <div style={{ fontSize: 16, fontWeight: 650, color: "var(--gray-900)", marginBottom: 8 }}>A Vishal</div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                    <div style={{ fontSize: 13, color: "var(--gray-600)" }}>📧 vishal@example.com</div>
-                    <div style={{ fontSize: 13, color: "var(--gray-600)" }}>📱 +91 98765 43210</div>
-                    <div style={{ fontSize: 13, color: "var(--gray-600)" }}>📍 Bangalore, India</div>
-                  </div>
-                </div>
-
-                {/* Skills */}
-                <div style={{ marginBottom: 20, paddingBottom: 16, borderBottom: "1px solid var(--gray-100)" }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--gray-700)", marginBottom: 10 }}>Skills</div>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                    {["Python", "FastAPI", "React", "JavaScript", "Node.js", "AWS", "Docker", "PostgreSQL", "MongoDB", "Git", "CI/CD", "Machine Learning"].map((skill, i) => (
-                      <span key={i} style={{
-                        padding: "4px 10px", borderRadius: 99,
-                        background: "var(--gray-100)", fontSize: 12,
-                        color: "var(--gray-700)", fontWeight: 500,
-                        border: "1px solid var(--gray-200)",
-                      }}>{skill}</span>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Experience */}
-                <div style={{ marginBottom: 20, paddingBottom: 16, borderBottom: "1px solid var(--gray-100)" }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--gray-700)", marginBottom: 10 }}>Experience</div>
-                  <div style={{ marginBottom: 12 }}>
-                    <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--gray-900)" }}>Senior Software Engineer</div>
-                    <div style={{ fontSize: 12, color: "var(--gray-500)", marginBottom: 4 }}>Tech Corp · 2022 - Present</div>
-                    <div style={{ fontSize: 12, color: "var(--gray-600)", lineHeight: 1.5 }}>Led development of microservices architecture, improved system performance by 40%, mentored junior developers</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--gray-900)" }}>Software Engineer</div>
-                    <div style={{ fontSize: 12, color: "var(--gray-500)", marginBottom: 4 }}>StartupXYZ · 2020 - 2022</div>
-                    <div style={{ fontSize: 12, color: "var(--gray-600)", lineHeight: 1.5 }}>Built scalable web applications using React and Node.js, implemented CI/CD pipelines</div>
-                  </div>
-                </div>
-
-                {/* Education */}
-                <div style={{ marginBottom: 20, paddingBottom: 16, borderBottom: "1px solid var(--gray-100)" }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--gray-700)", marginBottom: 10 }}>Education</div>
-                  <div>
-                    <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--gray-900)" }}>B.Tech in Computer Science</div>
-                    <div style={{ fontSize: 12, color: "var(--gray-500)" }}>IIT Delhi · 2016 - 2020</div>
-                    <div style={{ fontSize: 12, color: "var(--gray-600)" }}>CGPA: 8.5/10</div>
-                  </div>
-                </div>
-
-                {/* Certifications */}
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--gray-700)", marginBottom: 10 }}>Certifications</div>
-                  {["AWS Certified Solutions Architect", "Google Cloud Professional", "MongoDB Certified Developer"].map((cert, i) => (
-                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                      <div style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--gray-400)" }}/>
-                      <span style={{ fontSize: 13, color: "var(--gray-600)" }}>{cert}</span>
+              {resumeData && (
+                <Card style={{ marginTop: 14 }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 650, color: "var(--gray-900)", marginBottom: 16 }}>Extracted Information</div>
+                  
+                  {/* Personal Info */}
+                  {(resumeData.name || resumeData.email || resumeData.phone) && (
+                    <div style={{ marginBottom: 20, paddingBottom: 16, borderBottom: "1px solid var(--gray-100)" }}>
+                      {resumeData.name && <div style={{ fontSize: 16, fontWeight: 650, color: "var(--gray-900)", marginBottom: 8 }}>{resumeData.name}</div>}
+                      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                        {resumeData.email && <div style={{ fontSize: 13, color: "var(--gray-600)" }}>📧 {resumeData.email}</div>}
+                        {resumeData.phone && <div style={{ fontSize: 13, color: "var(--gray-600)" }}>📱 {resumeData.phone}</div>}
+                      </div>
                     </div>
-                  ))}
-                </div>
-              </Card>
+                  )}
+
+                  {/* Skills */}
+                  {resumeData.skills && resumeData.skills.length > 0 && (
+                    <div style={{ marginBottom: 20, paddingBottom: 16, borderBottom: "1px solid var(--gray-100)" }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "var(--gray-700)", marginBottom: 10 }}>Skills</div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                        {resumeData.skills.map((skill, i) => (
+                          <span key={i} style={{
+                            padding: "4px 10px", borderRadius: 99,
+                            background: "var(--gray-100)", fontSize: 12,
+                            color: "var(--gray-700)", fontWeight: 500,
+                            border: "1px solid var(--gray-200)",
+                          }}>{typeof skill === 'string' ? skill : skill.name}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Experience */}
+                  {resumeData.experiences && resumeData.experiences.length > 0 && (
+                    <div style={{ marginBottom: 20, paddingBottom: 16, borderBottom: "1px solid var(--gray-100)" }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "var(--gray-700)", marginBottom: 10 }}>Experience</div>
+                      {resumeData.experiences.map((exp, i) => (
+                        <div key={i} style={{ marginBottom: i < resumeData.experiences.length - 1 ? 12 : 0 }}>
+                          {exp.title && <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--gray-900)" }}>{exp.title}</div>}
+                          {(exp.company || exp.duration) && (
+                            <div style={{ fontSize: 12, color: "var(--gray-500)", marginBottom: 4 }}>
+                              {exp.company}{exp.company && exp.duration ? ' · ' : ''}{exp.duration}
+                            </div>
+                          )}
+                          {exp.description && Array.isArray(exp.description) && exp.description.length > 0 && (
+                            <div style={{ fontSize: 12, color: "var(--gray-600)", lineHeight: 1.5 }}>
+                              {exp.description.join('. ')}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Education */}
+                  {resumeData.education && resumeData.education.length > 0 && (
+                    <div style={{ marginBottom: 20, paddingBottom: 16, borderBottom: "1px solid var(--gray-100)" }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "var(--gray-700)", marginBottom: 10 }}>Education</div>
+                      {resumeData.education.map((edu, i) => (
+                        <div key={i} style={{ marginBottom: i < resumeData.education.length - 1 ? 12 : 0 }}>
+                          {edu.degree && <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--gray-900)" }}>{edu.degree}</div>}
+                          {(edu.institution || edu.year) && (
+                            <div style={{ fontSize: 12, color: "var(--gray-500)" }}>
+                              {edu.institution}{edu.institution && edu.year ? ' · ' : ''}{edu.year}
+                            </div>
+                          )}
+                          {edu.gpa && <div style={{ fontSize: 12, color: "var(--gray-600)" }}>CGPA: {edu.gpa}</div>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Projects */}
+                  {resumeData.projects && resumeData.projects.length > 0 && (
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "var(--gray-700)", marginBottom: 10 }}>Projects</div>
+                      {resumeData.projects.map((proj, i) => (
+                        <div key={i} style={{ marginBottom: i < resumeData.projects.length - 1 ? 16 : 0 }}>
+                          {proj.name && (
+                            <div style={{ fontSize: 14, fontWeight: 650, color: "var(--gray-900)", marginBottom: 6 }}>
+                              {proj.name}
+                            </div>
+                          )}
+                          {proj.description && (
+                            <div style={{ fontSize: 12.5, color: "var(--gray-600)", marginBottom: 8, lineHeight: 1.6 }}>
+                              {proj.description}
+                            </div>
+                          )}
+                          {proj.technologies && proj.technologies.length > 0 && (
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                              {proj.technologies.map((tech, j) => (
+                                <span key={j} style={{
+                                  padding: "4px 10px", borderRadius: 6,
+                                  background: "var(--gray-100)", fontSize: 11.5,
+                                  color: "var(--gray-600)", fontWeight: 500,
+                                  border: "1px solid var(--gray-200)",
+                                }}>{tech}</span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </Card>
+              )}
 
               {/* Issues */}
               <Card style={{ marginTop: 14 }}>
