@@ -2,25 +2,26 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  background: var(--gray-50);
 }
 
 .header {
-  background: var(--bg1);
-  border-bottom: 1px solid var(--border);
+  background: var(--white);
+  border-bottom: 1px solid var(--gray-150);
   padding: 20px 0;
+  box-shadow: var(--shadow-sm);
 }
 
 .logo {
   font-size: 32px;
   font-weight: 800;
-  background: linear-gradient(135deg, var(--c1), var(--c3));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: var(--gray-900);
   margin-bottom: 4px;
+  letter-spacing: -0.03em;
 }
 
 .tagline {
-  color: var(--muted2);
+  color: var(--gray-500);
   font-size: 14px;
 }
 
@@ -34,31 +35,34 @@
 }
 
 .footer {
-  background: var(--bg1);
-  border-top: 1px solid var(--border);
+  background: var(--white);
+  border-top: 1px solid var(--gray-150);
   padding: 20px 0;
   text-align: center;
-  color: var(--muted);
+  color: var(--gray-500);
   font-size: 14px;
 }
 
+
 .upload-zone {
-  border: 2px dashed var(--border2);
-  border-radius: 12px;
+  border: 2px dashed var(--gray-200);
+  border-radius: var(--radius-lg);
   padding: 60px 20px;
   text-align: center;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all var(--transition);
+  background: var(--gray-50);
 }
 
 .upload-zone:hover {
-  border-color: var(--c1);
-  background: rgba(0, 229, 180, 0.05);
+  border-color: var(--gray-700);
+  background: var(--white);
 }
 
 .upload-zone.active {
-  border-color: var(--c1);
-  background: rgba(0, 229, 180, 0.1);
+  border-color: var(--gray-700);
+  background: var(--white);
+  box-shadow: var(--shadow-md);
 }
 
 .score-circle {
@@ -72,6 +76,7 @@
   font-weight: 800;
   margin: 0 auto 20px;
   position: relative;
+  color: var(--gray-900);
 }
 
 .score-circle::before {
@@ -80,32 +85,35 @@
   inset: -4px;
   border-radius: 50%;
   padding: 4px;
-  background: linear-gradient(135deg, var(--c1), var(--c3));
+  background: linear-gradient(135deg, var(--gray-700), var(--gray-400));
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
 }
 
+
 .skill-tag {
   display: inline-block;
   padding: 6px 12px;
-  background: var(--bg3);
-  border: 1px solid var(--border);
-  border-radius: 6px;
+  background: var(--gray-100);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-sm);
   margin: 4px;
   font-size: 13px;
+  font-weight: 500;
+  color: var(--gray-700);
 }
 
 .skill-tag.matched {
-  background: rgba(0, 229, 180, 0.1);
-  border-color: var(--c1);
-  color: var(--c1);
+  background: #f0fdf4;
+  border-color: #86efac;
+  color: #166534;
 }
 
 .skill-tag.missing {
-  background: rgba(255, 92, 107, 0.1);
-  border-color: var(--c2);
-  color: var(--c2);
+  background: #fef2f2;
+  border-color: #fca5a5;
+  color: #991b1b;
 }
 
 .roadmap-timeline {
@@ -120,16 +128,17 @@
   top: 0;
   bottom: 0;
   width: 2px;
-  background: var(--border);
+  background: var(--gray-200);
 }
 
 .roadmap-item {
   position: relative;
   margin-bottom: 24px;
   padding: 16px;
-  background: var(--bg2);
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  background: var(--white);
+  border: 1px solid var(--gray-150);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
 }
 
 .roadmap-item::before {
@@ -140,29 +149,31 @@
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  background: var(--c1);
-  border: 2px solid var(--bg0);
+  background: var(--gray-700);
+  border: 2px solid var(--white);
 }
 
 .roadmap-item.milestone::before {
   width: 16px;
   height: 16px;
-  background: var(--c4);
-  box-shadow: 0 0 20px rgba(255, 181, 71, 0.5);
+  background: var(--gray-900);
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
 }
 
+
 .job-card {
-  background: var(--bg2);
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  background: var(--white);
+  border: 1px solid var(--gray-150);
+  border-radius: var(--radius-lg);
   padding: 20px;
-  transition: all 0.2s;
+  transition: all var(--transition);
+  box-shadow: var(--shadow-sm);
 }
 
 .job-card:hover {
-  border-color: var(--c1);
+  border-color: var(--gray-700);
   transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow-lg);
 }
 
 .match-badge {
@@ -170,60 +181,70 @@
   align-items: center;
   gap: 6px;
   padding: 6px 12px;
-  border-radius: 20px;
+  border-radius: var(--radius-full);
   font-size: 13px;
   font-weight: 600;
 }
 
 .match-high {
-  background: rgba(0, 229, 180, 0.2);
-  color: var(--c1);
+  background: #f0fdf4;
+  color: #166534;
+  border: 1px solid #bbf7d0;
 }
 
 .match-medium {
-  background: rgba(255, 181, 71, 0.2);
-  color: var(--c4);
+  background: #fffbeb;
+  color: #92400e;
+  border: 1px solid #fde68a;
 }
 
 .match-low {
-  background: rgba(255, 92, 107, 0.2);
-  color: var(--c2);
+  background: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fca5a5;
 }
 
 .question-card {
-  background: var(--bg2);
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  background: var(--white);
+  border: 1px solid var(--gray-150);
+  border-radius: var(--radius-lg);
   padding: 24px;
   margin-bottom: 20px;
+  box-shadow: var(--shadow-sm);
 }
 
 .option {
   padding: 12px;
-  background: var(--bg3);
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  background: var(--gray-50);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-md);
   margin-bottom: 8px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all var(--transition);
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--gray-700);
 }
 
 .option:hover {
-  border-color: var(--c1);
-  background: rgba(0, 229, 180, 0.05);
+  border-color: var(--gray-700);
+  background: var(--white);
 }
 
 .option.selected {
-  border-color: var(--c1);
-  background: rgba(0, 229, 180, 0.1);
+  border-color: var(--gray-900);
+  background: var(--gray-900);
+  color: var(--white);
 }
 
 .option.correct {
-  border-color: var(--c1);
-  background: rgba(0, 229, 180, 0.2);
+  border-color: #86efac;
+  background: #f0fdf4;
+  color: #166534;
 }
 
 .option.incorrect {
-  border-color: var(--c2);
-  background: rgba(255, 92, 107, 0.2);
+  border-color: #fca5a5;
+  background: #fef2f2;
+  color: #991b1b;
 }
