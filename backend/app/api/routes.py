@@ -81,42 +81,61 @@ async def get_sample_resume():
 
 
 @router.post("/api/resume/analyze")
-async def analyze_resume(resume_id: str = Form(...)):
-    """Analyze resume for ATS score and problems"""
+async def analyze_resume(
+    resume_id: str = Form(...),
+    target_role: str = Form("Software Engineer"),
+    job_description: str = Form("")
+):
+    """Analyze resume for comprehensive ATS score and insights"""
     try:
         if resume_id not in resume_store:
             raise HTTPException(404, "Resume not found")
         
         resume = resume_store[resume_id]
         
-        # Analyze with AI
-        analysis = await ai_service.analyze_resume_with_ai(resume.raw_text)
+        # Get comprehensive ATS analysis
+        ats_result = await ai_service.calculate_ats_score(
+            resume.raw_text,
+            target_role,
+            job_description
+        )
         
         # Convert to structured format
         problems = [
             ResumeProblem(
                 category="content",
-                severity="medium",
-                issue=problem,
-                suggestion="Improve this area"
+                severity="high" if "critical" in weakness.lower() else "medium",
+                issue=weakness,
+                suggestion=ats_result.get("suggestions", {}).get("improve_keywords", ["Review and improve"])[0] if ats_result.get("suggestions", {}).get("improve_keywords") else "Review and improve"
             )
-            for problem in analysis.get("problems", [])
+            for weakness in ats_result.get("analysis", {}).get("weaknesses", [])
         ]
         
+        # Add missing keywords as problems
+        for keyword in ats_result.get("missing_keywords", [])[:5]:
+            problems.append(ResumeProblem(
+                category="keywords",
+                severity="medium",
+                issue=f"Missing keyword: {keyword}",
+                suggestion=f"Consider adding '{keyword}' if relevant to your experience"
+            ))
+        
+        score_breakdown = ats_result.get("score_breakdown", {})
+        
         ats_analysis = ATSAnalysis(
-            score=analysis.get("ats_score", 70),
-            keyword_match=0.65,
-            formatting_score=75,
-            readability_score=80,
+            score=ats_result.get("ats_score", 0),
+            keyword_match=score_breakdown.get("keyword_match", 0) / 100,
+            formatting_score=score_breakdown.get("resume_structure", 0),
+            readability_score=score_breakdown.get("ats_compatibility", 0),
             problems=problems,
-            missing_keywords=analysis.get("missing_keywords", []),
-            strong_points=analysis.get("strong_points", [])
+            missing_keywords=ats_result.get("missing_keywords", []),
+            strong_points=ats_result.get("analysis", {}).get("strengths", [])
         )
         
         # Get bullet improvements
         improvements_data = await ai_service.improve_resume_bullets(
             [exp.dict() for exp in resume.experiences],
-            ""
+            job_description or target_role
         )
         
         bullet_improvements = [
@@ -127,11 +146,15 @@ async def analyze_resume(resume_id: str = Form(...)):
             ats_analysis=ats_analysis,
             problems=problems,
             bullet_improvements=bullet_improvements,
-            recruiter_view="Your resume shows good experience but needs more quantifiable metrics.",
-            overall_rating="Good"
+            recruiter_view=ats_result.get("final_verdict", "Resume analysis complete"),
+            overall_rating="Excellent" if ats_result.get("ats_score", 0) >= 80 else "Good" if ats_result.get("ats_score", 0) >= 60 else "Needs Improvement"
         )
         
-        return result.dict()
+        # Add the detailed ATS result to response
+        response = result.dict()
+        response["detailed_ats_analysis"] = ats_result
+        
+        return response
         
     except Exception as e:
         raise HTTPException(500, f"Error analyzing resume: {str(e)}")

@@ -404,3 +404,147 @@ Return as JSON with keys: score, strengths, weaknesses, model_answer, confidence
             "confidence_level": "Medium",
             "improvement_tips": ["Practice STAR method", "Add specific metrics"]
         }
+
+
+async def calculate_ats_score(resume_text: str, target_role: str = "", job_description: str = "") -> Dict[str, Any]:
+    """
+    Calculate comprehensive ATS score based on multiple criteria.
+    Returns detailed breakdown and actionable insights.
+    """
+    
+    prompt = f"""You are an advanced ATS (Applicant Tracking System) Resume Evaluator.
+Your task is to analyze a resume against a target job role and calculate a realistic ATS score based on multiple evaluation criteria.
+
+📥 INPUT:
+Resume Text: {resume_text}
+Target Job Role: {target_role if target_role else "General Software Engineer"}
+Job Description: {job_description if job_description else "Not provided - infer from target role"}
+
+🎯 OBJECTIVE:
+1. Analyze the resume content deeply
+2. Compare it with the target role and job description
+3. Calculate a realistic ATS score (0–100)
+4. Provide detailed breakdown and actionable insights
+5. Ensure ALL results are dynamic and based ONLY on input
+
+📊 SCORING CRITERIA (STRICT):
+Calculate ATS score based on:
+1. Keyword Match (30%) - Match resume skills with job role/JD keywords
+2. Skills Relevance (20%) - Are the skills relevant to the role?
+3. Experience Alignment (15%) - Projects / internships aligned with role?
+4. Education Fit (10%) - Relevant degree or coursework?
+5. Resume Structure & Clarity (10%) - Sections, readability, formatting
+6. Projects Quality (10%) - Real-world, tech stack usage, impact
+7. ATS Compatibility (5%) - Proper formatting, no tables/images-heavy text
+
+📊 OUTPUT FORMAT (STRICT JSON):
+{{
+    "ats_score": 0,
+    "score_breakdown": {{
+        "keyword_match": 0,
+        "skills_relevance": 0,
+        "experience_alignment": 0,
+        "education_fit": 0,
+        "resume_structure": 0,
+        "projects_quality": 0,
+        "ats_compatibility": 0
+    }},
+    "matched_keywords": [],
+    "missing_keywords": [],
+    "analysis": {{
+        "strengths": [],
+        "weaknesses": [],
+        "red_flags": []
+    }},
+    "suggestions": {{
+        "improve_keywords": [],
+        "add_projects": [],
+        "enhance_experience": [],
+        "formatting_fixes": []
+    }},
+    "final_verdict": "",
+    "improvement_roadmap": {{
+        "duration_weeks": 4,
+        "target_score_increase": 20,
+        "weekly_tasks": []
+    }}
+}}
+
+⚠️ IMPORTANT RULES:
+- DO NOT generate random scores
+- Every score MUST be justified by resume content
+- Scores must vary based on different resumes
+- DO NOT use fixed or example data
+- Extract keywords from BOTH resume and job description
+- If JD is missing → infer from target role intelligently
+- Keep output structured and clean
+
+📈 SCORING LOGIC:
+- If strong keyword match → increase score
+- If missing core skills → reduce score
+- If irrelevant experience → reduce score
+- If strong projects → boost score
+- If resume poorly formatted → reduce ATS compatibility
+
+🚀 BONUS:
+Generate a 2–4 week improvement roadmap to increase ATS score by at least +20 points.
+
+Return ONLY valid JSON, no additional text."""
+    
+    messages = [
+        {"role": "system", "content": "You are an expert ATS system analyzer with deep knowledge of recruitment processes and resume optimization."},
+        {"role": "user", "content": prompt}
+    ]
+    
+    response = await call_oxlo_chat(messages, temperature=0.3, max_tokens=4000)
+    
+    try:
+        result = json.loads(response)
+        # Ensure all required fields exist
+        if "ats_score" not in result:
+            result["ats_score"] = 0
+        if "score_breakdown" not in result:
+            result["score_breakdown"] = {
+                "keyword_match": 0,
+                "skills_relevance": 0,
+                "experience_alignment": 0,
+                "education_fit": 0,
+                "resume_structure": 0,
+                "projects_quality": 0,
+                "ats_compatibility": 0
+            }
+        return result
+    except Exception as e:
+        print(f"Error parsing ATS score response: {e}")
+        # Fallback response
+        return {
+            "ats_score": 0,
+            "score_breakdown": {
+                "keyword_match": 0,
+                "skills_relevance": 0,
+                "experience_alignment": 0,
+                "education_fit": 0,
+                "resume_structure": 0,
+                "projects_quality": 0,
+                "ats_compatibility": 0
+            },
+            "matched_keywords": [],
+            "missing_keywords": [],
+            "analysis": {
+                "strengths": [],
+                "weaknesses": ["Unable to analyze resume - please try again"],
+                "red_flags": []
+            },
+            "suggestions": {
+                "improve_keywords": [],
+                "add_projects": [],
+                "enhance_experience": [],
+                "formatting_fixes": []
+            },
+            "final_verdict": "Analysis failed - please ensure resume is properly formatted",
+            "improvement_roadmap": {
+                "duration_weeks": 4,
+                "target_score_increase": 20,
+                "weekly_tasks": []
+            }
+        }

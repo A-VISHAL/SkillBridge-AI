@@ -721,26 +721,96 @@ const ResumeAnalyzer = () => {
   const [dragging, setDragging] = useState(false);
   const [fileName, setFileName] = useState("");
   const [fileSize, setFileSize] = useState("");
+  const [resumeId, setResumeId] = useState(null);
+  const [atsScore, setAtsScore] = useState(0);
+  const [scoreBreakdown, setScoreBreakdown] = useState({
+    formatting_score: 0,
+    keyword_match: 0,
+    readability_score: 0
+  });
+  const [issues, setIssues] = useState([]);
+  const [suggestions, setSuggestions] = useState([]);
+  const [loading, setLoading] = useState(false);
   const fileInputRef = useRef(null);
 
-  const issues = [
-    { type: "error", text: "Missing quantified achievements in Experience section" },
-    { type: "warning", text: "Skills section lacks industry keywords" },
-    { type: "info", text: "Summary could be more role-specific" },
-  ];
-
-  const suggestions = [
-    "Add metrics to project descriptions (e.g., 'reduced load time by 40%')",
-    "Include tools: Docker, Kubernetes, CI/CD pipelines",
-    "Rewrite summary targeting Senior Software Engineer roles",
-  ];
-
-  const handleFileSelect = (file) => {
+  const handleFileSelect = async (file) => {
     if (file) {
+      setLoading(true);
       const sizeInKB = Math.round(file.size / 1024);
       setFileName(file.name);
       setFileSize(`${sizeInKB} KB`);
-      setUploaded(true);
+      
+      try {
+        // Upload resume
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        const uploadResponse = await fetch('http://localhost:8000/api/resume/upload', {
+          method: 'POST',
+          body: formData,
+        });
+        
+        if (!uploadResponse.ok) {
+          throw new Error('Upload failed');
+        }
+        
+        const uploadData = await uploadResponse.json();
+        const resumeId = uploadData.resume_id;
+        setResumeId(resumeId);
+        
+        // Analyze resume
+        const analyzeFormData = new FormData();
+        analyzeFormData.append('resume_id', resumeId);
+        analyzeFormData.append('target_role', 'Software Engineer');
+        
+        const analyzeResponse = await fetch('http://localhost:8000/api/resume/analyze', {
+          method: 'POST',
+          body: analyzeFormData,
+        });
+        
+        if (!analyzeResponse.ok) {
+          throw new Error('Analysis failed');
+        }
+        
+        const analyzeData = await analyzeResponse.json();
+        
+        // Update state with real data
+        setAtsScore(analyzeData.ats_analysis?.score || 0);
+        setScoreBreakdown({
+          formatting_score: analyzeData.ats_analysis?.formatting_score || 0,
+          keyword_match: Math.round((analyzeData.ats_analysis?.keyword_match || 0) * 100),
+          readability_score: analyzeData.ats_analysis?.readability_score || 0
+        });
+        
+        // Set issues from problems
+        const problemIssues = (analyzeData.problems || []).map(p => ({
+          type: p.severity === 'high' ? 'error' : p.severity === 'medium' ? 'warning' : 'info',
+          text: p.issue
+        }));
+        setIssues(problemIssues);
+        
+        // Set suggestions
+        const allSuggestions = [];
+        if (analyzeData.detailed_ats_analysis?.suggestions) {
+          const sug = analyzeData.detailed_ats_analysis.suggestions;
+          allSuggestions.push(...(sug.improve_keywords || []));
+          allSuggestions.push(...(sug.enhance_experience || []));
+          allSuggestions.push(...(sug.formatting_fixes || []));
+        }
+        setSuggestions(allSuggestions.slice(0, 5));
+        
+        setUploaded(true);
+      } catch (error) {
+        console.error('Error:', error);
+        // Fallback to demo data
+        setAtsScore(0);
+        setScoreBreakdown({ formatting_score: 0, keyword_match: 0, readability_score: 0 });
+        setIssues([{ type: "error", text: "Failed to analyze resume. Please try again." }]);
+        setSuggestions(["Ensure resume is in PDF or DOCX format"]);
+        setUploaded(true);
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -764,19 +834,65 @@ const ResumeAnalyzer = () => {
     }
   };
 
-  const handleSampleResume = () => {
-    const sampleNames = [
-      "John_Doe_Resume_2025.pdf",
-      "Sarah_Johnson_Resume.pdf",
-      "Michael_Chen_SWE_Resume.pdf",
-      "Emily_Williams_Resume.pdf",
-      "David_Kumar_Resume_2025.pdf"
-    ];
-    const randomName = sampleNames[Math.floor(Math.random() * sampleNames.length)];
-    const randomSize = Math.floor(Math.random() * (350 - 180) + 180);
-    setFileName(randomName);
-    setFileSize(`${randomSize} KB`);
-    setUploaded(true);
+  const handleSampleResume = async () => {
+    setLoading(true);
+    try {
+      // Get sample resume
+      const sampleResponse = await fetch('http://localhost:8000/api/resume/sample');
+      const sampleData = await sampleResponse.json();
+      
+      setFileName("Sample_Resume.pdf");
+      setFileSize("245 KB");
+      setResumeId(sampleData.resume_id);
+      
+      // Analyze sample resume
+      const analyzeFormData = new FormData();
+      analyzeFormData.append('resume_id', sampleData.resume_id);
+      analyzeFormData.append('target_role', 'Software Engineer');
+      
+      const analyzeResponse = await fetch('http://localhost:8000/api/resume/analyze', {
+        method: 'POST',
+        body: analyzeFormData,
+      });
+      
+      const analyzeData = await analyzeResponse.json();
+      
+      // Update state with real data
+      setAtsScore(analyzeData.ats_analysis?.score || 0);
+      setScoreBreakdown({
+        formatting_score: analyzeData.ats_analysis?.formatting_score || 0,
+        keyword_match: Math.round((analyzeData.ats_analysis?.keyword_match || 0) * 100),
+        readability_score: analyzeData.ats_analysis?.readability_score || 0
+      });
+      
+      const problemIssues = (analyzeData.problems || []).map(p => ({
+        type: p.severity === 'high' ? 'error' : p.severity === 'medium' ? 'warning' : 'info',
+        text: p.issue
+      }));
+      setIssues(problemIssues);
+      
+      const allSuggestions = [];
+      if (analyzeData.detailed_ats_analysis?.suggestions) {
+        const sug = analyzeData.detailed_ats_analysis.suggestions;
+        allSuggestions.push(...(sug.improve_keywords || []));
+        allSuggestions.push(...(sug.enhance_experience || []));
+        allSuggestions.push(...(sug.formatting_fixes || []));
+      }
+      setSuggestions(allSuggestions.slice(0, 5));
+      
+      setUploaded(true);
+    } catch (error) {
+      console.error('Error:', error);
+      setFileName("Sample_Resume.pdf");
+      setFileSize("245 KB");
+      setAtsScore(0);
+      setScoreBreakdown({ formatting_score: 0, keyword_match: 0, readability_score: 0 });
+      setIssues([{ type: "error", text: "Failed to load sample resume" }]);
+      setSuggestions([]);
+      setUploaded(true);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -798,14 +914,18 @@ const ResumeAnalyzer = () => {
                 style={{
                   border: `2px dashed ${dragging ? "var(--gray-600)" : "var(--gray-200)"}`,
                   borderRadius: "var(--radius-lg)", padding: "48px 32px",
-                  textAlign: "center", cursor: "pointer",
+                  textAlign: "center", cursor: loading ? "wait" : "pointer",
                   background: dragging ? "var(--gray-50)" : "transparent",
                   transition: "all var(--transition)",
+                  opacity: loading ? 0.6 : 1,
+                  pointerEvents: loading ? "none" : "auto",
                 }}>
                 <div style={{ width: 48, height: 48, borderRadius: 14, background: "var(--gray-100)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
                   <Icon name="upload" size={22} color="var(--gray-500)"/>
                 </div>
-                <div style={{ fontSize: 15, fontWeight: 600, color: "var(--gray-800)", marginBottom: 6 }}>Drop your resume here</div>
+                <div style={{ fontSize: 15, fontWeight: 600, color: "var(--gray-800)", marginBottom: 6 }}>
+                  {loading ? "Processing resume..." : "Drop your resume here"}
+                </div>
                 <div style={{ fontSize: 13, color: "var(--gray-400)", marginBottom: 20 }}>PDF, DOCX supported · Max 5MB</div>
                 <input
                   ref={fileInputRef}
@@ -835,6 +955,72 @@ const ResumeAnalyzer = () => {
                   <button onClick={() => setUploaded(false)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
                     <Icon name="x" size={16} color="var(--gray-400)"/>
                   </button>
+                </div>
+              </Card>
+
+              {/* Extracted Information */}
+              <Card style={{ marginTop: 14 }}>
+                <div style={{ fontSize: 13.5, fontWeight: 650, color: "var(--gray-900)", marginBottom: 16 }}>Extracted Information</div>
+                
+                {/* Personal Info */}
+                <div style={{ marginBottom: 20, paddingBottom: 16, borderBottom: "1px solid var(--gray-100)" }}>
+                  <div style={{ fontSize: 16, fontWeight: 650, color: "var(--gray-900)", marginBottom: 8 }}>A Vishal</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    <div style={{ fontSize: 13, color: "var(--gray-600)" }}>📧 vishal@example.com</div>
+                    <div style={{ fontSize: 13, color: "var(--gray-600)" }}>📱 +91 98765 43210</div>
+                    <div style={{ fontSize: 13, color: "var(--gray-600)" }}>📍 Bangalore, India</div>
+                  </div>
+                </div>
+
+                {/* Skills */}
+                <div style={{ marginBottom: 20, paddingBottom: 16, borderBottom: "1px solid var(--gray-100)" }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--gray-700)", marginBottom: 10 }}>Skills</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {["Python", "FastAPI", "React", "JavaScript", "Node.js", "AWS", "Docker", "PostgreSQL", "MongoDB", "Git", "CI/CD", "Machine Learning"].map((skill, i) => (
+                      <span key={i} style={{
+                        padding: "4px 10px", borderRadius: 99,
+                        background: "var(--gray-100)", fontSize: 12,
+                        color: "var(--gray-700)", fontWeight: 500,
+                        border: "1px solid var(--gray-200)",
+                      }}>{skill}</span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Experience */}
+                <div style={{ marginBottom: 20, paddingBottom: 16, borderBottom: "1px solid var(--gray-100)" }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--gray-700)", marginBottom: 10 }}>Experience</div>
+                  <div style={{ marginBottom: 12 }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--gray-900)" }}>Senior Software Engineer</div>
+                    <div style={{ fontSize: 12, color: "var(--gray-500)", marginBottom: 4 }}>Tech Corp · 2022 - Present</div>
+                    <div style={{ fontSize: 12, color: "var(--gray-600)", lineHeight: 1.5 }}>Led development of microservices architecture, improved system performance by 40%, mentored junior developers</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--gray-900)" }}>Software Engineer</div>
+                    <div style={{ fontSize: 12, color: "var(--gray-500)", marginBottom: 4 }}>StartupXYZ · 2020 - 2022</div>
+                    <div style={{ fontSize: 12, color: "var(--gray-600)", lineHeight: 1.5 }}>Built scalable web applications using React and Node.js, implemented CI/CD pipelines</div>
+                  </div>
+                </div>
+
+                {/* Education */}
+                <div style={{ marginBottom: 20, paddingBottom: 16, borderBottom: "1px solid var(--gray-100)" }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--gray-700)", marginBottom: 10 }}>Education</div>
+                  <div>
+                    <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--gray-900)" }}>B.Tech in Computer Science</div>
+                    <div style={{ fontSize: 12, color: "var(--gray-500)" }}>IIT Delhi · 2016 - 2020</div>
+                    <div style={{ fontSize: 12, color: "var(--gray-600)" }}>CGPA: 8.5/10</div>
+                  </div>
+                </div>
+
+                {/* Certifications */}
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--gray-700)", marginBottom: 10 }}>Certifications</div>
+                  {["AWS Certified Solutions Architect", "Google Cloud Professional", "MongoDB Certified Developer"].map((cert, i) => (
+                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                      <div style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--gray-400)" }}/>
+                      <span style={{ fontSize: 13, color: "var(--gray-600)" }}>{cert}</span>
+                    </div>
+                  ))}
                 </div>
               </Card>
 
@@ -873,12 +1059,13 @@ const ResumeAnalyzer = () => {
         {/* Score */}
         <Card style={{ padding: "28px 24px", textAlign: "center" }}>
           <div style={{ fontSize: 12, color: "var(--gray-400)", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 20 }}>ATS Score</div>
-          <CircularProgress value={uploaded ? 82 : 0} size={140} label="Score"/>
+          <CircularProgress value={uploaded ? atsScore : 0} size={140} label="Score"/>
+          {loading && <div style={{ fontSize: 12, color: "var(--gray-500)", marginTop: 10 }}>Analyzing...</div>}
           <div style={{ marginTop: 24, display: "flex", flexDirection: "column", gap: 10 }}>
             {[
-              { label: "Formatting", val: 90 },
-              { label: "Keywords", val: 68 },
-              { label: "Impact", val: 74 },
+              { label: "Formatting", val: scoreBreakdown.formatting_score },
+              { label: "Keywords", val: scoreBreakdown.keyword_match },
+              { label: "Impact", val: scoreBreakdown.readability_score },
             ].map(item => (
               <div key={item.label}>
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 5, color: "var(--gray-500)", fontWeight: 500 }}>
