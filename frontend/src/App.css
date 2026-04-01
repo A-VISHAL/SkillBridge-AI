@@ -1,0 +1,229 @@
+.app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  background: var(--bg1);
+  border-bottom: 1px solid var(--border);
+  padding: 20px 0;
+}
+
+.logo {
+  font-size: 32px;
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--c1), var(--c3));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 4px;
+}
+
+.tagline {
+  color: var(--muted2);
+  font-size: 14px;
+}
+
+.main {
+  flex: 1;
+  padding: 40px 0;
+}
+
+.tab-content {
+  margin-top: 20px;
+}
+
+.footer {
+  background: var(--bg1);
+  border-top: 1px solid var(--border);
+  padding: 20px 0;
+  text-align: center;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.upload-zone {
+  border: 2px dashed var(--border2);
+  border-radius: 12px;
+  padding: 60px 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.upload-zone:hover {
+  border-color: var(--c1);
+  background: rgba(0, 229, 180, 0.05);
+}
+
+.upload-zone.active {
+  border-color: var(--c1);
+  background: rgba(0, 229, 180, 0.1);
+}
+
+.score-circle {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  font-weight: 800;
+  margin: 0 auto 20px;
+  position: relative;
+}
+
+.score-circle::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  padding: 4px;
+  background: linear-gradient(135deg, var(--c1), var(--c3));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+
+.skill-tag {
+  display: inline-block;
+  padding: 6px 12px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin: 4px;
+  font-size: 13px;
+}
+
+.skill-tag.matched {
+  background: rgba(0, 229, 180, 0.1);
+  border-color: var(--c1);
+  color: var(--c1);
+}
+
+.skill-tag.missing {
+  background: rgba(255, 92, 107, 0.1);
+  border-color: var(--c2);
+  color: var(--c2);
+}
+
+.roadmap-timeline {
+  position: relative;
+  padding-left: 40px;
+}
+
+.roadmap-timeline::before {
+  content: '';
+  position: absolute;
+  left: 15px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--border);
+}
+
+.roadmap-item {
+  position: relative;
+  margin-bottom: 24px;
+  padding: 16px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.roadmap-item::before {
+  content: '';
+  position: absolute;
+  left: -32px;
+  top: 20px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--c1);
+  border: 2px solid var(--bg0);
+}
+
+.roadmap-item.milestone::before {
+  width: 16px;
+  height: 16px;
+  background: var(--c4);
+  box-shadow: 0 0 20px rgba(255, 181, 71, 0.5);
+}
+
+.job-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  transition: all 0.2s;
+}
+
+.job-card:hover {
+  border-color: var(--c1);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+}
+
+.match-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.match-high {
+  background: rgba(0, 229, 180, 0.2);
+  color: var(--c1);
+}
+
+.match-medium {
+  background: rgba(255, 181, 71, 0.2);
+  color: var(--c4);
+}
+
+.match-low {
+  background: rgba(255, 92, 107, 0.2);
+  color: var(--c2);
+}
+
+.question-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 20px;
+}
+
+.option {
+  padding: 12px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.option:hover {
+  border-color: var(--c1);
+  background: rgba(0, 229, 180, 0.05);
+}
+
+.option.selected {
+  border-color: var(--c1);
+  background: rgba(0, 229, 180, 0.1);
+}
+
+.option.correct {
+  border-color: var(--c1);
+  background: rgba(0, 229, 180, 0.2);
+}
+
+.option.incorrect {
+  border-color: var(--c2);
+  background: rgba(255, 92, 107, 0.2);
+}

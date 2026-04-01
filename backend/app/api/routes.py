@@ -1,0 +1,578 @@
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException
+from fastapi.responses import JSONResponse
+from typing import List, Optional
+import os
+import uuid
+from datetime import datetime
+
+from app.core.config import settings
+from app.models.schemas import *
+from app.services import parser, ai_service, job_service
+
+router = APIRouter()
+
+# In-memory storage for demo
+resume_store = {}
+progress_store = {}
+interview_sessions = {}
+
+# ============ Health & Status ============
+
+@router.get("/health")
+async def health_check():
+    return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+
+@router.get("/")
+async def root():
+    return {
+        "name": "SkillBridge AI API",
+        "version": "1.0.0",
+        "description": "Agentic Career Operating System",
+        "docs": "/docs"
+    }
+
+# ============ Resume Operations ============
+
+@router.post("/api/resume/upload")
+async def upload_resume(file: UploadFile = File(...)):
+    """Upload and parse resume"""
+    try:
+        # Validate file type
+        if not file.filename.endswith(('.pdf', '.docx', '.txt')):
+            raise HTTPException(400, "Only PDF, DOCX, and TXT files are supported")
+        
+        # Save file
+        file_id = str(uuid.uuid4())
+        file_path = os.path.join(settings.UPLOAD_DIR, f"{file_id}_{file.filename}")
+        
+        with open(file_path, "wb") as f:
+            content = await file.read()
+            f.write(content)
+        
+        # Parse resume
+        parsed_resume = parser.parse_resume(file_path)
+        
+        # Store in memory
+        resume_store[file_id] = parsed_resume
+        
+        # Clean up file
+        os.remove(file_path)
+        
+        return {
+            "resume_id": file_id,
+            "resume": parsed_resume.dict(),
+            "message": "Resume uploaded and parsed successfully"
+        }
+        
+    except Exception as e:
+        raise HTTPException(500, f"Error processing resume: {str(e)}")
+
+@router.get("/api/resume/sample")
+async def get_sample_resume():
+    """Get sample resume for demo"""
+    sample = parser.get_sample_resume()
+    resume_id = "sample_demo"
+    resume_store[resume_id] = sample
+    
+    return {
+        "resume_id": resume_id,
+        "resume": sample.dict()
+    }
+
+
+@router.post("/api/resume/analyze")
+async def analyze_resume(resume_id: str = Form(...)):
+    """Analyze resume for ATS score and problems"""
+    try:
+        if resume_id not in resume_store:
+            raise HTTPException(404, "Resume not found")
+        
+        resume = resume_store[resume_id]
+        
+        # Analyze with AI
+        analysis = await ai_service.analyze_resume_with_ai(resume.raw_text)
+        
+        # Convert to structured format
+        problems = [
+            ResumeProblem(
+                category="content",
+                severity="medium",
+                issue=problem,
+                suggestion="Improve this area"
+            )
+            for problem in analysis.get("problems", [])
+        ]
+        
+        ats_analysis = ATSAnalysis(
+            score=analysis.get("ats_score", 70),
+            keyword_match=0.65,
+            formatting_score=75,
+            readability_score=80,
+            problems=problems,
+            missing_keywords=analysis.get("missing_keywords", []),
+            strong_points=analysis.get("strong_points", [])
+        )
+        
+        # Get bullet improvements
+        improvements_data = await ai_service.improve_resume_bullets(
+            [exp.dict() for exp in resume.experiences],
+            ""
+        )
+        
+        bullet_improvements = [
+            BulletImprovement(**imp) for imp in improvements_data[:5]
+        ]
+        
+        result = ResumeAnalysisResult(
+            ats_analysis=ats_analysis,
+            problems=problems,
+            bullet_improvements=bullet_improvements,
+            recruiter_view="Your resume shows good experience but needs more quantifiable metrics.",
+            overall_rating="Good"
+        )
+        
+        return result.dict()
+        
+    except Exception as e:
+        raise HTTPException(500, f"Error analyzing resume: {str(e)}")
+
+# ============ JD Matching ============
+
+@router.post("/api/jd/match")
+async def match_jd(
+    resume_id: str = Form(...),
+    job_description: str = Form(...)
+):
+    """Match resume to job description with focus areas"""
+    try:
+        if resume_id not in resume_store:
+            raise HTTPException(404, "Resume not found")
+        
+        resume = resume_store[resume_id]
+        
+        # Match with AI
+        match_data = await ai_service.match_resume_to_jd(resume.raw_text, job_description)
+        
+        # Convert to structured format
+        focus_areas = [
+            FocusArea(**area) for area in match_data.get("focus_areas", [])
+        ]
+        
+        result = JDMatchResult(
+            match_percentage=match_data.get("match_percentage", 68),
+            hire_probability=match_data.get("hire_probability", "Medium"),
+            matched_skills=match_data.get("matched_skills", []),
+            missing_skills=match_data.get("missing_skills", []),
+            focus_areas=focus_areas,
+            interview_topics=match_data.get("interview_topics", []),
+            strengths=match_data.get("strengths", []),
+            weaknesses=match_data.get("weaknesses", [])
+        )
+        
+        return result.dict()
+        
+    except Exception as e:
+        raise HTTPException(500, f"Error matching JD: {str(e)}")
+
+
+# ============ Skill Gap & Roadmap ============
+
+@router.post("/api/skill-gap")
+async def analyze_skill_gap(
+    resume_id: str = Form(...),
+    job_description: str = Form(...)
+):
+    """Analyze skill gaps"""
+    try:
+        if resume_id not in resume_store:
+            raise HTTPException(404, "Resume not found")
+        
+        resume = resume_store[resume_id]
+        match_data = await ai_service.match_resume_to_jd(resume.raw_text, job_description)
+        
+        missing_skills = match_data.get("missing_skills", [])
+        
+        skill_gaps = [
+            SkillGap(
+                skill=skill,
+                current_level="None",
+                required_level="Intermediate",
+                gap_severity="Important",
+                learning_resources=[f"Learn {skill} tutorial", f"{skill} documentation"]
+            )
+            for skill in missing_skills
+        ]
+        
+        return {"skill_gaps": [gap.dict() for gap in skill_gaps]}
+        
+    except Exception as e:
+        raise HTTPException(500, f"Error analyzing skill gap: {str(e)}")
+
+@router.post("/api/roadmap")
+async def generate_roadmap(
+    resume_id: str = Form(...),
+    job_description: str = Form(...),
+    daily_hours: int = Form(2)
+):
+    """Generate personalized learning roadmap"""
+    try:
+        if resume_id not in resume_store:
+            raise HTTPException(404, "Resume not found")
+        
+        resume = resume_store[resume_id]
+        match_data = await ai_service.match_resume_to_jd(resume.raw_text, job_description)
+        
+        missing_skills = match_data.get("missing_skills", [])
+        roadmap_data = await ai_service.generate_roadmap(
+            resume.raw_text,
+            job_description,
+            missing_skills
+        )
+        
+        tasks = [RoadmapTask(**task) for task in roadmap_data.get("tasks", [])]
+        
+        roadmap = CareerRoadmap(
+            duration_weeks=roadmap_data.get("duration_weeks", 12),
+            daily_hours=daily_hours,
+            tasks=tasks,
+            milestones=roadmap_data.get("milestones", []),
+            completion_criteria=roadmap_data.get("completion_criteria", "Complete all tasks")
+        )
+        
+        return roadmap.dict()
+        
+    except Exception as e:
+        raise HTTPException(500, f"Error generating roadmap: {str(e)}")
+
+# ============ Quiz System ============
+
+@router.post("/api/quiz/generate")
+async def generate_quiz(
+    topic: str = Form(...),
+    difficulty: str = Form("Medium"),
+    count: int = Form(5)
+):
+    """Generate adaptive quiz questions"""
+    try:
+        questions_data = await ai_service.generate_quiz_questions(topic, difficulty, count)
+        
+        questions = [QuizQuestion(**q) for q in questions_data]
+        
+        return {"questions": [q.dict() for q in questions]}
+        
+    except Exception as e:
+        raise HTTPException(500, f"Error generating quiz: {str(e)}")
+
+@router.post("/api/quiz/evaluate")
+async def evaluate_quiz(answers: List[QuizAnswer]):
+    """Evaluate quiz answers and detect weak areas"""
+    try:
+        results = []
+        weak_topics = []
+        
+        for answer in answers:
+            # In real implementation, fetch question from storage
+            result_data = await ai_service.evaluate_quiz_answer(
+                "Sample question",
+                "Correct answer",
+                answer.user_answer
+            )
+            
+            result = QuizResult(
+                question_id=answer.question_id,
+                is_correct=result_data.get("is_correct", False),
+                score=result_data.get("score", 0),
+                explanation=result_data.get("explanation", ""),
+                weak_area=result_data.get("weak_area")
+            )
+            
+            results.append(result)
+            
+            if result.weak_area:
+                weak_topics.append(result.weak_area)
+        
+        correct = sum(1 for r in results if r.is_correct)
+        
+        performance = QuizPerformance(
+            total_questions=len(answers),
+            correct_answers=correct,
+            score_percentage=(correct / len(answers)) * 100 if answers else 0,
+            weak_topics=list(set(weak_topics)),
+            strong_topics=[],
+            topic_scores={},
+            recommendation="Focus on weak areas identified"
+        )
+        
+        return {
+            "results": [r.dict() for r in results],
+            "performance": performance.dict()
+        }
+        
+    except Exception as e:
+        raise HTTPException(500, f"Error evaluating quiz: {str(e)}")
+
+
+# ============ Interview System ============
+
+@router.post("/api/interview/start")
+async def start_interview(
+    job_description: str = Form(...),
+    mode: str = Form("Technical"),
+    count: int = Form(5)
+):
+    """Start mock interview session"""
+    try:
+        questions_data = await ai_service.generate_interview_questions(
+            job_description,
+            mode,
+            count
+        )
+        
+        questions = [InterviewQuestion(**q) for q in questions_data]
+        
+        session_id = str(uuid.uuid4())
+        session = InterviewSession(
+            session_id=session_id,
+            mode=mode,
+            questions=questions
+        )
+        
+        interview_sessions[session_id] = session
+        
+        return session.dict()
+        
+    except Exception as e:
+        raise HTTPException(500, f"Error starting interview: {str(e)}")
+
+@router.post("/api/interview/evaluate")
+async def evaluate_interview_answer(
+    session_id: str = Form(...),
+    question_id: str = Form(...),
+    answer: str = Form(...),
+    time_taken: int = Form(...)
+):
+    """Evaluate interview answer"""
+    try:
+        if session_id not in interview_sessions:
+            raise HTTPException(404, "Interview session not found")
+        
+        session = interview_sessions[session_id]
+        
+        # Find question
+        question = next((q for q in session.questions if q.id == question_id), None)
+        if not question:
+            raise HTTPException(404, "Question not found")
+        
+        # Evaluate with AI
+        feedback_data = await ai_service.evaluate_interview_answer(
+            question.question,
+            answer,
+            question.expected_keywords
+        )
+        
+        feedback = InterviewFeedback(
+            question_id=question_id,
+            score=feedback_data.get("score", 7),
+            strengths=feedback_data.get("strengths", []),
+            weaknesses=feedback_data.get("weaknesses", []),
+            model_answer=feedback_data.get("model_answer", ""),
+            confidence_level=feedback_data.get("confidence_level", "Medium"),
+            improvement_tips=feedback_data.get("improvement_tips", [])
+        )
+        
+        # Store answer and feedback
+        session.answers.append(InterviewAnswer(
+            question_id=question_id,
+            answer=answer,
+            time_taken_seconds=time_taken
+        ))
+        session.feedbacks.append(feedback)
+        
+        # Calculate overall score
+        if len(session.feedbacks) == len(session.questions):
+            avg_score = sum(f.score for f in session.feedbacks) / len(session.feedbacks)
+            session.overall_score = avg_score
+            session.readiness = "Ready" if avg_score >= 7 else "Needs Practice"
+        
+        return feedback.dict()
+        
+    except Exception as e:
+        raise HTTPException(500, f"Error evaluating answer: {str(e)}")
+
+@router.get("/api/interview/session/{session_id}")
+async def get_interview_session(session_id: str):
+    """Get interview session details"""
+    if session_id not in interview_sessions:
+        raise HTTPException(404, "Interview session not found")
+    
+    return interview_sessions[session_id].dict()
+
+
+# ============ Progress Tracking ============
+
+@router.post("/api/progress/track")
+async def track_progress(
+    resume_id: str = Form(...),
+    quiz_score: Optional[float] = Form(None),
+    interview_score: Optional[float] = Form(None),
+    completed_task: Optional[str] = Form(None)
+):
+    """Track learning progress"""
+    try:
+        if resume_id not in progress_store:
+            progress_store[resume_id] = ProgressMetrics()
+        
+        progress = progress_store[resume_id]
+        
+        if quiz_score is not None:
+            progress.quiz_scores.append(quiz_score)
+        
+        if interview_score is not None:
+            progress.interview_scores.append(interview_score)
+        
+        if completed_task:
+            progress.completed_tasks += 1
+        
+        progress.last_updated = datetime.now()
+        
+        # AI decision on next steps
+        avg_quiz = sum(progress.quiz_scores) / len(progress.quiz_scores) if progress.quiz_scores else 0
+        avg_interview = sum(progress.interview_scores) / len(progress.interview_scores) if progress.interview_scores else 0
+        
+        if avg_quiz >= 80 and avg_interview >= 7:
+            decision = AIDecision(
+                decision="ready_for_interviews",
+                reason="Strong performance in quizzes and mock interviews",
+                next_action="Start applying to jobs",
+                confidence=0.9
+            )
+        elif avg_quiz < 60:
+            decision = AIDecision(
+                decision="revise",
+                topic="Core concepts",
+                reason="Quiz scores indicate knowledge gaps",
+                next_action="Review weak topics and retake quizzes",
+                confidence=0.85
+            )
+        else:
+            decision = AIDecision(
+                decision="move_ahead",
+                reason="Good progress, continue learning",
+                next_action="Complete next roadmap tasks",
+                confidence=0.75
+            )
+        
+        return {
+            "progress": progress.dict(),
+            "ai_decision": decision.dict()
+        }
+        
+    except Exception as e:
+        raise HTTPException(500, f"Error tracking progress: {str(e)}")
+
+@router.get("/api/progress/{resume_id}")
+async def get_progress(resume_id: str):
+    """Get progress metrics"""
+    if resume_id not in progress_store:
+        raise HTTPException(404, "Progress not found")
+    
+    return progress_store[resume_id].dict()
+
+# ============ Job Search ============
+
+@router.post("/api/jobs/search")
+async def search_jobs(
+    resume_id: str = Form(...),
+    role: str = Form(...),
+    location: str = Form("India"),
+    remote: bool = Form(False)
+):
+    """Search for matching jobs"""
+    try:
+        if resume_id not in resume_store:
+            raise HTTPException(404, "Resume not found")
+        
+        resume = resume_store[resume_id]
+        
+        preferences = {
+            "role": role,
+            "location": location,
+            "remote": remote
+        }
+        
+        jobs = await job_service.find_matching_jobs(resume, preferences)
+        
+        return {"jobs": [job.dict() for job in jobs]}
+        
+    except Exception as e:
+        raise HTTPException(500, f"Error searching jobs: {str(e)}")
+
+# ============ Daily Coaching ============
+
+@router.get("/api/coach/daily")
+async def get_daily_coaching(resume_id: str):
+    """Get daily coaching message"""
+    try:
+        today = datetime.now().strftime("%Y-%m-%d")
+        
+        coaching = DailyCoaching(
+            date=today,
+            reminder="Complete today's roadmap task",
+            motivation="You're making great progress! Keep going!",
+            suggestion="Practice coding for 30 minutes today",
+            focus_topic="Docker containerization"
+        )
+        
+        return coaching.dict()
+        
+    except Exception as e:
+        raise HTTPException(500, f"Error getting coaching: {str(e)}")
+
+# ============ Portfolio Projects ============
+
+@router.post("/api/portfolio/suggest")
+async def suggest_portfolio_projects(
+    resume_id: str = Form(...),
+    target_role: str = Form(...)
+):
+    """Suggest portfolio projects"""
+    try:
+        # Sample suggestions based on role
+        if "frontend" in target_role.lower():
+            projects = [
+                ProjectSuggestion(
+                    name="Real-time Chat Application",
+                    description="Build a chat app with WebSocket, user authentication, and message history",
+                    difficulty="Medium",
+                    technologies=["React", "Node.js", "Socket.io", "MongoDB"],
+                    estimated_days=14,
+                    learning_outcomes=["Real-time communication", "WebSocket", "State management"],
+                    resources=["Socket.io docs", "React tutorial"]
+                ),
+                ProjectSuggestion(
+                    name="Netflix Clone",
+                    description="Streaming platform UI with movie browsing and video playback",
+                    difficulty="Hard",
+                    technologies=["React", "TypeScript", "Tailwind", "Firebase"],
+                    estimated_days=21,
+                    learning_outcomes=["Complex UI", "API integration", "Authentication"],
+                    resources=["React docs", "Firebase tutorial"]
+                )
+            ]
+        else:
+            projects = [
+                ProjectSuggestion(
+                    name="REST API with Authentication",
+                    description="Build a secure API with JWT authentication and CRUD operations",
+                    difficulty="Medium",
+                    technologies=["Python", "FastAPI", "PostgreSQL", "JWT"],
+                    estimated_days=10,
+                    learning_outcomes=["API design", "Security", "Database"],
+                    resources=["FastAPI docs", "JWT tutorial"]
+                )
+            ]
+        
+        return {"projects": [p.dict() for p in projects]}
+        
+    except Exception as e:
+        raise HTTPException(500, f"Error suggesting projects: {str(e)}")
