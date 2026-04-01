@@ -719,6 +719,9 @@ const DashboardOverview = () => {
 const ResumeAnalyzer = () => {
   const [uploaded, setUploaded] = useState(false);
   const [dragging, setDragging] = useState(false);
+  const [fileName, setFileName] = useState("");
+  const [fileSize, setFileSize] = useState("");
+  const fileInputRef = useRef(null);
 
   const issues = [
     { type: "error", text: "Missing quantified achievements in Experience section" },
@@ -732,6 +735,50 @@ const ResumeAnalyzer = () => {
     "Rewrite summary targeting Senior Software Engineer roles",
   ];
 
+  const handleFileSelect = (file) => {
+    if (file) {
+      const sizeInKB = Math.round(file.size / 1024);
+      setFileName(file.name);
+      setFileSize(`${sizeInKB} KB`);
+      setUploaded(true);
+    }
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setDragging(false);
+    const file = e.dataTransfer.files[0];
+    if (file && (file.type === "application/pdf" || file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document")) {
+      handleFileSelect(file);
+    }
+  };
+
+  const handleBrowseClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileInputChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      handleFileSelect(file);
+    }
+  };
+
+  const handleSampleResume = () => {
+    const sampleNames = [
+      "John_Doe_Resume_2025.pdf",
+      "Sarah_Johnson_Resume.pdf",
+      "Michael_Chen_SWE_Resume.pdf",
+      "Emily_Williams_Resume.pdf",
+      "David_Kumar_Resume_2025.pdf"
+    ];
+    const randomName = sampleNames[Math.floor(Math.random() * sampleNames.length)];
+    const randomSize = Math.floor(Math.random() * (350 - 180) + 180);
+    setFileName(randomName);
+    setFileSize(`${randomSize} KB`);
+    setUploaded(true);
+  };
+
   return (
     <div style={{ padding: 28, display: "flex", flexDirection: "column", gap: 22, animation: "fadeIn 0.4s ease" }}>
       <div>
@@ -743,24 +790,35 @@ const ResumeAnalyzer = () => {
         <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
           {/* Upload */}
           {!uploaded ? (
-            <div
-              onDragOver={e => { e.preventDefault(); setDragging(true); }}
-              onDragLeave={() => setDragging(false)}
-              onDrop={e => { e.preventDefault(); setDragging(false); setUploaded(true); }}
-              onClick={() => setUploaded(true)}
-              style={{
-                border: `2px dashed ${dragging ? "var(--gray-600)" : "var(--gray-200)"}`,
-                borderRadius: "var(--radius-lg)", padding: "48px 32px",
-                textAlign: "center", cursor: "pointer",
-                background: dragging ? "var(--gray-50)" : "transparent",
-                transition: "all var(--transition)",
-              }}>
-              <div style={{ width: 48, height: 48, borderRadius: 14, background: "var(--gray-100)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
-                <Icon name="upload" size={22} color="var(--gray-500)"/>
+            <div>
+              <div
+                onDragOver={e => { e.preventDefault(); setDragging(true); }}
+                onDragLeave={() => setDragging(false)}
+                onDrop={handleDrop}
+                style={{
+                  border: `2px dashed ${dragging ? "var(--gray-600)" : "var(--gray-200)"}`,
+                  borderRadius: "var(--radius-lg)", padding: "48px 32px",
+                  textAlign: "center", cursor: "pointer",
+                  background: dragging ? "var(--gray-50)" : "transparent",
+                  transition: "all var(--transition)",
+                }}>
+                <div style={{ width: 48, height: 48, borderRadius: 14, background: "var(--gray-100)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+                  <Icon name="upload" size={22} color="var(--gray-500)"/>
+                </div>
+                <div style={{ fontSize: 15, fontWeight: 600, color: "var(--gray-800)", marginBottom: 6 }}>Drop your resume here</div>
+                <div style={{ fontSize: 13, color: "var(--gray-400)", marginBottom: 20 }}>PDF, DOCX supported · Max 5MB</div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,.doc,.docx"
+                  onChange={handleFileInputChange}
+                  style={{ display: "none" }}
+                />
+                <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+                  <Btn variant="secondary" onClick={handleBrowseClick} style={{ padding: "8px 20px", fontSize: 13 }}>Browse files</Btn>
+                  <Btn variant="ghost" onClick={handleSampleResume} style={{ padding: "8px 20px", fontSize: 13 }}>Use sample resume</Btn>
+                </div>
               </div>
-              <div style={{ fontSize: 15, fontWeight: 600, color: "var(--gray-800)", marginBottom: 6 }}>Drop your resume here</div>
-              <div style={{ fontSize: 13, color: "var(--gray-400)" }}>PDF, DOCX supported · Max 5MB</div>
-              <Btn variant="secondary" style={{ marginTop: 20, padding: "8px 20px", fontSize: 13 }}>Browse files</Btn>
             </div>
           ) : (
             <div>
@@ -770,8 +828,8 @@ const ResumeAnalyzer = () => {
                     <Icon name="resume" size={18} color="var(--gray-600)"/>
                   </div>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: "var(--gray-900)" }}>Aryan_Sharma_Resume_2025.pdf</div>
-                    <div style={{ fontSize: 12, color: "var(--gray-400)" }}>Uploaded · 245 KB</div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: "var(--gray-900)" }}>{fileName}</div>
+                    <div style={{ fontSize: 12, color: "var(--gray-400)" }}>Uploaded · {fileSize}</div>
                   </div>
                   <Badge variant="success">Analyzed</Badge>
                   <button onClick={() => setUploaded(false)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
@@ -837,7 +895,7 @@ const ResumeAnalyzer = () => {
       </div>
     </div>
   );
-};
+}
 
 // ─── JD Matcher ───────────────────────────────────────────────────────────────
 const JDMatcher = () => {
@@ -1238,7 +1296,7 @@ const JobFinder = () => {
 
 // ─── Dashboard Shell ──────────────────────────────────────────────────────────
 const Dashboard = () => {
-  const [active, setActive] = useState("dashboard");
+  const [active, setActive] = useState("resume");
 
   const pages = {
     dashboard: { component: <DashboardOverview/>, title: "Overview" },
