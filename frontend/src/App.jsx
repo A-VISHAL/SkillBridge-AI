@@ -1731,6 +1731,9 @@ const JobFinder = ({ resumeId, resumeData }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState("");
+  const [location, setLocation] = useState("India");
+  const [activeChip, setActiveChip] = useState("all");
+  const [savedJobs, setSavedJobs] = useState({});
 
   const deriveRoleFromResume = (data) => {
     if (data?.experiences?.length > 0) {
@@ -1769,7 +1772,7 @@ const JobFinder = ({ resumeId, resumeData }) => {
       const formData = new FormData();
       formData.append("resume_id", resumeId);
       formData.append("role", role || "Software Engineer");
-      formData.append("location", "India");
+      formData.append("location", location || "India");
       formData.append("remote", "false");
 
       const response = await fetch("http://localhost:8000/api/jobs/search", {
@@ -1798,38 +1801,148 @@ const JobFinder = ({ resumeId, resumeData }) => {
     }
   }, [resumeId]);
 
+  const filterByChip = (job) => {
+    const match = Math.round(job.match_percentage || 0);
+    const title = (job.title || "").toLowerCase();
+
+    if (activeChip === "high") return match >= 70;
+    if (activeChip === "entry") return /junior|intern|trainee|associate|graduate/.test(title);
+    if (activeChip === "remote") return (job.location || "").toLowerCase().includes("remote");
+    if (activeChip === "saved") return Boolean(savedJobs[job.id]);
+    return true;
+  };
+
   const filteredJobs = jobs.filter((job) => {
     const haystack = `${job.title || ""} ${job.company || ""} ${job.location || ""}`.toLowerCase();
-    return haystack.includes(filter.toLowerCase());
+    return haystack.includes(filter.toLowerCase()) && filterByChip(job);
   });
+
+  const toggleSave = (jobId) => {
+    setSavedJobs((prev) => ({ ...prev, [jobId]: !prev[jobId] }));
+  };
+
+  const quickChips = [
+    { id: "all", label: "All jobs" },
+    { id: "high", label: "70%+ match" },
+    { id: "entry", label: "Entry level" },
+    { id: "remote", label: "Remote" },
+    { id: "saved", label: "Saved" },
+  ];
 
   return (
     <div style={{ padding: 28, animation: "fadeIn 0.4s ease" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "1fr auto",
+        gap: 14,
+        marginBottom: 20,
+        alignItems: "start",
+      }}>
         <div>
           <h2 style={{ fontSize: 20, fontWeight: 700, color: "var(--gray-900)", letterSpacing: "-0.04em", marginBottom: 4 }}>Job Finder</h2>
           <p style={{ fontSize: 13.5, color: "var(--gray-500)" }}>
             {loading ? "Finding jobs from your extracted resume data..." : `${filteredJobs.length} curated roles matched to your profile.`}
           </p>
+          <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+            <Badge variant="default">Role: {role || "Software Engineer"}</Badge>
+            <Badge variant="default">Location: {location}</Badge>
+            <Badge variant="default">Saved: {Object.values(savedJobs).filter(Boolean).length}</Badge>
+          </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ display: "grid", gap: 10 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--gray-50)", border: "1px solid var(--gray-200)", borderRadius: 99, padding: "8px 14px" }}>
             <Icon name="search" size={14} color="var(--gray-400)"/>
             <input
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
               placeholder="Filter jobs..."
-              style={{ border: "none", background: "transparent", fontSize: 13, color: "var(--gray-600)", outline: "none", fontFamily: "inherit", width: 140 }}
+              style={{ border: "none", background: "transparent", fontSize: 13, color: "var(--gray-600)", outline: "none", fontFamily: "inherit", width: 170 }}
             />
           </div>
-          <Btn variant="secondary" onClick={fetchJobs} style={{ padding: "8px 14px", fontSize: 13 }}>Refresh</Btn>
+          <div style={{ display: "flex", gap: 8 }}>
+            <input
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+              placeholder="Target role"
+              style={{
+                border: "1px solid var(--gray-200)",
+                background: "var(--white)",
+                fontSize: 12.5,
+                color: "var(--gray-700)",
+                outline: "none",
+                fontFamily: "inherit",
+                borderRadius: 99,
+                padding: "8px 12px",
+                width: 140,
+              }}
+            />
+            <input
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              placeholder="Location"
+              style={{
+                border: "1px solid var(--gray-200)",
+                background: "var(--white)",
+                fontSize: 12.5,
+                color: "var(--gray-700)",
+                outline: "none",
+                fontFamily: "inherit",
+                borderRadius: 99,
+                padding: "8px 12px",
+                width: 120,
+              }}
+            />
+            <Btn variant="secondary" onClick={fetchJobs} style={{ padding: "8px 14px", fontSize: 13 }}>Refresh</Btn>
+          </div>
         </div>
+      </div>
+
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
+        {quickChips.map((chip) => (
+          <button
+            key={chip.id}
+            onClick={() => setActiveChip(chip.id)}
+            style={{
+              border: activeChip === chip.id ? "1px solid var(--gray-700)" : "1px solid var(--gray-200)",
+              background: activeChip === chip.id ? "var(--gray-900)" : "var(--white)",
+              color: activeChip === chip.id ? "var(--white)" : "var(--gray-700)",
+              borderRadius: 99,
+              padding: "6px 12px",
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: "pointer",
+              transition: "all var(--transition)",
+            }}
+          >
+            {chip.label}
+          </button>
+        ))}
       </div>
 
       {error && (
         <Card style={{ marginBottom: 14, padding: "14px 16px", border: "1px solid #fde68a", background: "#fffbeb" }}>
           <div style={{ fontSize: 13, color: "#92400e", fontWeight: 600 }}>{error}</div>
         </Card>
+      )}
+
+      {loading && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 14 }}>
+          {Array.from({ length: 6 }).map((_, idx) => (
+            <Card key={idx} style={{ padding: "20px 22px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14 }}>
+                <div style={{ width: 40, height: 40, borderRadius: 12, background: "linear-gradient(90deg, var(--gray-100), var(--gray-150), var(--gray-100))", backgroundSize: "250% 100%", animation: "shimmer 1.8s infinite" }}/>
+                <div style={{ width: 72, height: 20, borderRadius: 99, background: "linear-gradient(90deg, var(--gray-100), var(--gray-150), var(--gray-100))", backgroundSize: "250% 100%", animation: "shimmer 1.8s infinite" }}/>
+              </div>
+              <div style={{ width: "75%", height: 14, borderRadius: 6, marginBottom: 8, background: "linear-gradient(90deg, var(--gray-100), var(--gray-150), var(--gray-100))", backgroundSize: "250% 100%", animation: "shimmer 1.8s infinite" }}/>
+              <div style={{ width: "45%", height: 12, borderRadius: 6, marginBottom: 14, background: "linear-gradient(90deg, var(--gray-100), var(--gray-150), var(--gray-100))", backgroundSize: "250% 100%", animation: "shimmer 1.8s infinite" }}/>
+              <div style={{ width: "100%", height: 4, borderRadius: 99, marginBottom: 14, background: "linear-gradient(90deg, var(--gray-100), var(--gray-150), var(--gray-100))", backgroundSize: "250% 100%", animation: "shimmer 1.8s infinite" }}/>
+              <div style={{ display: "flex", gap: 8 }}>
+                <div style={{ flex: 2, height: 34, borderRadius: 99, background: "linear-gradient(90deg, var(--gray-100), var(--gray-150), var(--gray-100))", backgroundSize: "250% 100%", animation: "shimmer 1.8s infinite" }}/>
+                <div style={{ flex: 1, height: 34, borderRadius: 99, background: "linear-gradient(90deg, var(--gray-100), var(--gray-150), var(--gray-100))", backgroundSize: "250% 100%", animation: "shimmer 1.8s infinite" }}/>
+              </div>
+            </Card>
+          ))}
+        </div>
       )}
 
       {!loading && !error && filteredJobs.length === 0 && (
@@ -1840,12 +1953,25 @@ const JobFinder = ({ resumeId, resumeData }) => {
         </Card>
       )}
 
+      {!loading && (
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 14 }}>
         {filteredJobs.map((job, i) => {
           const match = Math.round(job.match_percentage || 0);
           const company = job.company || "Company";
+          const skills = (job.required_skills || []).slice(0, 4);
+          const isSaved = Boolean(savedJobs[job.id]);
           return (
-          <Card key={i} style={{ padding: "20px 22px" }}>
+          <Card key={i} style={{ padding: "20px 22px", overflow: "hidden", position: "relative" }}>
+            <div style={{
+              position: "absolute",
+              right: -40,
+              top: -40,
+              width: 120,
+              height: 120,
+              borderRadius: "50%",
+              background: match >= 70 ? "radial-gradient(circle, rgba(16,185,129,0.15), transparent 70%)" : "radial-gradient(circle, rgba(59,130,246,0.12), transparent 70%)",
+              pointerEvents: "none",
+            }}/>
             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 14 }}>
               <div style={{ width: 40, height: 40, borderRadius: 12, background: "var(--gray-100)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700, color: "var(--gray-700)" }}>
                 {company[0]}
@@ -1860,9 +1986,37 @@ const JobFinder = ({ resumeId, resumeData }) => {
               <span>📍 {job.location || "India"}</span>
               <span>· {job.source || "Job Board"}</span>
             </div>
+            {job.salary && (
+              <div style={{ fontSize: 12, color: "var(--gray-500)", marginBottom: 10, fontWeight: 600 }}>
+                Salary: {job.salary}
+              </div>
+            )}
             <div style={{ height: 3, background: "var(--gray-100)", borderRadius: 99, marginBottom: 14 }}>
-              <div style={{ height: "100%", borderRadius: 99, width: `${match}%`, background: "linear-gradient(90deg, var(--gray-700), var(--gray-400))" }}/>
+              <div style={{
+                height: "100%",
+                borderRadius: 99,
+                width: `${match}%`,
+                background: match >= 70 ? "linear-gradient(90deg, #10b981, #34d399)" : "linear-gradient(90deg, var(--gray-700), var(--gray-400))",
+                transition: "width 0.9s cubic-bezier(0.22, 1, 0.36, 1)",
+              }}/>
             </div>
+            {skills.length > 0 && (
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
+                {skills.map((skill, idx) => (
+                  <span key={idx} style={{
+                    fontSize: 11.5,
+                    padding: "4px 8px",
+                    borderRadius: 99,
+                    border: "1px solid var(--gray-200)",
+                    background: "var(--gray-50)",
+                    color: "var(--gray-600)",
+                    fontWeight: 600,
+                  }}>
+                    {skill}
+                  </span>
+                ))}
+              </div>
+            )}
             <div style={{ display: "flex", gap: 8 }}>
               <Btn
                 variant="primary"
@@ -1871,14 +2025,22 @@ const JobFinder = ({ resumeId, resumeData }) => {
               >
                 Apply now
               </Btn>
-              <Btn variant="secondary" onClick={() => navigator.clipboard?.writeText(job.apply_link || "")} style={{ flex: 1, justifyContent: "center", padding: "8px", fontSize: 13 }}>
-                Save
+              <Btn
+                variant={isSaved ? "primary" : "secondary"}
+                onClick={() => {
+                  toggleSave(job.id);
+                  navigator.clipboard?.writeText(job.apply_link || "");
+                }}
+                style={{ flex: 1, justifyContent: "center", padding: "8px", fontSize: 13 }}
+              >
+                {isSaved ? "Saved" : "Save"}
               </Btn>
             </div>
           </Card>
           );
         })}
       </div>
+      )}
     </div>
   );
 };

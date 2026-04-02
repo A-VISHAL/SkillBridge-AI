@@ -26,8 +26,21 @@ Adaptive AI Decisions → Job Matching → Continuous Loop
 - Python 3.9+
 - Node.js 18+
 - npm or yarn
+- Anthropic Claude API key (optional, for AI-powered parsing)
 
-### Backend Setup
+### One-Command Start (Windows)
+```bash
+# Simply run the start script
+start.bat
+```
+
+This will automatically:
+1. Start the backend server on http://localhost:8000
+2. Start the frontend server on http://localhost:5173
+
+### Manual Setup
+
+#### Backend Setup
 ```bash
 cd backend
 python -m venv venv
@@ -35,13 +48,13 @@ venv\Scripts\activate  # Windows
 source venv/bin/activate  # Mac/Linux
 pip install -r requirements.txt
 cp .env.example .env
-# Edit .env with your API keys (optional for demo mode)
-python main.py
+# Edit .env with your Anthropic API key
+python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 Backend runs on: **http://localhost:8000**
 
-### Frontend Setup
+#### Frontend Setup
 ```bash
 cd frontend
 npm install
@@ -59,6 +72,8 @@ Frontend runs on: **http://localhost:5173**
 **What it does:** AI-powered resume analysis with ATS scoring and improvements
 
 **Features:**
+- **Dual Parsing System**: AI-powered (Anthropic Claude) + Regex fallback
+- Intelligent extraction of Experience, Education, Skills, Projects
 - ATS Score (0-100)
 - Missing keywords detection
 - Weak bullet points identification
@@ -68,9 +83,12 @@ Frontend runs on: **http://localhost:5173**
 
 **How it works:**
 1. Upload resume (PDF/DOCX/TXT)
-2. AI extracts and analyzes content
-3. Generates ATS score and detailed feedback
-4. Provides rewritten bullet points with metrics
+2. AI extracts structured data using Claude API
+3. Parses Experience (title, company, duration, descriptions)
+4. Parses Education (degree, institution, year, CGPA)
+5. Extracts Skills and Projects with technologies
+6. Generates ATS score and detailed feedback
+7. Provides rewritten bullet points with metrics
 
 **Example Output:**
 ```json
@@ -367,12 +385,15 @@ backend/
 │   ├── models/
 │   │   └── schemas.py         # 30+ Pydantic models
 │   ├── services/
-│   │   ├── parser.py          # Resume parsing (PDF/DOCX/TXT)
+│   │   ├── parser.py          # Regex-based resume parsing
+│   │   ├── ai_parser.py       # AI-powered parsing (Anthropic Claude)
 │   │   ├── ai_service.py      # AI/LLM integration
 │   │   └── job_service.py     # Job search APIs
 │   └── utils/
 ├── main.py                     # FastAPI application
-└── requirements.txt
+├── requirements.txt
+├── .env                        # Environment variables (not in git)
+└── .env.example                # Example configuration
 ```
 
 ### Frontend (React/Vite)
@@ -398,6 +419,13 @@ frontend/
 ---
 
 ## 🎨 Design System (Apple-Inspired Light Theme)
+
+### Visual Features
+- **Subtle Animated Particles**: Floating background animations throughout the app
+- **Horizontal Timeline**: "From zero to hired in 4 steps" process visualization
+- **Card-Based Layout**: Separate cards for Personal Info, Skills, Experience, Education, Projects
+- **Smooth Transitions**: All interactions have smooth animations
+- **Responsive Design**: Works on desktop, tablet, and mobile
 
 ### Color Palette (Monochromatic)
 ```css
@@ -551,9 +579,10 @@ font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display',
 ## 📡 API Endpoints
 
 ### Resume Operations
-- `POST /api/resume/upload` - Upload and parse resume
+- `POST /api/resume/upload` - Upload and parse resume (AI-powered)
 - `GET /api/resume/sample` - Get sample resume
 - `POST /api/resume/analyze` - Analyze resume (ATS score, problems)
+- `GET /api/test-ai` - Test AI API connection (Anthropic Claude)
 
 ### JD Matching
 - `POST /api/jd/match` - Match resume to job description
@@ -589,9 +618,9 @@ font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display',
 Create a `.env` file in the backend directory:
 
 ```bash
-# AI Service (Oxlo API)
-OXLO_API_KEY=your_oxlo_api_key_here
-OXLO_CHAT_ENDPOINT=https://api.oxlo.ai/v1/chat
+# AI Service (Anthropic Claude API)
+OXLO_API_KEY=your_anthropic_api_key_here
+OXLO_CHAT_ENDPOINT=https://api.anthropic.com/v1/messages
 OXLO_EMBEDDINGS_ENDPOINT=https://api.oxlo.ai/v1/embeddings
 
 # Job Search APIs
@@ -600,16 +629,24 @@ ADZUNA_APP_KEY=your_adzuna_app_key
 RAPIDAPI_KEY=your_rapidapi_key
 
 # Server Configuration
-CORS_ORIGINS=http://localhost:5173
+CORS_ORIGINS=http://localhost:5173,http://localhost:3000
 UPLOAD_DIR=./uploads
 MAX_FILE_SIZE_MB=5
 
-# Optional: Redis for caching
+# Redis (optional)
 REDIS_URL=redis://localhost:6379
 CACHE_TTL_MINUTES=15
+
+# Job Search Config
+MAX_JOBS_PER_QUERY=50
+MIN_SKILL_MATCH_RATIO=0.6
+API_TIMEOUT_SECONDS=10
 ```
 
-**Note:** The application works in demo mode without API keys!
+**Note:** 
+- The application uses **Anthropic Claude API** for AI-powered resume parsing and analysis
+- Get your API key from: https://console.anthropic.com/
+- The application works with fallback regex parsing if no API key is provided
 
 ---
 
@@ -689,7 +726,8 @@ vercel --prod
 - Pydantic (Data validation)
 - PyMuPDF (PDF parsing)
 - python-docx (DOCX parsing)
-- Oxlo API (AI/LLM)
+- httpx (Async HTTP client)
+- Anthropic Claude API (AI-powered resume parsing)
 - Adzuna API (Job search)
 
 **Frontend:**

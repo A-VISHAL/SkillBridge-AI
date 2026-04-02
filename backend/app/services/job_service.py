@@ -1,5 +1,6 @@
 import httpx
 from typing import List, Dict, Any
+from urllib.parse import quote_plus
 from app.core.config import settings
 from app.models.schemas import JobListing, ParsedResume
 
@@ -103,6 +104,45 @@ def _job_id(job: Dict) -> str:
     return str(job.get("id") or job.get("job_id") or "")
 
 
+def _build_entry_level_fallback_jobs(resume: ParsedResume, preferences: Dict) -> List[JobListing]:
+    """Build basic entry-level jobs when external APIs return no jobs."""
+    location = preferences.get("location", "India")
+    titles = [
+        "Junior Software Developer",
+        "Trainee Python Developer",
+        "Graduate Engineer Trainee",
+        "Associate Software Engineer",
+        "Junior Backend Developer",
+        "Junior Frontend Developer",
+    ]
+
+    if resume.skills:
+        skill_names = [skill.name for skill in resume.skills if skill.name][:2]
+        if skill_names:
+            titles[0] = f"Junior {skill_names[0]} Developer"
+
+    fallback_jobs: List[JobListing] = []
+    for idx, title in enumerate(titles):
+        query = quote_plus(f"{title} {location}")
+        fallback_jobs.append(
+            JobListing(
+                id=f"fallback-{idx + 1}",
+                title=title,
+                company="Hiring Partner",
+                location=location,
+                match_percentage=max(25.0, 45.0 - idx * 3),
+                salary="Not disclosed",
+                description="Entry-level opportunity suitable for early-career candidates and freshers.",
+                required_skills=[skill.name for skill in resume.skills[:4] if skill.name],
+                apply_link=f"https://www.linkedin.com/jobs/search/?keywords={query}",
+                posted_date="",
+                source="Fallback",
+            )
+        )
+
+    return fallback_jobs
+
+
 def calculate_job_match(resume: ParsedResume, job: Dict) -> float:
     """Calculate match percentage between resume and job"""
     
@@ -139,38 +179,50 @@ async def find_matching_jobs(resume: ParsedResume, preferences: Dict) -> List[Jo
     seen_job_keys = set()
     
     # Convert to JobListing format with match scores
-    job_listings = []
+    matched_jobs: List[JobListing] = []
+    all_scored_jobs: List[JobListing] = []
     for job in all_jobs:
         dedupe_key = (_job_title(job).lower(), _job_company(job).lower(), _job_location(job).lower())
         if dedupe_key in seen_job_keys:
             continue
         seen_job_keys.add(dedupe_key)
 
-        if len(job_listings) >= settings.MAX_JOBS_PER_QUERY:
+        if len(all_scored_jobs) >= settings.MAX_JOBS_PER_QUERY:
             break
 
         match_percentage = calculate_job_match(resume, job)
-        
-        # Filter by minimum match ratio
+
+        listing = JobListing(
+            id=_job_id(job),
+            title=_job_title(job),
+            company=_job_company(job),
+            location=_job_location(job),
+            match_percentage=match_percentage,
+            salary=_format_salary(job),
+            description=_job_description(job)[:500],
+            required_skills=_extract_skills_from_job(job),
+            apply_link=_job_apply_link(job),
+            posted_date=_job_posted_date(job),
+            source="Adzuna" if job in jobs_adzuna else "RapidAPI",
+        )
+        all_scored_jobs.append(listing)
+
+        # Strict matching first.
         if match_percentage >= settings.MIN_SKILL_MATCH_RATIO * 100:
-            job_listings.append(JobListing(
-                id=_job_id(job),
-                title=_job_title(job),
-                company=_job_company(job),
-                location=_job_location(job),
-                match_percentage=match_percentage,
-                salary=_format_salary(job),
-                description=_job_description(job)[:500],
-                required_skills=_extract_skills_from_job(job),
-                apply_link=_job_apply_link(job),
-                posted_date=_job_posted_date(job),
-                source="Adzuna" if job in jobs_adzuna else "RapidAPI"
-            ))
-    
-    # Sort by match percentage
-    job_listings.sort(key=lambda x: x.match_percentage, reverse=True)
-    
-    return job_listings
+            matched_jobs.append(listing)
+
+    # Prefer strict matches.
+    if matched_jobs:
+        matched_jobs.sort(key=lambda x: x.match_percentage, reverse=True)
+        return matched_jobs
+
+    # If no strict matches, still show lower-match API jobs instead of empty state.
+    if all_scored_jobs:
+        all_scored_jobs.sort(key=lambda x: x.match_percentage, reverse=True)
+        return all_scored_jobs[: min(12, len(all_scored_jobs))]
+
+    # If API returned nothing, provide entry-level fallback suggestions.
+    return _build_entry_level_fallback_jobs(resume, preferences)
 
 def _format_salary(job: Dict) -> str:
     """Format salary information"""
