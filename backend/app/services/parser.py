@@ -266,7 +266,30 @@ def parse_resume(file_path: str) -> ParsedResume:
     print(text[:500])  # Print first 500 chars
     print("=" * 50)
     
-    # Extract all components
+    # Try AI parsing first if API key is available
+    from app.core.config import settings
+    if settings.OXLO_API_KEY:
+        print("Attempting AI-powered parsing...")
+        try:
+            import asyncio
+            from app.services.ai_parser import parse_resume_with_ai
+            
+            # Run async function in sync context
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            ai_result = loop.run_until_complete(parse_resume_with_ai(text))
+            loop.close()
+            
+            if ai_result:
+                print("✓ AI parsing successful!")
+                return ai_result
+            else:
+                print("✗ AI parsing failed, falling back to regex parser")
+        except Exception as e:
+            print(f"✗ AI parsing error: {e}, falling back to regex parser")
+    
+    # Fallback to regex parsing
+    print("Using regex-based parsing...")
     experiences = extract_experiences(text)
     education = extract_education(text)
     projects = extract_projects(text)
