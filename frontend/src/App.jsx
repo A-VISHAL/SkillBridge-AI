@@ -451,23 +451,87 @@ const LandingPage = ({ onEnterApp }) => {
       </section>
 
       {/* How it works */}
-      <section data-key="howto" style={{ maxWidth: 1100, margin: "0 auto", padding: "80px 24px" }}>
-        <div style={{ textAlign: "center", marginBottom: 64 }}>
-          <div style={{ fontSize: 12, color: "var(--gray-400)", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 12 }}>How it works</div>
-          <h2 style={{ fontSize: "clamp(28px, 4vw, 42px)", fontWeight: 700, letterSpacing: "-0.035em", color: "var(--gray-900)" }}>
+      <section data-key="howto" style={{ maxWidth: 1200, margin: "0 auto", padding: "100px 24px" }}>
+        <div style={{ textAlign: "center", marginBottom: 80 }}>
+          <div style={{ fontSize: 11, color: "var(--gray-400)", fontWeight: 600, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 14 }}>PROCESS</div>
+          <h2 style={{ fontSize: "clamp(32px, 5vw, 48px)", fontWeight: 700, letterSpacing: "-0.04em", color: "var(--gray-900)", lineHeight: 1.1 }}>
             From zero to hired in 4 steps
           </h2>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 2 }}>
+        
+        {/* Horizontal Timeline */}
+        <div style={{ 
+          display: "flex", 
+          alignItems: "flex-start", 
+          justifyContent: "space-between",
+          gap: 40,
+          position: "relative",
+          maxWidth: 1100,
+          margin: "0 auto"
+        }}>
           {steps.map((s, i) => (
             <div key={s.num} style={{
-              padding: "32px 28px",
-              borderRight: i < steps.length - 1 ? "1px solid var(--gray-150)" : "none",
-              ...(visible.howto ? { animation: `fadeUp 0.6s ${i * 0.1}s ease forwards` } : { opacity: 0 }),
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              textAlign: "center",
+              position: "relative",
+              ...(visible.howto ? { animation: `fadeUp 0.7s ${i * 0.15}s ease forwards` } : { opacity: 0 }),
             }}>
-              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.12em", color: "var(--gray-300)", marginBottom: 16, fontFamily: "'DM Mono', monospace" }}>{s.num}</div>
-              <h3 style={{ fontSize: 16, fontWeight: 650, color: "var(--gray-900)", marginBottom: 10, letterSpacing: "-0.02em" }}>{s.title}</h3>
-              <p style={{ fontSize: 13.5, color: "var(--gray-500)", lineHeight: 1.65 }}>{s.desc}</p>
+              {/* Step Number Circle */}
+              <div style={{
+                width: 56,
+                height: 56,
+                borderRadius: "50%",
+                background: "var(--gray-100)",
+                border: "1px solid var(--gray-200)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                marginBottom: 24,
+                fontSize: 16,
+                fontWeight: 700,
+                color: "var(--gray-400)",
+                fontFamily: "'DM Mono', monospace",
+                transition: "all 0.3s ease"
+              }}>
+                {s.num}
+              </div>
+              
+              {/* Connecting Line */}
+              {i < steps.length - 1 && (
+                <div style={{
+                  position: "absolute",
+                  top: 28,
+                  left: "calc(50% + 28px)",
+                  width: "calc(100% - 56px)",
+                  height: 2,
+                  background: "var(--gray-200)",
+                  zIndex: -1
+                }}/>
+              )}
+              
+              {/* Content */}
+              <div>
+                <h3 style={{ 
+                  fontSize: 17, 
+                  fontWeight: 700, 
+                  color: "var(--gray-900)", 
+                  marginBottom: 12, 
+                  letterSpacing: "-0.02em" 
+                }}>
+                  {s.title}
+                </h3>
+                <p style={{ 
+                  fontSize: 13.5, 
+                  color: "var(--gray-500)", 
+                  lineHeight: 1.7,
+                  maxWidth: 220
+                }}>
+                  {s.desc}
+                </p>
+              </div>
             </div>
           ))}
         </div>
@@ -1645,6 +1709,10 @@ const Dashboard = ({ onLogout }) => {
 
 export default function App() {
   const [view, setView] = useState("landing"); // "landing" | "app"
+
+  const handleLogout = () => {
+    setView("landing");
+  };
 
   return (
     <>
