@@ -88,8 +88,8 @@ const globalStyles = `
     transition: transform var(--transition), box-shadow var(--transition);
   }
   .card-hover:hover {
-    transform: translateY(-3px);
-    box-shadow: var(--shadow-lg);
+    transform: translateY(-8px);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.12), 0 4px 16px rgba(0,0,0,0.06);
   }
 
   /* Glass */
@@ -179,19 +179,28 @@ const Btn = ({ children, variant = "primary", onClick, style = {}, icon }) => {
   );
 };
 
-const Card = ({ children, style = {}, hover = true, glass = false }) => (
-  <div className={`${hover ? "card-hover" : ""} ${glass ? "glass" : ""}`}
-    style={{
-      background: glass ? undefined : "var(--white)",
-      border: "1px solid var(--gray-150)",
-      borderRadius: "var(--radius-lg)",
-      boxShadow: "var(--shadow-md)",
-      padding: 24,
-      ...style,
-    }}>
-    {children}
-  </div>
-);
+const Card = ({ children, style = {}, hover = true, glass = false }) => {
+  const [isHovered, setIsHovered] = useState(false);
+
+  return (
+    <div
+      className={`${hover ? "card-hover" : ""} ${glass ? "glass" : ""}`}
+      onMouseEnter={() => hover && setIsHovered(true)}
+      onMouseLeave={() => hover && setIsHovered(false)}
+      style={{
+        background: glass ? undefined : "var(--white)",
+        border: "1px solid var(--gray-150)",
+        borderRadius: "var(--radius-lg)",
+        boxShadow: isHovered && hover ? "0 20px 60px rgba(0,0,0,0.12), 0 4px 16px rgba(0,0,0,0.06)" : "var(--shadow-md)",
+        padding: 24,
+        transform: isHovered && hover ? "translateY(-8px)" : "translateY(0)",
+        transition: "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+        ...style,
+      }}>
+      {children}
+    </div>
+  );
+}
 
 // ─── Icons (minimal inline SVGs) ────────────────────────────────────────────
 const Icon = ({ name, size = 18, color = "currentColor" }) => {
@@ -610,41 +619,116 @@ const Sidebar = ({ active, setActive }) => {
 };
 
 // ─── Topbar ───────────────────────────────────────────────────────────────────
-const Topbar = ({ title }) => (
-  <header style={{
-    height: 60, borderBottom: "1px solid var(--gray-150)",
-    display: "flex", alignItems: "center", justifyContent: "space-between",
-    padding: "0 28px", background: "var(--white)", position: "sticky", top: 0, zIndex: 10,
-  }}>
-    <h1 style={{ fontSize: 16, fontWeight: 650, color: "var(--gray-900)", letterSpacing: "-0.025em" }}>{title}</h1>
-    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-      <div style={{
-        display: "flex", alignItems: "center", gap: 8,
-        background: "var(--gray-50)", border: "1px solid var(--gray-200)",
-        borderRadius: 99, padding: "8px 14px", width: 200,
-      }}>
-        <Icon name="search" size={14} color="var(--gray-400)"/>
-        <input placeholder="Search anything..." style={{
-          border: "none", background: "transparent", fontSize: 13, color: "var(--gray-600)",
-          outline: "none", width: "100%", fontFamily: "inherit",
-        }}/>
-      </div>
-      <div style={{
-        width: 36, height: 36, borderRadius: "50%", background: "var(--gray-50)",
-        border: "1px solid var(--gray-200)", display: "flex", alignItems: "center",
-        justifyContent: "center", cursor: "pointer", position: "relative",
-      }}>
-        <Icon name="bell" size={15} color="var(--gray-500)"/>
+const Topbar = ({ title, onLogout }) => {
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const profileRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (profileRef.current && !profileRef.current.contains(e.target)) {
+        setShowProfileMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  return (
+    <header style={{
+      height: 60, borderBottom: "1px solid var(--gray-150)",
+      display: "flex", alignItems: "center", justifyContent: "space-between",
+      padding: "0 28px", background: "var(--white)", position: "sticky", top: 0, zIndex: 10,
+    }}>
+      <h1 style={{ fontSize: 16, fontWeight: 650, color: "var(--gray-900)", letterSpacing: "-0.025em" }}>{title}</h1>
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <div style={{
-          position: "absolute", top: 8, right: 8,
-          width: 7, height: 7, borderRadius: "50%",
-          background: "var(--gray-700)", border: "1.5px solid var(--white)",
-        }}/>
+          display: "flex", alignItems: "center", gap: 8,
+          background: "var(--gray-50)", border: "1px solid var(--gray-200)",
+          borderRadius: 99, padding: "8px 14px", width: 200,
+        }}>
+          <Icon name="search" size={14} color="var(--gray-400)"/>
+          <input placeholder="Search anything..." style={{
+            border: "none", background: "transparent", fontSize: 13, color: "var(--gray-600)",
+            outline: "none", width: "100%", fontFamily: "inherit",
+          }}/>
+        </div>
+        <div style={{
+          width: 36, height: 36, borderRadius: "50%", background: "var(--gray-50)",
+          border: "1px solid var(--gray-200)", display: "flex", alignItems: "center",
+          justifyContent: "center", cursor: "pointer", position: "relative",
+        }}>
+          <Icon name="bell" size={15} color="var(--gray-500)"/>
+          <div style={{
+            position: "absolute", top: 8, right: 8,
+            width: 7, height: 7, borderRadius: "50%",
+            background: "var(--gray-700)", border: "1.5px solid var(--white)",
+          }}/>
+        </div>
+        <div ref={profileRef} style={{ position: "relative" }}>
+          <div 
+            onClick={() => setShowProfileMenu(!showProfileMenu)}
+            style={{ 
+              width: 32, height: 32, borderRadius: "50%", 
+              background: "var(--gray-900)", display: "flex", 
+              alignItems: "center", justifyContent: "center", 
+              fontSize: 12, fontWeight: 700, color: "var(--white)", 
+              cursor: "pointer",
+              transition: "transform 0.2s ease",
+              transform: showProfileMenu ? "scale(0.95)" : "scale(1)"
+            }}>
+            A
+          </div>
+          {showProfileMenu && (
+            <div style={{
+              position: "absolute", top: "calc(100% + 8px)", right: 0,
+              background: "var(--white)", border: "1px solid var(--gray-150)",
+              borderRadius: "var(--radius-md)", boxShadow: "var(--shadow-lg)",
+              minWidth: 180, padding: "6px", zIndex: 100,
+              animation: "fadeIn 0.15s ease"
+            }}>
+              <div style={{
+                padding: "10px 12px", borderRadius: "8px",
+                cursor: "pointer", transition: "background 0.15s ease",
+                display: "flex", alignItems: "center", gap: 10,
+                fontSize: 13.5, color: "var(--gray-700)", fontWeight: 500
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.background = "var(--gray-50)"}
+              onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}>
+                <Icon name="user" size={15} color="var(--gray-500)"/>
+                Profile
+              </div>
+              <div style={{
+                padding: "10px 12px", borderRadius: "8px",
+                cursor: "pointer", transition: "background 0.15s ease",
+                display: "flex", alignItems: "center", gap: 10,
+                fontSize: 13.5, color: "var(--gray-700)", fontWeight: 500
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.background = "var(--gray-50)"}
+              onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}>
+                <Icon name="settings" size={15} color="var(--gray-500)"/>
+                Settings
+              </div>
+              <div style={{ height: 1, background: "var(--gray-150)", margin: "6px 0" }}/>
+              <div 
+                onClick={onLogout}
+                style={{
+                  padding: "10px 12px", borderRadius: "8px",
+                  cursor: "pointer", transition: "background 0.15s ease",
+                  display: "flex", alignItems: "center", gap: 10,
+                  fontSize: 13.5, color: "var(--gray-700)", fontWeight: 500
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.background = "var(--gray-50)"}
+                onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}>
+                <Icon name="x" size={15} color="var(--gray-500)"/>
+                Logout
+              </div>
+            </div>
+          )}
+        </div>
       </div>
-      <div style={{ width: 32, height: 32, borderRadius: "50%", background: "var(--gray-900)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: "var(--white)", cursor: "pointer" }}>A</div>
-    </div>
-  </header>
-);
+    </header>
+  );
+};
 
 // ─── Dashboard Overview ───────────────────────────────────────────────────────
 const DashboardOverview = () => {
@@ -1527,7 +1611,7 @@ const JobFinder = () => {
 };
 
 // ─── Dashboard Shell ──────────────────────────────────────────────────────────
-const Dashboard = () => {
+const Dashboard = ({ onLogout }) => {
   const [active, setActive] = useState("resume");
 
   const pages = {
@@ -1546,7 +1630,7 @@ const Dashboard = () => {
     <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: "var(--gray-50)" }}>
       <Sidebar active={active} setActive={setActive}/>
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-        <Topbar title={current.title}/>
+        <Topbar title={current.title} onLogout={onLogout}/>
         <main style={{ flex: 1, overflowY: "auto" }}>
           {current.component}
         </main>
@@ -1567,7 +1651,7 @@ export default function App() {
       <style>{globalStyles}</style>
       {view === "landing"
         ? <LandingPage onEnterApp={() => setView("app")}/>
-        : <Dashboard/>}
+        : <Dashboard onLogout={handleLogout}/>}
     </>
   );
 }
