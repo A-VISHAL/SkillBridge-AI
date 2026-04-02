@@ -79,6 +79,28 @@ const globalStyles = `
     0%, 100% { transform: translateY(0px); }
     50% { transform: translateY(-8px); }
   }
+  @keyframes floatParticle1 {
+    0%, 100% { transform: translate(0, 0); }
+    25% { transform: translate(30px, -40px); }
+    50% { transform: translate(-20px, -80px); }
+    75% { transform: translate(40px, -60px); }
+  }
+  @keyframes floatParticle2 {
+    0%, 100% { transform: translate(0, 0); }
+    33% { transform: translate(-40px, -50px); }
+    66% { transform: translate(30px, -90px); }
+  }
+  @keyframes floatParticle3 {
+    0%, 100% { transform: translate(0, 0); }
+    20% { transform: translate(50px, -30px); }
+    40% { transform: translate(-30px, -70px); }
+    60% { transform: translate(20px, -100px); }
+    80% { transform: translate(-40px, -50px); }
+  }
+  @keyframes floatSlow {
+    0%, 100% { transform: translateY(0px) translateX(0px); }
+    50% { transform: translateY(-20px) translateX(10px); }
+  }
 
   .fade-up { animation: fadeUp 0.6s ease forwards; }
   .fade-in { animation: fadeIn 0.5s ease forwards; }
@@ -328,8 +350,75 @@ const LandingPage = ({ onEnterApp }) => {
     { name: "Priya K.", role: "Data Analyst @ Airbnb", text: "The mock interview feature is eerily realistic. It caught nervousness patterns I didn't even notice.", avatar: "P" },
   ];
 
+  // Animated particles
+  const particles = Array.from({ length: 15 }, (_, i) => ({
+    id: i,
+    size: Math.random() * 4 + 3,
+    left: Math.random() * 100,
+    top: Math.random() * 100,
+    delay: Math.random() * 4,
+    duration: Math.random() * 12 + 18,
+    animation: `floatParticle${(i % 3) + 1}`
+  }));
+
   return (
-    <div className="mesh-bg" style={{ minHeight: "100vh" }}>
+    <div className="mesh-bg" style={{ minHeight: "100vh", position: "relative", overflow: "hidden" }}>
+      {/* Animated Background Particles */}
+      <div style={{ position: "fixed", inset: 0, overflow: "hidden", pointerEvents: "none", zIndex: 0 }}>
+        {particles.map(p => (
+          <div
+            key={p.id}
+            style={{
+              position: "absolute",
+              left: `${p.left}%`,
+              top: `${p.top}%`,
+              width: p.size,
+              height: p.size,
+              borderRadius: "50%",
+              background: "rgba(180, 180, 180, 0.25)",
+              animation: `${p.animation} ${p.duration}s ease-in-out ${p.delay}s infinite`,
+              boxShadow: `0 0 ${p.size * 2}px rgba(180, 180, 180, 0.15)`,
+              filter: "blur(0.5px)"
+            }}
+          />
+        ))}
+        
+        {/* Larger floating shapes */}
+        <div style={{
+          position: "absolute",
+          top: "15%",
+          right: "20%",
+          width: 320,
+          height: 320,
+          borderRadius: "50%",
+          background: "radial-gradient(circle, rgba(200, 200, 200, 0.12), transparent 70%)",
+          animation: "floatSlow 22s ease-in-out infinite",
+          filter: "blur(50px)"
+        }}/>
+        <div style={{
+          position: "absolute",
+          bottom: "20%",
+          left: "15%",
+          width: 380,
+          height: 380,
+          borderRadius: "50%",
+          background: "radial-gradient(circle, rgba(190, 190, 190, 0.1), transparent 70%)",
+          animation: "floatSlow 26s ease-in-out infinite 4s",
+          filter: "blur(55px)"
+        }}/>
+        <div style={{
+          position: "absolute",
+          top: "40%",
+          left: "60%",
+          width: 300,
+          height: 300,
+          borderRadius: "50%",
+          background: "radial-gradient(circle, rgba(185, 185, 185, 0.08), transparent 70%)",
+          animation: "floatSlow 24s ease-in-out infinite 8s",
+          filter: "blur(52px)"
+        }}/>
+      </div>
+
       {/* Navbar */}
       <nav className="glass" style={{
         position: "fixed", top: 0, left: 0, right: 0, zIndex: 100,
@@ -1690,10 +1779,77 @@ const Dashboard = ({ onLogout }) => {
 
   const current = pages[active];
 
+  // Animated particles
+  const particles = Array.from({ length: 15 }, (_, i) => ({
+    id: i,
+    size: Math.random() * 4 + 3,
+    left: Math.random() * 100,
+    top: Math.random() * 100,
+    delay: Math.random() * 4,
+    duration: Math.random() * 12 + 18,
+    animation: `floatParticle${(i % 3) + 1}`
+  }));
+
   return (
-    <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: "var(--gray-50)" }}>
+    <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: "var(--gray-50)", position: "relative" }}>
+      {/* Animated Background Particles */}
+      <div style={{ position: "fixed", inset: 0, overflow: "hidden", pointerEvents: "none", zIndex: 0 }}>
+        {particles.map(p => (
+          <div
+            key={p.id}
+            style={{
+              position: "absolute",
+              left: `${p.left}%`,
+              top: `${p.top}%`,
+              width: p.size,
+              height: p.size,
+              borderRadius: "50%",
+              background: "rgba(160, 160, 160, 0.22)",
+              animation: `${p.animation} ${p.duration}s ease-in-out ${p.delay}s infinite`,
+              boxShadow: `0 0 ${p.size * 2}px rgba(160, 160, 160, 0.12)`,
+              filter: "blur(0.5px)"
+            }}
+          />
+        ))}
+        
+        {/* Larger floating shapes */}
+        <div style={{
+          position: "absolute",
+          top: "15%",
+          right: "20%",
+          width: 320,
+          height: 320,
+          borderRadius: "50%",
+          background: "radial-gradient(circle, rgba(180, 180, 180, 0.1), transparent 70%)",
+          animation: "floatSlow 22s ease-in-out infinite",
+          filter: "blur(50px)"
+        }}/>
+        <div style={{
+          position: "absolute",
+          bottom: "25%",
+          left: "15%",
+          width: 380,
+          height: 380,
+          borderRadius: "50%",
+          background: "radial-gradient(circle, rgba(170, 170, 170, 0.08), transparent 70%)",
+          animation: "floatSlow 26s ease-in-out infinite 4s",
+          filter: "blur(55px)"
+        }}/>
+        <div style={{
+          position: "absolute",
+          top: "40%",
+          left: "60%",
+          width: 300,
+          height: 300,
+          borderRadius: "50%",
+          background: "radial-gradient(circle, rgba(165, 165, 165, 0.07), transparent 70%)",
+          animation: "floatSlow 24s ease-in-out infinite 8s",
+          filter: "blur(52px)"
+        }}/>
+      </div>
+
       <Sidebar active={active} setActive={setActive}/>
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", position: "relative", zIndex: 1 }}>
         <Topbar title={current.title} onLogout={onLogout}/>
         <main style={{ flex: 1, overflowY: "auto" }}>
           {current.component}
