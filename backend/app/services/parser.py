@@ -16,6 +16,50 @@ TECH_SKILLS = [
     "Linux", "Bash", "PowerShell", "Nginx", "Apache", "Terraform", "Ansible"
 ]
 
+SECTION_HEADINGS = {
+    "experience": re.compile(r'^(?:[\u2022•\-*\d.\)\s]*)?(experience|work experience|employment|professional experience|work history)\b', re.IGNORECASE),
+    "education": re.compile(r'^(?:[\u2022•\-*\d.\)\s]*)?(education|academic|qualifications?|educational background)\b', re.IGNORECASE),
+    "projects": re.compile(r'^(?:[\u2022•\-*\d.\)\s]*)?(projects?|personal projects)\b', re.IGNORECASE),
+    "skills": re.compile(r'^(?:[\u2022•\-*\d.\)\s]*)?(skills?|technical skills|core competencies)\b', re.IGNORECASE),
+    "certifications": re.compile(r'^(?:[\u2022•\-*\d.\)\s]*)?(certifications?|achievements?)\b', re.IGNORECASE),
+}
+
+
+def normalize_lines(text: str) -> List[str]:
+    lines = []
+    for raw_line in text.replace('\r', '\n').split('\n'):
+        line = re.sub(r'\s+', ' ', raw_line).strip()
+        if line:
+            lines.append(line)
+    return lines
+
+
+def is_section_heading(line: str) -> bool:
+    normalized = re.sub(r'[:\-–—]+$', '', line.strip())
+    return any(pattern.match(normalized) for pattern in SECTION_HEADINGS.values())
+
+
+def extract_section_lines(text: str, section_name: str) -> List[str]:
+    lines = normalize_lines(text)
+    section_pattern = SECTION_HEADINGS[section_name]
+    collected = []
+    in_section = False
+
+    for line in lines:
+        normalized = re.sub(r'[:\-–—]+$', '', line.strip())
+
+        if section_pattern.match(normalized):
+            in_section = True
+            continue
+
+        if in_section and is_section_heading(normalized):
+            break
+
+        if in_section:
+            collected.append(line)
+
+    return collected
+
 def extract_text_from_pdf(file_path: str) -> str:
     """Extract text from PDF using PyMuPDF"""
     try:
@@ -76,49 +120,54 @@ def extract_experiences(text: str) -> List[Experience]:
     """Extract work experiences with descriptions"""
     experiences = []
     
-    # Look for experience section with multiple patterns
-    patterns = [
-        r'(EXPERIENCE|WORK\s*EXPERIENCE|EMPLOYMENT|PROFESSIONAL\s*EXPERIENCE|WORK\s*HISTORY)',
-        r'(EDUCATION|PROJECTS?|SKILLS?|CERTIFICATIONS?|ACHIEVEMENTS?|$)'
-    ]
-    
-    exp_section = re.search(
-        f'{patterns[0]}(.*?){patterns[1]}',
-        text,
-        re.IGNORECASE | re.DOTALL
-    )
-    
-    if not exp_section:
-        # Try without end marker
-        exp_section = re.search(patterns[0] + r'(.*)', text, re.IGNORECASE | re.DOTALL)
-    
-    if exp_section:
-        exp_text = exp_section.group(2) if len(exp_section.groups()) > 1 else exp_section.group(1)
-        lines = [l.strip() for l in exp_text.strip().split('\n') if l.strip()]
+    lines = extract_section_lines(text, "experience")
+    if not lines:
+        lines = normalize_lines(text)
+
+    if lines:
         
         # Job title keywords
         job_keywords = ['engineer', 'developer', 'manager', 'analyst', 'intern', 'designer', 
                        'consultant', 'lead', 'architect', 'specialist', 'coordinator', 'associate',
                        'executive', 'officer', 'director', 'head', 'senior', 'junior']
+        date_pattern = re.compile(r'\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{4}\b|\b\d{4}\b', re.IGNORECASE)
         
         current_exp = None
         i = 0
         
         while i < len(lines):
             line = lines[i]
+            clean_line = re.sub(r'\s+', ' ', line).strip()
             
             # Check if this is a job title
-            is_job_title = any(keyword in line.lower() for keyword in job_keywords)
+            is_job_title = (
+                any(keyword in clean_line.lower() for keyword in job_keywords)
+                and len(clean_line) < 120
+                and not clean_line.lower().startswith(('built', 'developed', 'implemented', 'worked', 'improved', 'designed'))
+            )
             
-            if is_job_title and not line.startswith(('•', '-', '*', '·')):
+            if is_job_title and not clean_line.startswith(('•', '-', '*', '·')):
                 # Save previous experience
                 if current_exp and (current_exp.company or current_exp.description):
                     experiences.append(current_exp)
                 
+                company = ""
+                duration = ""
+                title_line = clean_line
+
+                title_match = re.split(r'\s+[·|\-|–—]\s+', clean_line, maxsplit=1)
+                if len(title_match) > 1:
+                    title_line = title_match[0].strip()
+                    remainder = title_match[1].strip()
+                    if date_pattern.search(remainder):
+                        duration = remainder
+                    else:
+                        company = remainder
+
                 current_exp = Experience(
-                    title=line,
-                    company="",
-                    duration="",
+                    title=title_line,
+                    company=company,
+                    duration=duration,
                     description=[]
                 )
                 
@@ -126,12 +175,18 @@ def extract_experiences(text: str) -> List[Experience]:
                 if i + 1 < len(lines):
                     next_line = lines[i + 1]
                     if not next_line.startswith(('•', '-', '*', '·')) and not any(k in next_line.lower() for k in job_keywords):
+                        if date_pattern.search(next_line):
+                            current_exp.duration = next_line
+                        else:
+                            current_exp.company = next_line
+                            if i + 2 < len(lines) and date_pattern.search(lines[i + 2]):
+                                current_exp.duration = lines[i + 2]
+                                i += 1
                         i += 1
-                        current_exp.company = next_line
             
             # Collect descriptions
-            elif current_exp and line.startswith(('•', '-', '*', '·')):
-                desc = line.lstrip('•-*· ').strip()
+            elif current_exp and clean_line.startswith(('•', '-', '*', '·')):
+                desc = clean_line.lstrip('•-*· ').strip()
                 if desc and len(desc) > 10:
                     current_exp.description.append(desc)
             
@@ -152,42 +207,50 @@ def extract_education(text: str) -> List[Education]:
     """Extract education information with details"""
     education = []
     
-    edu_section = re.search(
-        r'(EDUCATION|ACADEMIC|QUALIFICATION|EDUCATIONAL\s*BACKGROUND)(.*?)(EXPERIENCE|PROJECTS?|SKILLS?|CERTIFICATIONS?|ACHIEVEMENTS?|$)',
-        text,
-        re.IGNORECASE | re.DOTALL
-    )
-    
-    if edu_section:
-        edu_text = edu_section.group(2)
-        lines = [l.strip() for l in edu_text.strip().split('\n') if l.strip()]
+    lines = extract_section_lines(text, "education")
+    if not lines:
+        lines = normalize_lines(text)
+
+    if lines:
         current_edu = None
         i = 0
+        degree_pattern = re.compile(
+            r'(b\.?\s*tech|b\.?\s*e\.?|m\.?\s*tech|mba|bca|mca|b\.?\s*sc\.?|m\.?\s*sc\.?|bachelor|master|diploma|ph\.?d\.?|phd|engineering)',
+            re.IGNORECASE,
+        )
         
         while i < len(lines):
-            line = lines[i]
+            line = re.sub(r'\s+', ' ', lines[i]).strip()
             
             # Check if line contains a degree
-            if any(degree in line.upper() for degree in ['B.TECH', 'B.E.', 'M.TECH', 'MBA', 'BCA', 'MCA', 'B.SC', 'M.SC', 'BACHELOR', 'MASTER', 'DIPLOMA', 'B.A.', 'M.A.', 'PH.D', 'PHD']):
+            if degree_pattern.search(line):
                 # Save previous education
                 if current_edu:
                     education.append(current_edu)
                 
+                year_match = re.search(r'\b(19|20)\d{2}\b', line)
+                year = year_match.group(0) if year_match else ""
+                gpa_match = re.search(r'(cgpa|gpa)[:\s-]*([0-9]+(?:\.[0-9]+)?\s*/\s*[0-9]+|[0-9]+(?:\.[0-9]+)?)', line, re.IGNORECASE)
+                gpa = gpa_match.group(0) if gpa_match else ""
+
                 current_edu = Education(
                     degree=line,
                     institution="",
-                    year="",
-                    gpa=""
+                    year=year,
+                    gpa=gpa
                 )
                 
                 # Try to get institution from next line
                 if i + 1 < len(lines) and not lines[i + 1].startswith(('•', '-', '*')) and 'cgpa' not in lines[i + 1].lower() and 'gpa' not in lines[i + 1].lower():
                     i += 1
-                    current_edu.institution = lines[i]
+                    current_edu.institution = re.sub(r'\s+', ' ', lines[i]).strip()
             
             # Check if line contains CGPA/GPA
             elif current_edu and ('cgpa' in line.lower() or 'gpa' in line.lower() or re.search(r'\d+\.\d+\s*/\s*\d+', line)):
                 current_edu.gpa = line
+
+            elif current_edu and not current_edu.institution and len(line) < 140 and not is_section_heading(line):
+                current_edu.institution = line
             
             i += 1
         
@@ -258,7 +321,7 @@ def parse_resume(file_path: str) -> ParsedResume:
         text = extract_text_from_txt(file_path)
     
     if not text:
-        return get_sample_resume()
+        return ParsedResume(raw_text="")
     
     # Debug: Print extracted text sections
     print("=" * 50)
@@ -266,29 +329,7 @@ def parse_resume(file_path: str) -> ParsedResume:
     print(text[:500])  # Print first 500 chars
     print("=" * 50)
     
-    # Try AI parsing first if API key is available
-    from app.core.config import settings
-    if settings.OXLO_API_KEY:
-        print("Attempting AI-powered parsing...")
-        try:
-            import asyncio
-            from app.services.ai_parser import parse_resume_with_ai
-            
-            # Run async function in sync context
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            ai_result = loop.run_until_complete(parse_resume_with_ai(text))
-            loop.close()
-            
-            if ai_result:
-                print("✓ AI parsing successful!")
-                return ai_result
-            else:
-                print("✗ AI parsing failed, falling back to regex parser")
-        except Exception as e:
-            print(f"✗ AI parsing error: {e}, falling back to regex parser")
-    
-    # Fallback to regex parsing
+    # Use deterministic regex extraction only so the UI shows data present in the resume.
     print("Using regex-based parsing...")
     experiences = extract_experiences(text)
     education = extract_education(text)
@@ -297,43 +338,6 @@ def parse_resume(file_path: str) -> ParsedResume:
     print(f"Extracted {len(experiences)} experiences")
     print(f"Extracted {len(education)} education entries")
     print(f"Extracted {len(projects)} projects")
-    
-    # If no experiences or education found, use sample data
-    if not experiences:
-        print("WARNING: No experiences found, using sample data")
-        experiences = [
-            Experience(
-                title="Software Developer",
-                company="Tech Solutions Pvt Ltd · Jan 2022 - Present",
-                duration="",
-                description=[
-                    "Developed REST APIs using Python Flask serving 10K+ daily requests",
-                    "Built responsive web applications using React and TypeScript",
-                    "Collaborated with cross-functional teams in Agile environment"
-                ]
-            ),
-            Experience(
-                title="Junior Developer Intern",
-                company="StartupXYZ · Jun 2021 - Dec 2021",
-                duration="",
-                description=[
-                    "Worked on frontend development using React",
-                    "Implemented user authentication and authorization",
-                    "Fixed bugs and improved application performance"
-                ]
-            )
-        ]
-    
-    if not education:
-        print("WARNING: No education found, using sample data")
-        education = [
-            Education(
-                degree="B.Tech in Computer Science",
-                institution="ABC Institute of Technology · 2021",
-                year="",
-                gpa="CGPA: 8.5/10"
-            )
-        ]
     
     return ParsedResume(
         email=extract_email(text),

@@ -7,7 +7,13 @@ from app.models.schemas import ParsedResume, Skill, Experience, Education, Proje
 async def parse_resume_with_ai(resume_text: str) -> ParsedResume:
     """Use AI to parse resume and extract structured data"""
     
-    prompt = f"""Extract structured information from this resume. Return ONLY valid JSON with this exact structure:
+    prompt = f"""Extract structured information from this resume.
+
+Rules:
+- Return ONLY valid JSON with this exact structure.
+- Include only information explicitly present in the resume text.
+- Do not infer, guess, normalize, or fabricate education, experience, dates, employers, degrees, or GPA.
+- If a field is not present, return an empty string, null, or an empty array as appropriate.
 
 {{
   "name": "Full Name",
@@ -45,14 +51,19 @@ Resume text:
 Return ONLY the JSON, no other text."""
 
     try:
-        print(f"Calling AI API at: {settings.OXLO_CHAT_ENDPOINT}")
-        print(f"API Key present: {bool(settings.OXLO_API_KEY)}")
+        print("=" * 60)
+        print("AI PARSER - Starting")
+        print(f"API Endpoint: {settings.OXLO_CHAT_ENDPOINT}")
+        print(f"API Key (first 10 chars): {settings.OXLO_API_KEY[:10]}...")
+        print(f"Resume text length: {len(resume_text)} chars")
+        print("=" * 60)
         
         async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.post(
                 settings.OXLO_CHAT_ENDPOINT,
                 headers={
-                    "Authorization": f"Bearer {settings.OXLO_API_KEY}",
+                    "x-api-key": settings.OXLO_API_KEY,
+                    "anthropic-version": "2023-06-01",
                     "Content-Type": "application/json"
                 },
                 json={
@@ -68,23 +79,30 @@ Return ONLY the JSON, no other text."""
                 }
             )
             
-            print(f"AI API Response Status: {response.status_code}")
+            print(f"✓ API Response Status: {response.status_code}")
             
             if response.status_code != 200:
-                print(f"AI API Error Response: {response.text}")
+                print(f"✗ API Error: {response.text}")
                 return None
             
             result = response.json()
-            print(f"AI API Response: {json.dumps(result, indent=2)[:500]}")
+            print(f"✓ Got API response, keys: {list(result.keys())}")
             
-            # Extract the JSON from AI response
-            content = result.get("choices", [{}])[0].get("message", {}).get("content", "")
+            # Extract the JSON from Anthropic API response
+            # Anthropic returns: {"content": [{"type": "text", "text": "..."}], ...}
+            content = ""
+            if "content" in result and isinstance(result["content"], list):
+                for block in result["content"]:
+                    if block.get("type") == "text":
+                        content = block.get("text", "")
+                        break
             
             if not content:
-                # Try alternative response structure
-                content = result.get("content", "")
-            
-            print(f"Extracted content: {content[:200]}")
+                print(f"✗ No content found in response: {result}")
+                return None
+                
+            print(f"✓ Extracted content length: {len(content)} chars")
+            print(f"Content preview: {content[:200]}...")
             
             # Try to parse JSON from response
             # Remove markdown code blocks if present
@@ -98,7 +116,13 @@ Return ONLY the JSON, no other text."""
             content = content.strip()
             
             data = json.loads(content)
-            print(f"Parsed JSON successfully: {list(data.keys())}")
+            print(f"✓ Parsed JSON successfully!")
+            print(f"  - Name: {data.get('name')}")
+            print(f"  - Email: {data.get('email')}")
+            print(f"  - Skills: {len(data.get('skills', []))} found")
+            print(f"  - Experiences: {len(data.get('experiences', []))} found")
+            print(f"  - Education: {len(data.get('education', []))} found")
+            print(f"  - Projects: {len(data.get('projects', []))} found")
             
             # Convert to ParsedResume object
             parsed = ParsedResume(
@@ -135,15 +159,18 @@ Return ONLY the JSON, no other text."""
                 raw_text=resume_text
             )
             
-            print(f"Created ParsedResume with {len(parsed.experiences)} experiences, {len(parsed.education)} education")
+            print(f"✓ Created ParsedResume object successfully!")
+            print("=" * 60)
             return parsed
             
     except json.JSONDecodeError as e:
-        print(f"JSON parsing error: {e}")
-        print(f"Content that failed to parse: {content[:500]}")
+        print(f"✗ JSON parsing error: {e}")
+        print(f"Content that failed: {content[:500]}")
+        print("=" * 60)
         return None
     except Exception as e:
-        print(f"Error parsing resume with AI: {type(e).__name__}: {e}")
+        print(f"✗ Error in AI parser: {type(e).__name__}: {e}")
         import traceback
         traceback.print_exc()
+        print("=" * 60)
         return None

@@ -18,6 +18,38 @@ interview_sessions = {}
 
 # ============ Health & Status ============
 
+@router.get("/api/test-ai")
+async def test_ai_connection():
+    """Test AI API connection"""
+    from app.core.config import settings
+    import httpx
+    
+    if not settings.OXLO_API_KEY:
+        return {"error": "No API key configured"}
+    
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                settings.OXLO_CHAT_ENDPOINT,
+                headers={
+                    "x-api-key": settings.OXLO_API_KEY,
+                    "anthropic-version": "2023-06-01",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": "claude-3-5-sonnet-20241022",
+                    "messages": [{"role": "user", "content": "Say 'API is working!'"}],
+                    "max_tokens": 50
+                }
+            )
+            
+            return {
+                "status": response.status_code,
+                "response": response.json() if response.status_code == 200 else response.text
+            }
+    except Exception as e:
+        return {"error": str(e)}
+
 @router.get("/health")
 async def health_check():
     return {"status": "healthy", "timestamp": datetime.now().isoformat()}

@@ -953,7 +953,7 @@ const DashboardOverview = () => {
 };
 
 // ─── Resume Analyzer ──────────────────────────────────────────────────────────
-const ResumeAnalyzer = () => {
+const ResumeAnalyzer = ({ onResumeParsed }) => {
   const [uploaded, setUploaded] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [fileName, setFileName] = useState("");
@@ -996,6 +996,7 @@ const ResumeAnalyzer = () => {
         const resumeId = uploadData.resume_id;
         setResumeId(resumeId);
         setResumeData(uploadData.resume); // Store parsed resume data
+        onResumeParsed?.(resumeId, uploadData.resume);
         
         // Analyze resume
         const analyzeFormData = new FormData();
@@ -1084,6 +1085,7 @@ const ResumeAnalyzer = () => {
       setFileSize("245 KB");
       setResumeId(sampleData.resume_id);
       setResumeData(sampleData.resume); // Store parsed resume data
+      onResumeParsed?.(sampleData.resume_id, sampleData.resume);
       
       // Analyze sample resume
       const analyzeFormData = new FormData();
@@ -1724,57 +1726,158 @@ const MockInterview = () => {
 };
 
 // ─── Job Finder ───────────────────────────────────────────────────────────────
-const JobFinder = () => {
-  const jobs = [
-    { title: "Senior Software Engineer", company: "Stripe", location: "Remote", match: 91, type: "Full-time" },
-    { title: "Frontend Engineer", company: "Linear", location: "San Francisco", match: 87, type: "Full-time" },
-    { title: "Full-Stack Developer", company: "Vercel", location: "Remote", match: 84, type: "Full-time" },
-    { title: "Software Engineer II", company: "Figma", location: "New York", match: 79, type: "Full-time" },
-    { title: "Backend Engineer", company: "PlanetScale", location: "Remote", match: 76, type: "Full-time" },
-    { title: "Software Engineer", company: "Notion", location: "San Francisco", match: 72, type: "Contract" },
-  ];
+const JobFinder = ({ resumeId, resumeData }) => {
+  const [jobs, setJobs] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [filter, setFilter] = useState("");
+
+  const deriveRoleFromResume = (data) => {
+    if (data?.experiences?.length > 0) {
+      const title = data.experiences[0]?.title?.trim();
+      if (title) return title;
+    }
+
+    const skillNames = (data?.skills || [])
+      .map((s) => (typeof s === "string" ? s : s?.name || ""))
+      .filter(Boolean)
+      .map((s) => s.toLowerCase());
+
+    if (skillNames.includes("react")) return "React Developer";
+    if (skillNames.includes("python")) return "Python Developer";
+    if (skillNames.includes("node.js")) return "Node.js Developer";
+
+    return "Software Engineer";
+  };
+
+  const [role, setRole] = useState(deriveRoleFromResume(resumeData));
+
+  useEffect(() => {
+    setRole(deriveRoleFromResume(resumeData));
+  }, [resumeData]);
+
+  const fetchJobs = async () => {
+    if (!resumeId) {
+      setError("Upload your resume in Resume Analyzer first to get matched jobs.");
+      setJobs([]);
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+    try {
+      const formData = new FormData();
+      formData.append("resume_id", resumeId);
+      formData.append("role", role || "Software Engineer");
+      formData.append("location", "India");
+      formData.append("remote", "false");
+
+      const response = await fetch("http://localhost:8000/api/jobs/search", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch jobs");
+      }
+
+      const data = await response.json();
+      setJobs(Array.isArray(data.jobs) ? data.jobs : []);
+    } catch (e) {
+      console.error(e);
+      setError("Could not load jobs right now. Please try again.");
+      setJobs([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (resumeId) {
+      fetchJobs();
+    }
+  }, [resumeId]);
+
+  const filteredJobs = jobs.filter((job) => {
+    const haystack = `${job.title || ""} ${job.company || ""} ${job.location || ""}`.toLowerCase();
+    return haystack.includes(filter.toLowerCase());
+  });
 
   return (
     <div style={{ padding: 28, animation: "fadeIn 0.4s ease" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
         <div>
           <h2 style={{ fontSize: 20, fontWeight: 700, color: "var(--gray-900)", letterSpacing: "-0.04em", marginBottom: 4 }}>Job Finder</h2>
-          <p style={{ fontSize: 13.5, color: "var(--gray-500)" }}>12 curated roles matched to your profile.</p>
+          <p style={{ fontSize: 13.5, color: "var(--gray-500)" }}>
+            {loading ? "Finding jobs from your extracted resume data..." : `${filteredJobs.length} curated roles matched to your profile.`}
+          </p>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--gray-50)", border: "1px solid var(--gray-200)", borderRadius: 99, padding: "8px 14px" }}>
             <Icon name="search" size={14} color="var(--gray-400)"/>
-            <input placeholder="Filter jobs..." style={{ border: "none", background: "transparent", fontSize: 13, color: "var(--gray-600)", outline: "none", fontFamily: "inherit", width: 140 }}/>
+            <input
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              placeholder="Filter jobs..."
+              style={{ border: "none", background: "transparent", fontSize: 13, color: "var(--gray-600)", outline: "none", fontFamily: "inherit", width: 140 }}
+            />
           </div>
+          <Btn variant="secondary" onClick={fetchJobs} style={{ padding: "8px 14px", fontSize: 13 }}>Refresh</Btn>
         </div>
       </div>
 
+      {error && (
+        <Card style={{ marginBottom: 14, padding: "14px 16px", border: "1px solid #fde68a", background: "#fffbeb" }}>
+          <div style={{ fontSize: 13, color: "#92400e", fontWeight: 600 }}>{error}</div>
+        </Card>
+      )}
+
+      {!loading && !error && filteredJobs.length === 0 && (
+        <Card style={{ marginBottom: 14, padding: "18px 20px" }}>
+          <div style={{ fontSize: 13.5, color: "var(--gray-600)" }}>
+            No matching jobs found yet. Try clicking Refresh after uploading your latest resume.
+          </div>
+        </Card>
+      )}
+
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 14 }}>
-        {jobs.map((job, i) => (
+        {filteredJobs.map((job, i) => {
+          const match = Math.round(job.match_percentage || 0);
+          const company = job.company || "Company";
+          return (
           <Card key={i} style={{ padding: "20px 22px" }}>
             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 14 }}>
               <div style={{ width: 40, height: 40, borderRadius: 12, background: "var(--gray-100)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700, color: "var(--gray-700)" }}>
-                {job.company[0]}
+                {company[0]}
               </div>
-              <Badge variant={job.match >= 85 ? "success" : job.match >= 75 ? "default" : "default"}>
-                {job.match}% match
+              <Badge variant={match >= 85 ? "success" : "default"}>
+                {match}% match
               </Badge>
             </div>
-            <div style={{ fontSize: 15, fontWeight: 650, color: "var(--gray-900)", marginBottom: 4, letterSpacing: "-0.02em" }}>{job.title}</div>
-            <div style={{ fontSize: 13, color: "var(--gray-500)", marginBottom: 4 }}>{job.company}</div>
+            <div style={{ fontSize: 15, fontWeight: 650, color: "var(--gray-900)", marginBottom: 4, letterSpacing: "-0.02em" }}>{job.title || "Role"}</div>
+            <div style={{ fontSize: 13, color: "var(--gray-500)", marginBottom: 4 }}>{company}</div>
             <div style={{ fontSize: 12, color: "var(--gray-400)", marginBottom: 16, display: "flex", gap: 8 }}>
-              <span>📍 {job.location}</span>
-              <span>· {job.type}</span>
+              <span>📍 {job.location || "India"}</span>
+              <span>· {job.source || "Job Board"}</span>
             </div>
             <div style={{ height: 3, background: "var(--gray-100)", borderRadius: 99, marginBottom: 14 }}>
-              <div style={{ height: "100%", borderRadius: 99, width: `${job.match}%`, background: "linear-gradient(90deg, var(--gray-700), var(--gray-400))" }}/>
+              <div style={{ height: "100%", borderRadius: 99, width: `${match}%`, background: "linear-gradient(90deg, var(--gray-700), var(--gray-400))" }}/>
             </div>
             <div style={{ display: "flex", gap: 8 }}>
-              <Btn variant="primary" style={{ flex: 2, justifyContent: "center", padding: "8px", fontSize: 13 }}>Apply now</Btn>
-              <Btn variant="secondary" style={{ flex: 1, justifyContent: "center", padding: "8px", fontSize: 13 }}>Save</Btn>
+              <Btn
+                variant="primary"
+                onClick={() => job.apply_link && window.open(job.apply_link, "_blank", "noopener,noreferrer")}
+                style={{ flex: 2, justifyContent: "center", padding: "8px", fontSize: 13 }}
+              >
+                Apply now
+              </Btn>
+              <Btn variant="secondary" onClick={() => navigator.clipboard?.writeText(job.apply_link || "")} style={{ flex: 1, justifyContent: "center", padding: "8px", fontSize: 13 }}>
+                Save
+              </Btn>
             </div>
           </Card>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -1783,15 +1886,20 @@ const JobFinder = () => {
 // ─── Dashboard Shell ──────────────────────────────────────────────────────────
 const Dashboard = ({ onLogout }) => {
   const [active, setActive] = useState("resume");
+  const [resumeContext, setResumeContext] = useState({ resumeId: null, resumeData: null });
+
+  const handleResumeParsed = (resumeId, resumeData) => {
+    setResumeContext({ resumeId, resumeData });
+  };
 
   const pages = {
     dashboard: { component: <DashboardOverview/>, title: "Overview" },
-    resume: { component: <ResumeAnalyzer/>, title: "Resume Analyzer" },
+    resume: { component: <ResumeAnalyzer onResumeParsed={handleResumeParsed}/>, title: "Resume Analyzer" },
     matcher: { component: <JDMatcher/>, title: "JD Matcher" },
     roadmap: { component: <Roadmap/>, title: "Learning Roadmap" },
     quiz: { component: <Quiz/>, title: "Adaptive Quiz" },
     interview: { component: <MockInterview/>, title: "Mock Interview" },
-    jobs: { component: <JobFinder/>, title: "Job Finder" },
+    jobs: { component: <JobFinder resumeId={resumeContext.resumeId} resumeData={resumeContext.resumeData}/>, title: "Job Finder" },
   };
 
   const current = pages[active];
