@@ -11,33 +11,100 @@ async def call_oxlo_chat(
     """Call Oxlo Chat API"""
     
     if not settings.OXLO_API_KEY:
-        return _get_fallback_response(messages)
+        raise ValueError("OXLO_API_KEY is not configured")
     
-    try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(
-                settings.OXLO_CHAT_ENDPOINT,
-                headers={
-                    "Authorization": f"Bearer {settings.OXLO_API_KEY}",
-                    "Content-Type": "application/json"
-                },
-                json={
-                    "messages": messages,
-                    "temperature": temperature,
-                    "max_tokens": max_tokens
-                }
-            )
-            
-            if response.status_code == 200:
+    endpoint = settings.OXLO_CHAT_ENDPOINT.lower()
+    api_key = settings.OXLO_API_KEY.strip()
+    if api_key.lower().startswith("bearer "):
+        api_key = api_key[7:].strip()
+
+    # Auto-correct common misconfiguration: Oxlo key with Anthropic endpoint.
+    # Anthropic keys usually start with "sk-ant-"; if not, fallback to Oxlo chat endpoint.
+    actual_endpoint = settings.OXLO_CHAT_ENDPOINT
+    if "anthropic.com" in endpoint and not api_key.startswith("sk-ant-"):
+        actual_endpoint = "https://api.oxlo.ai/v1/chat"
+        endpoint = actual_endpoint.lower()
+
+    def _extract_text(data: Dict[str, Any]) -> Optional[str]:
+        # Anthropic style: {"content": [{"type": "text", "text": "..."}]}
+        if "content" in data and isinstance(data["content"], list):
+            for block in data["content"]:
+                if isinstance(block, dict) and block.get("type") == "text":
+                    text = block.get("text", "").strip()
+                    if text:
+                        return text
+
+        # OpenAI/Oxlo style: {"choices": [{"message": {"content": "..."}}]}
+        choices = data.get("choices")
+        if isinstance(choices, list) and choices:
+            message = choices[0].get("message", {}) if isinstance(choices[0], dict) else {}
+            content = message.get("content", "") if isinstance(message, dict) else ""
+            if isinstance(content, str) and content.strip():
+                return content.strip()
+
+        # Some providers return direct "text"
+        if isinstance(data.get("text"), str) and data.get("text").strip():
+            return data.get("text").strip()
+
+        return None
+
+    # Build both payload styles and try endpoint-compatible flow first, then fallback.
+    anthropic_system = "\n".join([m.get("content", "") for m in messages if m.get("role") == "system"]).strip()
+    anthropic_messages = [m for m in messages if m.get("role") in ("user", "assistant")]
+    if not anthropic_messages:
+        anthropic_messages = [{"role": "user", "content": "Hello"}]
+
+    anthropic_headers = {
+        "Authorization": f"Bearer {api_key}",
+        "x-api-key": api_key,
+        "anthropic-version": "2023-06-01",
+        "Content-Type": "application/json",
+    }
+    anthropic_payload: Dict[str, Any] = {
+        "model": "claude-3-5-sonnet-20241022",
+        "messages": anthropic_messages,
+        "temperature": temperature,
+        "max_tokens": max_tokens,
+    }
+    if anthropic_system:
+        anthropic_payload["system"] = anthropic_system
+
+    openai_headers = {
+        "Authorization": f"Bearer {api_key}",
+        "x-api-key": api_key,
+        "Content-Type": "application/json",
+    }
+    openai_payload = {
+        "messages": messages,
+        "temperature": temperature,
+        "max_tokens": max_tokens,
+    }
+
+    attempts = []
+    if "anthropic" in endpoint:
+        attempts = [(anthropic_headers, anthropic_payload), (openai_headers, openai_payload)]
+    else:
+        attempts = [(openai_headers, openai_payload), (anthropic_headers, anthropic_payload)]
+
+    last_error = ""
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        for headers, payload in attempts:
+            try:
+                response = await client.post(actual_endpoint, headers=headers, json=payload)
+                if response.status_code != 200:
+                    last_error = f"status={response.status_code}, body={response.text[:220]}"
+                    continue
+
                 data = response.json()
-                return data.get("choices", [{}])[0].get("message", {}).get("content", "")
-            else:
-                print(f"Oxlo API error: {response.status_code}")
-                return _get_fallback_response(messages)
-                
-    except Exception as e:
-        print(f"Error calling Oxlo API: {e}")
-        return _get_fallback_response(messages)
+                text = _extract_text(data)
+                if text:
+                    return text
+
+                last_error = f"No textual content in response payload keys={list(data.keys())}"
+            except Exception as e:
+                last_error = str(e)
+
+    raise ValueError(f"AI API request failed: {last_error}")
 
 def _get_fallback_response(messages: List[Dict[str, str]]) -> str:
     """Fallback response when API is not available"""
@@ -121,7 +188,17 @@ Return as JSON array with keys: original, improved, reason, impact_score"""
         {"role": "user", "content": prompt}
     ]
     
-    response = await call_oxlo_chat(messages, temperature=0.5)
+    try:
+        response = await call_oxlo_chat(messages, temperature=0.5)
+    except Exception:
+        return [
+            {
+                "original": bullets[0] if bullets else "Worked on projects",
+                "improved": "Built and shipped production features with measurable impact on users and performance.",
+                "reason": "Fallback suggestion generated because AI service authentication failed.",
+                "impact_score": 7,
+            }
+        ]
     
     try:
         return json.loads(response)
@@ -167,29 +244,42 @@ Return as JSON with keys: match_percentage, hire_probability, matched_skills, mi
         {"role": "user", "content": prompt}
     ]
     
-    response = await call_oxlo_chat(messages, temperature=0.3, max_tokens=3000)
-    
     try:
-        return json.loads(response)
-    except:
+        response = await call_oxlo_chat(messages, temperature=0.3, max_tokens=3000)
+    except Exception:
+        # Graceful fallback so UI can continue even when external AI auth fails.
         return {
-            "match_percentage": 68,
+            "match_percentage": 62,
             "hire_probability": "Medium",
-            "matched_skills": ["Python", "React", "MongoDB"],
-            "missing_skills": ["Docker", "Kubernetes", "AWS Lambda"],
+            "matched_skills": ["Communication", "Problem Solving"],
+            "missing_skills": ["Role-specific keywords from JD"],
             "focus_areas": [
                 {
-                    "skill": "Docker",
+                    "skill": "JD keyword alignment",
                     "priority": "HIGH",
-                    "weight": 25,
-                    "reason": "Critical for deployment pipeline",
-                    "study_time": "2-3 weeks"
+                    "weight": 35,
+                    "reason": "AI service unavailable, unable to score exact technical overlap.",
+                    "study_time": "2-3 days",
                 }
             ],
-            "interview_topics": ["System Design", "Docker", "Microservices"],
-            "strengths": ["Strong Python skills", "Good project experience"],
-            "weaknesses": ["Limited cloud experience", "No containerization"]
+            "interview_topics": ["Core fundamentals", "Project deep-dive"],
+            "strengths": ["Resume data parsed successfully"],
+            "weaknesses": ["Live AI matching unavailable due to API authentication"],
         }
+    
+    try:
+        cleaned = response.strip()
+        if cleaned.startswith("```json"):
+            cleaned = cleaned[7:]
+        if cleaned.startswith("```"):
+            cleaned = cleaned[3:]
+        if cleaned.endswith("```"):
+            cleaned = cleaned[:-3]
+        cleaned = cleaned.strip()
+
+        return json.loads(cleaned)
+    except Exception as e:
+        raise ValueError(f"Failed to parse AI JD match response: {str(e)}")
 
 
 async def generate_roadmap(resume_text: str, jd_text: str, skill_gaps: List[str]) -> Dict[str, Any]:
@@ -496,7 +586,40 @@ Return ONLY valid JSON, no additional text."""
         {"role": "user", "content": prompt}
     ]
     
-    response = await call_oxlo_chat(messages, temperature=0.3, max_tokens=4000)
+    try:
+        response = await call_oxlo_chat(messages, temperature=0.3, max_tokens=4000)
+    except Exception:
+        return {
+            "ats_score": 55,
+            "score_breakdown": {
+                "keyword_match": 50,
+                "skills_relevance": 60,
+                "experience_alignment": 55,
+                "education_fit": 60,
+                "resume_structure": 65,
+                "projects_quality": 55,
+                "ats_compatibility": 60
+            },
+            "matched_keywords": [],
+            "missing_keywords": ["Job-specific keywords"],
+            "analysis": {
+                "strengths": ["Resume was parsed and structured successfully"],
+                "weaknesses": ["Live AI ATS scoring unavailable due to API authentication"],
+                "red_flags": []
+            },
+            "suggestions": {
+                "improve_keywords": ["Add exact keywords from target job description"],
+                "add_projects": ["Add measurable project outcomes"],
+                "enhance_experience": ["Quantify impact with numbers"],
+                "formatting_fixes": ["Use ATS-friendly section headings"]
+            },
+            "final_verdict": "Fallback analysis used because AI provider authentication failed",
+            "improvement_roadmap": {
+                "duration_weeks": 4,
+                "target_score_increase": 20,
+                "weekly_tasks": []
+            }
+        }
     
     try:
         result = json.loads(response)

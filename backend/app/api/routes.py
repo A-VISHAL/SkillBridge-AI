@@ -32,6 +32,7 @@ async def test_ai_connection():
             response = await client.post(
                 settings.OXLO_CHAT_ENDPOINT,
                 headers={
+                    "Authorization": f"Bearer {settings.OXLO_API_KEY}",
                     "x-api-key": settings.OXLO_API_KEY,
                     "anthropic-version": "2023-06-01",
                     "Content-Type": "application/json"

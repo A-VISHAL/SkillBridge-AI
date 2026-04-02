@@ -1,12 +1,16 @@
 @echo off
+setlocal
 echo ========================================
 echo Starting SkillBridge AI Application
 echo ========================================
 echo.
 
+set "ROOT_DIR=%~dp0"
+set "PYTHON_EXE=py"
+
 REM Start Backend
 echo [1/2] Starting Backend Server...
-start "SkillBridge Backend" cmd /k "cd backend && python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000"
+start "SkillBridge Backend" /D "%ROOT_DIR%backend" "%PYTHON_EXE%" -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
 timeout /t 3 /nobreak >nul
 
 REM Start Frontend

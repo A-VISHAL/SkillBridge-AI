@@ -3,14 +3,33 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
+def _get_env(*names: str, default: str = "") -> str:
+    """Return the first non-empty environment variable from a list of names."""
+    for name in names:
+        value = os.getenv(name)
+        if value is not None and str(value).strip() != "":
+            return str(value).strip()
+    return default
+
+
+def _normalize_api_key(value: str) -> str:
+    """Normalize common key formats like quoted strings or Bearer-prefixed values."""
+    key = (value or "").strip().strip('"').strip("'")
+    if key.lower().startswith("bearer "):
+        key = key[7:].strip()
+    return key
+
 class Settings:
     PROJECT_NAME: str = "SkillBridge AI API"
     VERSION: str = "1.0.0"
     DESCRIPTION: str = "Agentic Career Operating System - HackHazards '26"
     
     # Oxlo API
-    OXLO_API_KEY: str = os.getenv("OXLO_API_KEY", "")
-    OXLO_CHAT_ENDPOINT: str = os.getenv("OXLO_CHAT_ENDPOINT", "https://api.oxlo.ai/v1/chat")
+    OXLO_API_KEY: str = _normalize_api_key(
+        _get_env("OXLO_API_KEY", "OXLO_API_TOKEN", "OPENAI_API_KEY", "ANTHROPIC_API_KEY")
+    )
+    OXLO_CHAT_ENDPOINT: str = _get_env("OXLO_CHAT_ENDPOINT", default="https://api.oxlo.ai/v1/chat")
     OXLO_EMBEDDINGS_ENDPOINT: str = os.getenv("OXLO_EMBEDDINGS_ENDPOINT", "https://api.oxlo.ai/v1/embeddings")
     
     # Job Search APIs

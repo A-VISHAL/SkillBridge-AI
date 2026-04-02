@@ -983,7 +983,7 @@ const ResumeAnalyzer = ({ onResumeParsed }) => {
         const formData = new FormData();
         formData.append('file', file);
         
-        const uploadResponse = await fetch('http://localhost:8000/api/resume/upload', {
+        const uploadResponse = await fetch('/api/resume/upload', {
           method: 'POST',
           body: formData,
         });
@@ -1003,7 +1003,7 @@ const ResumeAnalyzer = ({ onResumeParsed }) => {
         analyzeFormData.append('resume_id', resumeId);
         analyzeFormData.append('target_role', 'Software Engineer');
         
-        const analyzeResponse = await fetch('http://localhost:8000/api/resume/analyze', {
+        const analyzeResponse = await fetch('/api/resume/analyze', {
           method: 'POST',
           body: analyzeFormData,
         });
@@ -1078,7 +1078,7 @@ const ResumeAnalyzer = ({ onResumeParsed }) => {
     setLoading(true);
     try {
       // Get sample resume
-      const sampleResponse = await fetch('http://localhost:8000/api/resume/sample');
+      const sampleResponse = await fetch('/api/resume/sample');
       const sampleData = await sampleResponse.json();
       
       setFileName("Sample_Resume.pdf");
@@ -1092,7 +1092,7 @@ const ResumeAnalyzer = ({ onResumeParsed }) => {
       analyzeFormData.append('resume_id', sampleData.resume_id);
       analyzeFormData.append('target_role', 'Software Engineer');
       
-      const analyzeResponse = await fetch('http://localhost:8000/api/resume/analyze', {
+      const analyzeResponse = await fetch('/api/resume/analyze', {
         method: 'POST',
         body: analyzeFormData,
       });
@@ -1386,12 +1386,58 @@ const ResumeAnalyzer = ({ onResumeParsed }) => {
 }
 
 // ─── JD Matcher ───────────────────────────────────────────────────────────────
-const JDMatcher = () => {
+const JDMatcher = ({ resumeId }) => {
   const [jd, setJD] = useState("");
-  const [analyzed, setAnalyzed] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [matchResult, setMatchResult] = useState(null);
 
-  const missingSkills = ["Docker", "Kubernetes", "GraphQL", "Redis", "gRPC", "Terraform"];
-  const focusAreas = ["System Design", "Distributed Systems", "Cloud Architecture"];
+  const analyzeMatch = async () => {
+    if (!resumeId) {
+      setError("Upload your resume in Resume Analyzer first.");
+      setMatchResult(null);
+      return;
+    }
+    if (!jd.trim()) {
+      setError("Paste a job description first.");
+      setMatchResult(null);
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+    try {
+      const formData = new FormData();
+      formData.append("resume_id", resumeId);
+      formData.append("job_description", jd);
+
+      const response = await fetch('/api/jd/match', {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const message = await response.text();
+        throw new Error(message || "Failed to analyze JD match");
+      }
+
+      const data = await response.json();
+      setMatchResult(data);
+    } catch (e) {
+      console.error(e);
+      setError("Could not analyze JD match with real data. Please check API key/config and try again.");
+      setMatchResult(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const analyzed = matchResult !== null;
+  const missingSkills = matchResult?.missing_skills || [];
+  const focusAreas = matchResult?.focus_areas || [];
+  const strengths = matchResult?.strengths || [];
+  const weaknesses = matchResult?.weaknesses || [];
+  const overallMatch = Math.round(matchResult?.match_percentage || 0);
 
   return (
     <div style={{ padding: 28, display: "flex", flexDirection: "column", gap: 22, animation: "fadeIn 0.4s ease" }}>
@@ -1416,15 +1462,19 @@ const JDMatcher = () => {
                 lineHeight: 1.65,
               }}
             />
-            <Btn variant="primary" onClick={() => setAnalyzed(true)} style={{ marginTop: 12, width: "100%", justifyContent: "center" }} icon={<Icon name="search" size={14}/>}>
-              Analyze match
+            <Btn variant="primary" onClick={analyzeMatch} style={{ marginTop: 12, width: "100%", justifyContent: "center" }} icon={<Icon name="search" size={14}/>}> 
+              {loading ? "Analyzing..." : "Analyze match"}
             </Btn>
+            {error && <div style={{ marginTop: 10, fontSize: 12.5, color: "#b91c1c", fontWeight: 600 }}>{error}</div>}
           </Card>
 
           {analyzed && (
             <Card style={{ padding: 20 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: "var(--gray-700)", marginBottom: 14 }}>Focus Areas</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {focusAreas.length === 0 && (
+                  <div style={{ fontSize: 12.5, color: "var(--gray-500)" }}>No focus areas returned for this JD.</div>
+                )}
                 {focusAreas.map((a, i) => (
                   <div key={i} style={{
                     display: "flex", alignItems: "center", gap: 10,
@@ -1433,7 +1483,8 @@ const JDMatcher = () => {
                     fontSize: 13, fontWeight: 500,
                   }}>
                     <Icon name="target" size={14} color="rgba(255,255,255,0.6)"/>
-                    {a}
+                    {a.skill || "Skill"}
+                    <span style={{ marginLeft: "auto", fontSize: 11, color: "rgba(255,255,255,0.65)" }}>{a.priority || "MEDIUM"}</span>
                   </div>
                 ))}
               </div>
@@ -1445,15 +1496,18 @@ const JDMatcher = () => {
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <Card style={{ padding: "24px 22px", textAlign: "center" }}>
               <div style={{ fontSize: 12, fontWeight: 600, color: "var(--gray-400)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 16 }}>Overall Match</div>
-              <CircularProgress value={74} size={130} label="Match"/>
+              <CircularProgress value={overallMatch} size={130} label="Match"/>
               <div style={{ marginTop: 18, fontSize: 13, color: "var(--gray-500)", lineHeight: 1.6 }}>
-                You match <strong style={{ color: "var(--gray-900)" }}>74%</strong> of this job's requirements. Upskilling in 3 areas would bring you to 90%+.
+                You match <strong style={{ color: "var(--gray-900)" }}>{overallMatch}%</strong> of this job's requirements.
               </div>
             </Card>
 
             <Card style={{ padding: 20 }}>
               <div style={{ fontSize: 13, fontWeight: 650, color: "var(--gray-900)", marginBottom: 14 }}>Missing Skills</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {missingSkills.length === 0 && (
+                  <span style={{ fontSize: 12.5, color: "var(--gray-500)" }}>No missing skills detected.</span>
+                )}
                 {missingSkills.map(skill => (
                   <span key={skill} style={{
                     padding: "5px 12px", borderRadius: 99,
@@ -1465,10 +1519,30 @@ const JDMatcher = () => {
               </div>
 
               <div style={{ marginTop: 18, display: "flex", flexDirection: "column", gap: 10 }}>
-                <ProgressBar value={92} label="Technical skills" sublabel="92%"/>
-                <ProgressBar value={68} label="DevOps & infrastructure" sublabel="68%"/>
-                <ProgressBar value={80} label="Soft skills match" sublabel="80%"/>
+                <ProgressBar value={Math.max(0, Math.min(100, overallMatch))} label="Overall technical match" sublabel={`${overallMatch}%`}/>
+                <ProgressBar value={Math.max(0, 100 - Math.min(100, missingSkills.length * 8))} label="Skill coverage" sublabel={`${Math.max(0, 100 - Math.min(100, missingSkills.length * 8))}%`}/>
               </div>
+
+              {(strengths.length > 0 || weaknesses.length > 0) && (
+                <div style={{ marginTop: 18, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "#166534", marginBottom: 8 }}>Strengths</div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      {strengths.slice(0, 3).map((s, i) => (
+                        <span key={i} style={{ fontSize: 12, color: "var(--gray-600)" }}>• {s}</span>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "#b45309", marginBottom: 8 }}>Weaknesses</div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      {weaknesses.slice(0, 3).map((w, i) => (
+                        <span key={i} style={{ fontSize: 12, color: "var(--gray-600)" }}>• {w}</span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
             </Card>
           </div>
         )}
@@ -1775,7 +1849,7 @@ const JobFinder = ({ resumeId, resumeData }) => {
       formData.append("location", location || "India");
       formData.append("remote", "false");
 
-      const response = await fetch("http://localhost:8000/api/jobs/search", {
+      const response = await fetch('/api/jobs/search', {
         method: "POST",
         body: formData,
       });
@@ -2057,7 +2131,7 @@ const Dashboard = ({ onLogout }) => {
   const pages = {
     dashboard: { component: <DashboardOverview/>, title: "Overview" },
     resume: { component: <ResumeAnalyzer onResumeParsed={handleResumeParsed}/>, title: "Resume Analyzer" },
-    matcher: { component: <JDMatcher/>, title: "JD Matcher" },
+    matcher: { component: <JDMatcher resumeId={resumeContext.resumeId}/>, title: "JD Matcher" },
     roadmap: { component: <Roadmap/>, title: "Learning Roadmap" },
     quiz: { component: <Quiz/>, title: "Adaptive Quiz" },
     interview: { component: <MockInterview/>, title: "Mock Interview" },
