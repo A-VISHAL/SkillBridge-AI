@@ -1200,91 +1200,108 @@ const ResumeAnalyzer = () => {
 
               {/* Extracted Information */}
               {resumeData && (
-                <Card style={{ marginTop: 14 }}>
-                  <div style={{ fontSize: 13.5, fontWeight: 650, color: "var(--gray-900)", marginBottom: 16 }}>Extracted Information</div>
+                <div style={{ marginTop: 14 }}>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: "var(--gray-900)", marginBottom: 14 }}>Extracted Information</div>
                   
-                  {/* Personal Info */}
+                  {/* Personal Info Card */}
                   {(resumeData.name || resumeData.email || resumeData.phone) && (
-                    <div style={{ marginBottom: 20, paddingBottom: 16, borderBottom: "1px solid var(--gray-100)" }}>
-                      {resumeData.name && <div style={{ fontSize: 16, fontWeight: 650, color: "var(--gray-900)", marginBottom: 8 }}>{resumeData.name}</div>}
-                      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                        {resumeData.email && <div style={{ fontSize: 13, color: "var(--gray-600)" }}>📧 {resumeData.email}</div>}
-                        {resumeData.phone && <div style={{ fontSize: 13, color: "var(--gray-600)" }}>📱 {resumeData.phone}</div>}
+                    <Card style={{ marginBottom: 12, padding: 20 }}>
+                      {resumeData.name && <div style={{ fontSize: 17, fontWeight: 700, color: "var(--gray-900)", marginBottom: 12 }}>{resumeData.name}</div>}
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        {resumeData.email && (
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <span style={{ fontSize: 14 }}>📧</span>
+                            <span style={{ fontSize: 13, color: "var(--gray-600)" }}>{resumeData.email}</span>
+                          </div>
+                        )}
+                        {resumeData.phone && (
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <span style={{ fontSize: 14 }}>📱</span>
+                            <span style={{ fontSize: 13, color: "var(--gray-600)" }}>{resumeData.phone}</span>
+                          </div>
+                        )}
                       </div>
-                    </div>
+                    </Card>
                   )}
 
-                  {/* Skills */}
+                  {/* Skills Card */}
                   {resumeData.skills && resumeData.skills.length > 0 && (
-                    <div style={{ marginBottom: 20, paddingBottom: 16, borderBottom: "1px solid var(--gray-100)" }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: "var(--gray-700)", marginBottom: 10 }}>Skills</div>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    <Card style={{ marginBottom: 12, padding: 20 }}>
+                      <div style={{ fontSize: 14, fontWeight: 650, color: "var(--gray-900)", marginBottom: 12 }}>Skills</div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
                         {resumeData.skills.map((skill, i) => (
                           <span key={i} style={{
-                            padding: "4px 10px", borderRadius: 99,
-                            background: "var(--gray-100)", fontSize: 12,
+                            padding: "6px 12px", borderRadius: 8,
+                            background: "var(--gray-100)", fontSize: 12.5,
                             color: "var(--gray-700)", fontWeight: 500,
                             border: "1px solid var(--gray-200)",
                           }}>{typeof skill === 'string' ? skill : skill.name}</span>
                         ))}
                       </div>
-                    </div>
+                    </Card>
                   )}
 
-                  {/* Experience */}
+                  {/* Experience Card */}
                   {resumeData.experiences && resumeData.experiences.length > 0 && (
-                    <div style={{ marginBottom: 20, paddingBottom: 16, borderBottom: "1px solid var(--gray-100)" }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: "var(--gray-700)", marginBottom: 10 }}>Experience</div>
+                    <Card style={{ marginBottom: 12, padding: 20 }}>
+                      <div style={{ fontSize: 14, fontWeight: 650, color: "var(--gray-900)", marginBottom: 14 }}>Experience</div>
                       {resumeData.experiences.map((exp, i) => (
-                        <div key={i} style={{ marginBottom: i < resumeData.experiences.length - 1 ? 12 : 0 }}>
-                          {exp.title && <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--gray-900)" }}>{exp.title}</div>}
+                        <div key={i} style={{ 
+                          marginBottom: i < resumeData.experiences.length - 1 ? 16 : 0,
+                          paddingBottom: i < resumeData.experiences.length - 1 ? 16 : 0,
+                          borderBottom: i < resumeData.experiences.length - 1 ? "1px solid var(--gray-100)" : "none"
+                        }}>
+                          {exp.title && <div style={{ fontSize: 14, fontWeight: 650, color: "var(--gray-900)", marginBottom: 4 }}>{exp.title}</div>}
                           {(exp.company || exp.duration) && (
-                            <div style={{ fontSize: 12, color: "var(--gray-500)", marginBottom: 4 }}>
+                            <div style={{ fontSize: 12.5, color: "var(--gray-500)", marginBottom: 6 }}>
                               {exp.company}{exp.company && exp.duration ? ' · ' : ''}{exp.duration}
                             </div>
                           )}
                           {exp.description && Array.isArray(exp.description) && exp.description.length > 0 && (
-                            <div style={{ fontSize: 12, color: "var(--gray-600)", lineHeight: 1.5 }}>
+                            <div style={{ fontSize: 12.5, color: "var(--gray-600)", lineHeight: 1.6 }}>
                               {exp.description.join('. ')}
                             </div>
                           )}
                         </div>
                       ))}
-                    </div>
+                    </Card>
                   )}
 
-                  {/* Education */}
+                  {/* Education Card */}
                   {resumeData.education && resumeData.education.length > 0 && (
-                    <div style={{ marginBottom: 20, paddingBottom: 16, borderBottom: "1px solid var(--gray-100)" }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: "var(--gray-700)", marginBottom: 10 }}>Education</div>
+                    <Card style={{ marginBottom: 12, padding: 20 }}>
+                      <div style={{ fontSize: 14, fontWeight: 650, color: "var(--gray-900)", marginBottom: 14 }}>Education</div>
                       {resumeData.education.map((edu, i) => (
-                        <div key={i} style={{ marginBottom: i < resumeData.education.length - 1 ? 12 : 0 }}>
-                          {edu.degree && <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--gray-900)" }}>{edu.degree}</div>}
+                        <div key={i} style={{ 
+                          marginBottom: i < resumeData.education.length - 1 ? 14 : 0,
+                          paddingBottom: i < resumeData.education.length - 1 ? 14 : 0,
+                          borderBottom: i < resumeData.education.length - 1 ? "1px solid var(--gray-100)" : "none"
+                        }}>
+                          {edu.degree && <div style={{ fontSize: 14, fontWeight: 650, color: "var(--gray-900)", marginBottom: 4 }}>{edu.degree}</div>}
                           {(edu.institution || edu.year) && (
-                            <div style={{ fontSize: 12, color: "var(--gray-500)" }}>
+                            <div style={{ fontSize: 12.5, color: "var(--gray-500)", marginBottom: 4 }}>
                               {edu.institution}{edu.institution && edu.year ? ' · ' : ''}{edu.year}
                             </div>
                           )}
-                          {edu.gpa && <div style={{ fontSize: 12, color: "var(--gray-600)" }}>CGPA: {edu.gpa}</div>}
+                          {edu.gpa && <div style={{ fontSize: 12.5, color: "var(--gray-600)" }}>CGPA: {edu.gpa}</div>}
                         </div>
                       ))}
-                    </div>
+                    </Card>
                   )}
 
-                  {/* Projects */}
+                  {/* Projects Card */}
                   {resumeData.projects && resumeData.projects.length > 0 && (
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: "var(--gray-700)", marginBottom: 10 }}>Projects</div>
+                    <Card style={{ marginBottom: 12, padding: 20 }}>
+                      <div style={{ fontSize: 14, fontWeight: 650, color: "var(--gray-900)", marginBottom: 14 }}>Projects</div>
                       {resumeData.projects.map((proj, i) => (
-                        <div key={i} style={{ marginBottom: i < resumeData.projects.length - 1 ? 16 : 0 }}>
+                        <div key={i} style={{ 
+                          marginBottom: i < resumeData.projects.length - 1 ? 14 : 0,
+                          paddingBottom: i < resumeData.projects.length - 1 ? 14 : 0,
+                          borderBottom: i < resumeData.projects.length - 1 ? "1px solid var(--gray-100)" : "none"
+                        }}>
                           {proj.name && (
-                            <div style={{ fontSize: 14, fontWeight: 650, color: "var(--gray-900)", marginBottom: 6 }}>
+                            <div style={{ fontSize: 13.5, fontWeight: 650, color: "var(--gray-900)", marginBottom: 8 }}>
                               {proj.name}
-                            </div>
-                          )}
-                          {proj.description && (
-                            <div style={{ fontSize: 12.5, color: "var(--gray-600)", marginBottom: 8, lineHeight: 1.6 }}>
-                              {proj.description}
                             </div>
                           )}
                           {proj.technologies && proj.technologies.length > 0 && (
@@ -1301,9 +1318,9 @@ const ResumeAnalyzer = () => {
                           )}
                         </div>
                       ))}
-                    </div>
+                    </Card>
                   )}
-                </Card>
+                </div>
               )}
 
               {/* Issues */}
