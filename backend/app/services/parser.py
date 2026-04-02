@@ -73,75 +73,142 @@ def extract_phone(text: str) -> Optional[str]:
     return match.group(0) if match else None
 
 def extract_experiences(text: str) -> List[Experience]:
-    """Extract work experiences (basic pattern matching)"""
+    """Extract work experiences with descriptions"""
     experiences = []
     
-    # Look for common experience section headers
+    # Look for experience section with multiple patterns
+    patterns = [
+        r'(EXPERIENCE|WORK\s*EXPERIENCE|EMPLOYMENT|PROFESSIONAL\s*EXPERIENCE|WORK\s*HISTORY)',
+        r'(EDUCATION|PROJECTS?|SKILLS?|CERTIFICATIONS?|ACHIEVEMENTS?|$)'
+    ]
+    
     exp_section = re.search(
-        r'(EXPERIENCE|WORK EXPERIENCE|EMPLOYMENT)(.*?)(EDUCATION|PROJECTS|SKILLS|$)',
+        f'{patterns[0]}(.*?){patterns[1]}',
         text,
         re.IGNORECASE | re.DOTALL
     )
     
+    if not exp_section:
+        # Try without end marker
+        exp_section = re.search(patterns[0] + r'(.*)', text, re.IGNORECASE | re.DOTALL)
+    
     if exp_section:
-        exp_text = exp_section.group(2)
-        # Simple extraction - in production, use more sophisticated NLP
-        lines = exp_text.strip().split('\n')
-        current_exp = None
+        exp_text = exp_section.group(2) if len(exp_section.groups()) > 1 else exp_section.group(1)
+        lines = [l.strip() for l in exp_text.strip().split('\n') if l.strip()]
         
-        for line in lines:
-            line = line.strip()
-            if not line:
-                continue
+        # Job title keywords
+        job_keywords = ['engineer', 'developer', 'manager', 'analyst', 'intern', 'designer', 
+                       'consultant', 'lead', 'architect', 'specialist', 'coordinator', 'associate',
+                       'executive', 'officer', 'director', 'head', 'senior', 'junior']
+        
+        current_exp = None
+        i = 0
+        
+        while i < len(lines):
+            line = lines[i]
             
-            # Check if line looks like a job title
-            if any(word in line.lower() for word in ['engineer', 'developer', 'manager', 'analyst', 'intern']):
-                if current_exp:
+            # Check if this is a job title
+            is_job_title = any(keyword in line.lower() for keyword in job_keywords)
+            
+            if is_job_title and not line.startswith(('•', '-', '*', '·')):
+                # Save previous experience
+                if current_exp and (current_exp.company or current_exp.description):
                     experiences.append(current_exp)
+                
                 current_exp = Experience(
                     title=line,
-                    company="Company Name",
+                    company="",
+                    duration="",
                     description=[]
                 )
-            elif current_exp and line.startswith(('•', '-', '*')):
-                current_exp.description.append(line.lstrip('•-* '))
+                
+                # Next line might be company/duration
+                if i + 1 < len(lines):
+                    next_line = lines[i + 1]
+                    if not next_line.startswith(('•', '-', '*', '·')) and not any(k in next_line.lower() for k in job_keywords):
+                        i += 1
+                        current_exp.company = next_line
+            
+            # Collect descriptions
+            elif current_exp and line.startswith(('•', '-', '*', '·')):
+                desc = line.lstrip('•-*· ').strip()
+                if desc and len(desc) > 10:
+                    current_exp.description.append(desc)
+            
+            i += 1
         
-        if current_exp:
+        # Add last experience
+        if current_exp and (current_exp.company or current_exp.description):
             experiences.append(current_exp)
+    
+    print(f"DEBUG: Found {len(experiences)} experiences")
+    for exp in experiences:
+        print(f"  - {exp.title}: {exp.company}")
     
     return experiences
 
 
 def extract_education(text: str) -> List[Education]:
-    """Extract education information"""
+    """Extract education information with details"""
     education = []
     
     edu_section = re.search(
-        r'(EDUCATION|ACADEMIC)(.*?)(EXPERIENCE|PROJECTS|SKILLS|$)',
+        r'(EDUCATION|ACADEMIC|QUALIFICATION|EDUCATIONAL\s*BACKGROUND)(.*?)(EXPERIENCE|PROJECTS?|SKILLS?|CERTIFICATIONS?|ACHIEVEMENTS?|$)',
         text,
         re.IGNORECASE | re.DOTALL
     )
     
     if edu_section:
         edu_text = edu_section.group(2)
-        lines = edu_text.strip().split('\n')
+        lines = [l.strip() for l in edu_text.strip().split('\n') if l.strip()]
+        current_edu = None
+        i = 0
         
-        for line in lines:
-            line = line.strip()
-            if any(degree in line.upper() for degree in ['B.TECH', 'B.E.', 'M.TECH', 'MBA', 'BCA', 'MCA', 'B.SC', 'M.SC']):
-                education.append(Education(
+        while i < len(lines):
+            line = lines[i]
+            
+            # Check if line contains a degree
+            if any(degree in line.upper() for degree in ['B.TECH', 'B.E.', 'M.TECH', 'MBA', 'BCA', 'MCA', 'B.SC', 'M.SC', 'BACHELOR', 'MASTER', 'DIPLOMA', 'B.A.', 'M.A.', 'PH.D', 'PHD']):
+                # Save previous education
+                if current_edu:
+                    education.append(current_edu)
+                
+                current_edu = Education(
                     degree=line,
-                    institution="University Name"
-                ))
+                    institution="",
+                    year="",
+                    gpa=""
+                )
+                
+                # Try to get institution from next line
+                if i + 1 < len(lines) and not lines[i + 1].startswith(('•', '-', '*')) and 'cgpa' not in lines[i + 1].lower() and 'gpa' not in lines[i + 1].lower():
+                    i += 1
+                    current_edu.institution = lines[i]
+            
+            # Check if line contains CGPA/GPA
+            elif current_edu and ('cgpa' in line.lower() or 'gpa' in line.lower() or re.search(r'\d+\.\d+\s*/\s*\d+', line)):
+                current_edu.gpa = line
+            
+            i += 1
+        
+        if current_edu:
+            education.append(current_edu)
     
     return education
 
 def extract_projects(text: str) -> List[Project]:
-    """Extract projects"""
+    """Extract projects - only titles"""
     projects = []
     
+    # Blacklist of words/phrases to skip
+    BLACKLIST_STARTS = [
+        'built', 'developed', 'implemented', 'integrated', 'designed', 
+        'created', 'worked', 'used', 'added', 'deployed', 'configured',
+        'established', 'maintained', 'improved', 'enhanced', 'optimized'
+    ]
+    
     proj_section = re.search(
-        r'(PROJECTS?|PERSONAL PROJECTS)(.*?)(EXPERIENCE|EDUCATION|SKILLS|$)',
+        r'(PROJECTS?|PERSONAL PROJECTS)(.*?)(EXPERIENCE|EDUCATION|SKILLS|CERTIFICATIONS?|$)',
         text,
         re.IGNORECASE | re.DOTALL
     )
@@ -149,26 +216,34 @@ def extract_projects(text: str) -> List[Project]:
     if proj_section:
         proj_text = proj_section.group(2)
         lines = proj_text.strip().split('\n')
-        current_proj = None
         
         for line in lines:
             line = line.strip()
-            if not line:
+            
+            # Skip empty lines and bullet points
+            if not line or line.startswith(('•', '-', '*', '·')):
                 continue
             
-            if not line.startswith(('•', '-', '*')) and len(line) > 10:
-                if current_proj:
-                    projects.append(current_proj)
-                current_proj = Project(
-                    name=line,
-                    description="",
-                    technologies=[]
-                )
-            elif current_proj:
-                current_proj.description += " " + line.lstrip('•-* ')
-        
-        if current_proj:
-            projects.append(current_proj)
+            # Skip lines starting with blacklisted action words
+            if any(line.lower().startswith(word) for word in BLACKLIST_STARTS):
+                continue
+            
+            # Skip lines that are just URLs
+            if line.startswith(('http://', 'https://', 'www.')):
+                continue
+            
+            # Only capture lines that look like project titles (reasonable length)
+            if 10 < len(line) < 200:
+                # Remove link-related suffixes from the title
+                line = re.sub(r'\s*[-:·]\s*(Link|GitHub\s*link|Github\s*link|Git\s*link).*$', '', line, flags=re.IGNORECASE)
+                line = line.strip()
+                
+                if line:  # Make sure we still have content after removal
+                    projects.append(Project(
+                        name=line,
+                        description="",
+                        technologies=[]
+                    ))
     
     return projects
 
@@ -185,14 +260,28 @@ def parse_resume(file_path: str) -> ParsedResume:
     if not text:
         return get_sample_resume()
     
+    # Debug: Print extracted text sections
+    print("=" * 50)
+    print("EXTRACTED TEXT:")
+    print(text[:500])  # Print first 500 chars
+    print("=" * 50)
+    
     # Extract all components
+    experiences = extract_experiences(text)
+    education = extract_education(text)
+    projects = extract_projects(text)
+    
+    print(f"Extracted {len(experiences)} experiences")
+    print(f"Extracted {len(education)} education entries")
+    print(f"Extracted {len(projects)} projects")
+    
     return ParsedResume(
         email=extract_email(text),
         phone=extract_phone(text),
         skills=extract_skills(text),
-        experiences=extract_experiences(text),
-        education=extract_education(text),
-        projects=extract_projects(text),
+        experiences=experiences,
+        education=education,
+        projects=projects,
         raw_text=text
     )
 
