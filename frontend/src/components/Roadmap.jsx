@@ -1,249 +1,154 @@
-import { useState, useEffect, useRef } from 'react'
+import { useEffect, useMemo, useState } from 'react';
 
-// Celebration Popup Component
-const CelebrationPopup = ({ isVisible, onClose }) => {
-  if (!isVisible) return null;
+const Button = ({ children, active = false, onClick, disabled = false, style = {} }) => (
+  <button
+    onClick={onClick}
+    disabled={disabled}
+    style={{
+      padding: '10px 18px',
+      borderRadius: 999,
+      border: active ? '1px solid #111827' : '1px solid #d1d5db',
+      background: active ? '#111827' : '#ffffff',
+      color: active ? '#ffffff' : '#374151',
+      fontWeight: 600,
+      fontSize: 13,
+      cursor: disabled ? 'not-allowed' : 'pointer',
+      transition: 'all 0.2s ease',
+      opacity: disabled ? 0.6 : 1,
+      fontFamily: 'inherit',
+      ...style,
+    }}
+  >
+    {children}
+  </button>
+);
+
+const Card = ({ children, style = {} }) => (
+  <div
+    style={{
+      background: '#ffffff',
+      border: '1px solid #ececec',
+      borderRadius: 20,
+      boxShadow: '0 10px 30px rgba(0,0,0,0.06)',
+      ...style,
+    }}
+  >
+    {children}
+  </div>
+);
+
+const Icon = ({ check = false }) => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    {check ? <polyline points="20 6 9 17 4 12" /> : <circle cx="12" cy="12" r="10" />}
+  </svg>
+);
+
+const CelebrationPopup = ({ visible, onClose }) => {
+  if (!visible) return null;
 
   return (
-    <div style={{
-      position: "fixed",
-      inset: 0,
-      background: "rgba(0,0,0,0.7)",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      zIndex: 9999,
-      animation: "fadeIn 0.3s ease",
-    }}>
-      <div style={{
-        background: "var(--white)",
-        borderRadius: "24px",
-        padding: "60px 40px",
-        textAlign: "center",
-        maxWidth: 500,
-        position: "relative",
-        animation: "popUp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)",
-        boxShadow: "0 25px 50px rgba(0,0,0,0.25)",
-      }}>
-        {/* Confetti effect */}
-        <div style={{ position: "absolute", inset: 0, overflow: "hidden", borderRadius: "24px" }}>
-          {Array.from({ length: 12 }).map((_, i) => (
-            <div
-              key={i}
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 9999,
+        background: 'rgba(0,0,0,0.68)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        animation: 'roadmapFadeIn 0.25s ease',
+      }}
+    >
+      <div
+        style={{
+          position: 'relative',
+          width: 'min(92vw, 560px)',
+          padding: '56px 34px 32px',
+          borderRadius: 28,
+          background: '#fff',
+          boxShadow: '0 30px 80px rgba(0,0,0,0.3)',
+          textAlign: 'center',
+          transformOrigin: 'center',
+          animation: 'roadmapPop 0.45s cubic-bezier(0.2, 1, 0.22, 1)',
+          overflow: 'hidden',
+        }}
+      >
+        <div
+          aria-hidden="true"
+          style={{
+            position: 'absolute',
+            inset: 0,
+            pointerEvents: 'none',
+            overflow: 'hidden',
+          }}
+        >
+          {Array.from({ length: 18 }).map((_, index) => (
+            <span
+              key={index}
               style={{
-                position: "absolute",
-                width: "10px",
-                height: "10px",
-                background: ["#10b981", "#3b82f6", "#f59e0b", "#ef4444"][i % 4],
-                borderRadius: "50%",
-                left: `${Math.random() * 100}%`,
-                top: "-20px",
-                animation: `confetti 3s ease-out forwards`,
-                animationDelay: `${i * 0.1}s`,
+                position: 'absolute',
+                top: -18,
+                left: `${(index * 17) % 100}%`,
+                width: 10,
+                height: 10,
+                borderRadius: '50%',
+                background: ['#10b981', '#3b82f6', '#f59e0b', '#ef4444'][index % 4],
+                animation: `roadmapConfetti ${2.6 + (index % 4) * 0.2}s linear forwards`,
+                animationDelay: `${index * 0.05}s`,
               }}
             />
           ))}
         </div>
 
-        {/* Content */}
-        <div style={{ position: "relative", zIndex: 1 }}>
-          <div style={{
-            fontSize: 80,
-            marginBottom: 20,
-            animation: "bounce 0.6s ease-out infinite",
-          }}>
-            🎉
+        <div style={{ position: 'relative', zIndex: 1 }}>
+          <div style={{ fontSize: 76, lineHeight: 1, marginBottom: 14 }}>🎉</div>
+          <div style={{ fontSize: 30, fontWeight: 800, letterSpacing: '-0.04em', color: '#111827' }}>
+            Congratulations!
           </div>
-          
-          <h2 style={{
-            fontSize: 32,
-            fontWeight: 700,
-            color: "var(--gray-900)",
-            marginBottom: 10,
-            letterSpacing: "-0.02em",
-          }}>
-            Congratulations! 🚀
-          </h2>
-          
-          <p style={{
-            fontSize: 16,
-            color: "var(--gray-600)",
-            marginBottom: 8,
-            lineHeight: 1.6,
-          }}>
-            You've completed your entire learning roadmap!
-          </p>
-          
-          <p style={{
-            fontSize: 14,
-            color: "var(--gray-500)",
-            marginBottom: 30,
-          }}>
-            You're now ready to ace your interviews and land that dream job! 💼
-          </p>
-
-          <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
-            <button
-              onClick={onClose}
-              style={{
-                padding: "12px 32px",
-                borderRadius: 99,
-                background: "var(--gray-900)",
-                color: "var(--white)",
-                border: "none",
-                fontSize: 14,
-                fontWeight: 600,
-                cursor: "pointer",
-                transition: "all 0.2s",
-                fontFamily: "inherit",
-              }}
-              onMouseEnter={(e) => e.target.style.background = "var(--gray-700)"}
-              onMouseLeave={(e) => e.target.style.background = "var(--gray-900)"}
-            >
-              View Certificate
-            </button>
+          <div style={{ marginTop: 10, fontSize: 16, color: '#4b5563', lineHeight: 1.6 }}>
+            You completed your roadmap. The learning path is done.
+          </div>
+          <div style={{ marginTop: 10, fontSize: 14, color: '#6b7280' }}>
+            Resume and JD-based plan fully completed.
+          </div>
+          <div style={{ marginTop: 26 }}>
+            <Button active onClick={onClose} style={{ padding: '12px 26px' }}>
+              Close
+            </Button>
           </div>
         </div>
       </div>
-
-      <style>{`
-        @keyframes popUp {
-          from {
-            transform: scale(0.5);
-            opacity: 0;
-          }
-          to {
-            transform: scale(1);
-            opacity: 1;
-          }
-        }
-        @keyframes confetti {
-          to {
-            transform: translateY(500px) rotateZ(360deg);
-            opacity: 0;
-          }
-        }
-        @keyframes bounce {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-20px); }
-        }
-      `}</style>
     </div>
   );
 };
 
-const Badge = ({ children, variant = "default", style = {} }) => {
-  const styles = {
-    default: { bg: "var(--gray-100)", color: "var(--gray-600)", border: "var(--gray-200)" },
-    success: { bg: "#f0fdf4", color: "#166534", border: "#bbf7d0" },
-    warning: { bg: "#fffbeb", color: "#92400e", border: "#fde68a" },
-    error: { bg: "#fef2f2", color: "#991b1b", border: "#fca5a5" },
-    neutral: { bg: "var(--gray-800)", color: "var(--white)", border: "var(--gray-800)" },
-  };
-  const s = styles[variant];
-  return (
-    <span style={{
-      display: "inline-flex", alignItems: "center", gap: 4,
-      padding: "2px 10px", borderRadius: 99,
-      fontSize: 11, fontWeight: 500, letterSpacing: "0.02em",
-      background: s.bg, color: s.color,
-      border: `1px solid ${s.border}`,
-      ...style,
-    }}>
-      {children}
-    </span>
-  );
-};
-
-const Btn = ({ children, variant = "primary", onClick, style = {}, disabled = false }) => {
-  const [hovered, setHovered] = useState(false);
-  const base = {
-    display: "inline-flex", alignItems: "center", justifyContent: "center",
-    gap: 8, padding: "10px 22px", borderRadius: 99,
-    fontSize: 13.5, fontWeight: 600, cursor: disabled ? "not-allowed" : "pointer",
-    transition: "all 0.2s ease", border: "none", fontFamily: "inherit",
-    letterSpacing: "-0.01em", opacity: disabled ? 0.6 : 1,
-  };
-  const variants = {
-    primary: {
-      background: hovered && !disabled ? "var(--gray-900)" : "var(--black)",
-      color: "var(--white)",
-      boxShadow: hovered && !disabled ? "0 6px 20px rgba(0,0,0,0.22)" : "0 2px 8px rgba(0,0,0,0.12)",
-      transform: hovered && !disabled ? "translateY(-1px)" : "none",
-    },
-    secondary: {
-      background: hovered && !disabled ? "var(--gray-100)" : "var(--white)",
-      color: "var(--gray-800)",
-      border: "1px solid var(--gray-200)",
-      boxShadow: "var(--shadow-sm)",
-    },
-  };
-  return (
-    <button onClick={onClick} disabled={disabled}
-      onMouseEnter={() => !disabled && setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{ ...base, ...variants[variant], ...style }}>
-      {children}
-    </button>
-  );
-};
-
-const Card = ({ children, style = {}, hover = false }) => (
-  <div style={{
-    background: "var(--white)",
-    border: "1px solid var(--gray-150)",
-    borderRadius: "var(--radius-lg)",
-    boxShadow: "var(--shadow-md)",
-    padding: 24,
-    ...style,
-  }}>
-    {children}
-  </div>
-);
-
-const Icon = ({ name, size = 18, color = "currentColor" }) => {
-  const icons = {
-    check: <><polyline points="20 6 9 17 4 12"/></>,
-    chevron: <><polyline points="9 18 15 12 9 6"/></>,
-    zap: <><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></>,
-  };
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24"
-      fill="none" stroke={color} strokeWidth="1.75"
-      strokeLinecap="round" strokeLinejoin="round">
-      {icons[name]}
-    </svg>
-  );
-};
-
 export default function Roadmap({ resumeId, jobDescription }) {
+  const [durationWeeks, setDurationWeeks] = useState(12);
   const [roadmap, setRoadmap] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [durationWeeks, setDurationWeeks] = useState(8);
+  const [error, setError] = useState('');
   const [taskProgress, setTaskProgress] = useState({});
   const [showCongrats, setShowCongrats] = useState(false);
-  const weeklyProgressRef = useRef({});
 
-  const generateRoadmap = async (weeks) => {
+  const fetchRoadmap = async (weeks) => {
     if (!resumeId) {
-      setError("Upload your resume in Resume Analyzer first.");
-      setRoadmap(null);
+      setError('Upload your resume first.');
       return;
     }
     if (!jobDescription) {
-      setError("Analyze a JD in JD Matcher first to generate a roadmap.");
-      setRoadmap(null);
+      setError('Analyze a JD first.');
       return;
     }
 
     setLoading(true);
-    setError("");
+    setError('');
+    setShowCongrats(false);
+
     try {
       const formData = new FormData();
-      formData.append("resume_id", resumeId);
-      formData.append("job_description", jobDescription);
-      formData.append("daily_hours", 2);
+      formData.append('resume_id', resumeId);
+      formData.append('job_description', jobDescription);
+      formData.append('daily_hours', '2');
 
       const response = await fetch('/api/roadmap', {
         method: 'POST',
@@ -251,719 +156,314 @@ export default function Roadmap({ resumeId, jobDescription }) {
       });
 
       if (!response.ok) {
-        throw new Error("Failed to generate roadmap");
+        throw new Error('Failed to generate roadmap');
       }
 
       const data = await response.json();
-      
-      // Validate and filter tasks by duration
-      if (data.tasks && Array.isArray(data.tasks)) {
-        data.tasks = data.tasks.filter(task => task.week <= weeks);
-      }
-      
-      data.duration_weeks = weeks;
-      setRoadmap(data);
-      setTaskProgress({});
-      weeklyProgressRef.current = {};
-      setShowCongrats(false);
-    } catch (e) {
-      console.error(e);
-      setError("Could not generate roadmap. Ensure API is configured and try again.");
-      setRoadmap(null);
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  const toggleTaskComplete = (weekNum, taskIdx) => {
-    const key = `${weekNum}-${taskIdx}`;
-    setTaskProgress(prev => {
-      const newProgress = { ...prev, [key]: !prev[key] };
-      
-      // Check if all tasks are complete
-      if (roadmap && roadmap.tasks) {
-        const allComplete = roadmap.tasks.every((_, idx) => {
-          const taskWeek = roadmap.tasks[idx].week;
-          const taskKey = `${taskWeek}-${roadmap.tasks.findIndex(t => t.week === taskWeek && roadmap.tasks.indexOf(t) === idx)}`;
-          return newProgress[taskKey];
+      const taskMap = new Map();
+      if (Array.isArray(data.tasks)) {
+        data.tasks.forEach((task) => {
+          const week = Number(task.week);
+          if (week >= 1 && week <= weeks && !taskMap.has(week)) {
+            taskMap.set(week, {
+              ...task,
+              week,
+              task: String(task.task || '').trim(),
+              skill: String(task.skill || 'Focus skill').trim(),
+              difficulty: String(task.difficulty || 'Medium').trim(),
+              estimated_hours: Number(task.estimated_hours || 12),
+              resources: Array.isArray(task.resources) ? task.resources : [],
+            });
+          }
         });
-        if (allComplete && roadmap.tasks.length > 0) {
-          setTimeout(() => setShowCongrats(true), 500);
+      }
+
+      const normalizedTasks = [];
+      for (let week = 1; week <= weeks; week += 1) {
+        if (taskMap.has(week)) {
+          normalizedTasks.push(taskMap.get(week));
+        } else {
+          normalizedTasks.push({
+            week,
+            task: `Week ${week}: Focused implementation sprint tied to the JD and your resume gaps. Review the role requirements, study one missing skill in depth, and finish with a small project or interview answer tied to the target company.`,
+            skill: week <= 3 ? 'Core skill' : week <= 6 ? 'Integration skill' : week <= 9 ? 'Advanced skill' : 'Interview prep',
+            difficulty: week <= 3 ? 'Easy' : week <= 6 ? 'Medium' : 'Hard',
+            estimated_hours: week <= 3 ? 12 : week <= 6 ? 14 : week <= 9 ? 16 : 18,
+            resources: ['JD keywords', 'Resume gap review', 'Practical exercise'],
+            priority: week === weeks ? 'CRITICAL' : 'HIGH',
+            milestone: week === 3 || week === 6 || week === 9 || week === weeks,
+          });
         }
       }
-      
-      return newProgress;
-    });
-  };
 
-  const handleDurationChange = (weeks) => {
-    setDurationWeeks(weeks);
-    generateRoadmap(weeks);
-  };
+      const milestones = Array.isArray(data.milestones) && data.milestones.length > 0
+        ? data.milestones
+        : normalizedTasks.filter((task) => task.milestone).map((task) => `Week ${task.week}: ${task.skill} milestone`);
 
-  if (loading) return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: 40 }}>
-      <div style={{ width: 40, height: 40, border: "3px solid var(--gray-150)", borderTopColor: "var(--gray-700)", borderRadius: "50%", animation: "spin 1s linear infinite" }}></div>
-    </div>
-  );
-
-  // Group tasks by week
-  const weekGroups = roadmap ? (roadmap.tasks || []).reduce((acc, task) => {
-    if (!acc[task.week]) acc[task.week] = [];
-    acc[task.week].push(task);
-    return acc;
-  }, {}) : {};
-
-  const weeks = Object.keys(weekGroups)
-    .sort((a, b) => parseInt(a) - parseInt(b))
-    .map(weekNum => {
-      const num = parseInt(weekNum);
-      const tasks = weekGroups[weekNum];
-      const completedCount = tasks.filter((_, idx) => taskProgress[`${num}-${idx}`]).length;
-      const isWeekComplete = completedCount === tasks.length && tasks.length > 0;
-      
-      return {
-        num,
-        title: `Week ${weekNum}`,
-        topics: [...new Set(tasks.map(t => t.skill).filter(Boolean))],
-        tasks: tasks.map((t, idx) => ({ ...t, idx, isComplete: taskProgress[`${num}-${idx}`] })),
-        completed: completedCount,
-        total: tasks.length,
-        isComplete: isWeekComplete,
-        current: num === 1,
-      };
-    });
-
-  const totalTasks = weeks.reduce((sum, w) => sum + w.total, 0);
-  const completedTasks = weeks.reduce((sum, w) => sum + w.completed, 0);
-  const overallProgress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
-
-  return (
-    <div style={{ padding: 28, animation: "fadeIn 0.4s ease", display: "flex", flexDirection: "column", gap: 22 }}>
-      <CelebrationPopup isVisible={showCongrats} onClose={() => setShowCongrats(false)} />
-
-      <div>
-        <h2 style={{ fontSize: 20, fontWeight: 700, color: "var(--gray-900)", letterSpacing: "-0.04em", marginBottom: 4 }}>
-          {roadmap ? `${durationWeeks}-Week Roadmap` : 'Learning Roadmap'}
-        </h2>
-        <p style={{ fontSize: 13.5, color: "var(--gray-500)" }}>
-          {roadmap 
-            ? `Your personalized learning path (${roadmap.daily_hours || 2} hours/day)` 
-            : 'Generate a custom learning roadmap based on your resume and target JD'}
-        </p>
-      </div>
-
-      {error && (
-        <Card style={{ background: "#fef2f2", border: "1px solid #fca5a5", padding: "14px 16px" }}>
-          <div style={{ fontSize: 13, color: "#991b1b", fontWeight: 600 }}>{error}</div>
-        </Card>
-      )}
-
-      {!roadmap ? (
-        <Card style={{ padding: "24px 28px" }}>
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 13.5, fontWeight: 650, color: "var(--gray-900)", marginBottom: 12 }}>Select Roadmap Duration</div>
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              {[4, 8, 12].map(w => (
-                <Btn 
-                  key={w}
-                  variant={durationWeeks === w ? "primary" : "secondary"}
-                  onClick={() => handleDurationChange(w)}
-                  style={{ padding: "10px 20px", fontSize: 13 }}
-                >
-                  {w} weeks
-                </Btn>
-              ))}
-            </div>
-          </div>
-        </Card>
-      ) : (
-        <>
-          {/* Progress Overview */}
-          <Card style={{ padding: "20px 24px" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-              <div>
-                <div style={{ fontSize: 13.5, fontWeight: 650, color: "var(--gray-900)" }}>Overall Progress</div>
-                <div style={{ fontSize: 12, color: "var(--gray-500)", marginTop: 2 }}>
-                  {completedTasks} of {totalTasks} tasks completed
-                </div>
-              </div>
-              <div style={{ fontSize: 24, fontWeight: 700, color: "var(--gray-900)", textAlign: "right" }}>
-                {overallProgress}%
-              </div>
-            </div>
-            <div style={{ height: 6, background: "var(--gray-100)", borderRadius: 99, overflow: "hidden" }}>
-              <div style={{
-                height: "100%",
-                background: "linear-gradient(90deg, var(--gray-700), var(--gray-400))",
-                width: `${overallProgress}%`,
-                transition: "width 0.6s cubic-bezier(0.4, 0, 0.2, 1)",
-                borderRadius: 99,
-              }}/>
-            </div>
-            <div style={{ display: "flex", gap: 10, marginTop: 14, flexWrap: "wrap" }}>
-              {[4, 8, 12].map(w => (
-                <button
-                  key={w}
-                  onClick={() => handleDurationChange(w)}
-                  style={{
-                    padding: "8px 16px",
-                    borderRadius: 99,
-                    border: durationWeeks === w ? "2px solid var(--gray-900)" : "1px solid var(--gray-200)",
-                    background: durationWeeks === w ? "var(--gray-900)" : "var(--white)",
-                    color: durationWeeks === w ? "var(--white)" : "var(--gray-700)",
-                    fontSize: 12,
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    transition: "all 0.2s ease",
-                    fontFamily: "inherit",
-                  }}
-                >
-                  {w}w
-                </button>
-              ))}
-            </div>
-          </Card>
-
-          {/* Visual Timeline & Weekly Cards */}
-          <div style={{ position: "relative" }}>
-            {/* Timeline connector "lake" */}
-            <div style={{
-              position: "absolute",
-              top: 60,
-              left: 0,
-              right: 0,
-              height: 3,
-              background: "linear-gradient(90deg, #10b981 0%, #10b981 " + overallProgress + "%, var(--gray-200) " + overallProgress + "%, var(--gray-200) 100%)",
-              borderRadius: 99,
-              zIndex: 0,
-              transition: "all 0.3s ease",
-            }}/>
-
-            <div style={{ display: "flex", gap: 14, overflowX: "auto", paddingBottom: 16, paddingTop: 20, position: "relative", zIndex: 1 }}>
-              {weeks.map(week => (
-                <div
-                  key={week.num}
-                  style={{
-                    flexShrink: 0, width: 260,
-                    background: week.current ? "var(--gray-900)" : "var(--white)",
-                    border: `1px solid ${week.current ? "transparent" : "var(--gray-150)"}`,
-                    borderRadius: "var(--radius-lg)", padding: "20px 18px",
-                    boxShadow: week.current ? "var(--shadow-lg)" : "var(--shadow-md)",
-                    transition: "transform 0.2s, box-shadow 0.2s",
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", color: week.current ? "rgba(255,255,255,0.5)" : "var(--gray-300)", fontFamily: "'DM Mono', monospace" }}>
-                      WEEK {week.num}
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      {week.isComplete && (
-                        <div style={{ width: 18, height: 18, borderRadius: "50%", background: "#10b981", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                          <Icon name="check" size={10} color="white"/>
-                        </div>
-                      )}
-                      {week.current && <Badge variant="neutral" style={{ fontSize: 10, padding: "2px 8px" }}>Now</Badge>}
-                    </div>
-                  </div>
-
-                  <div style={{ fontSize: 14.5, fontWeight: 650, color: week.current ? "var(--white)" : "var(--gray-900)", marginBottom: 4, letterSpacing: "-0.02em" }}>
-                    {week.title}
-                  </div>
-                  <div style={{ fontSize: 12, color: week.current ? "rgba(255,255,255,0.6)" : "var(--gray-500)", marginBottom: 12 }}>
-                    {week.completed}/{week.total} tasks
-                  </div>
-
-                  {/* Topics */}
-                  {week.topics.length > 0 && (
-                    <div style={{ marginBottom: 12, paddingBottom: 12, borderBottom: `1px solid ${week.current ? "rgba(255,255,255,0.12)" : "var(--gray-100)"}` }}>
-                      {week.topics.slice(0, 3).map((t, i) => (
-                        <div key={i} style={{ fontSize: 11.5, color: week.current ? "rgba(255,255,255,0.65)" : "var(--gray-600)", padding: "2px 0", fontWeight: 500 }}>
-                          • {t}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Tasks with Checkboxes */}
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    {week.tasks.slice(0, 4).map((task) => (
-                      <div key={task.idx} style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
-                        <button
-                          onClick={() => toggleTaskComplete(week.num, task.idx)}
-                          style={{
-                            width: 16, height: 16, borderRadius: 4, flexShrink: 0, marginTop: 2,
-                            border: `1.5px solid ${week.current ? "rgba(255,255,255,0.4)" : task.isComplete ? "var(--gray-700)" : "var(--gray-300)"}`,
-                            background: task.isComplete ? (week.current ? "rgba(255,255,255,0.3)" : "var(--gray-700)") : "transparent",
-                            cursor: "pointer", transition: "all 0.2s",
-                            display: "flex", alignItems: "center", justifyContent: "center",
-                            fontFamily: "inherit",
-                          }}
-                        >
-                          {task.isComplete && <Icon name="check" size={10} color={week.current ? "rgba(255,255,255,0.8)" : "white"}/>}
-                        </button>
-                        <span style={{
-                          fontSize: 12,
-                          color: week.current ? "rgba(255,255,255,0.7)" : "var(--gray-600)",
-                          textDecoration: task.isComplete ? "line-through" : "none",
-                          opacity: task.isComplete ? 0.6 : 1,
-                          lineHeight: 1.4,
-                        }}>
-                          {task.task}
-                        </span>
-                      </div>
-                    ))}
-                    {week.tasks.length > 4 && (
-                      <div style={{ fontSize: 11, color: week.current ? "rgba(255,255,255,0.5)" : "var(--gray-500)", fontWeight: 500 }}>
-                        +{week.tasks.length - 4} more tasks
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Tracking Section */}
-          <Card>
-            <div style={{ fontSize: 13.5, fontWeight: 650, color: "var(--gray-900)", marginBottom: 16 }}>Track Your Progress</div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14 }}>
-              {weeks.map(week => (
-                <div key={week.num} style={{
-                  padding: "14px 16px", borderRadius: "12px",
-                  background: week.isComplete ? "#f0fdf4" : "var(--gray-50)",
-                  border: week.isComplete ? "1px solid #bbf7d0" : "1px solid var(--gray-200)",
-                }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                    <span style={{
-                      fontSize: 13, fontWeight: 600,
-                      color: week.isComplete ? "#166534" : "var(--gray-700)",
-                    }}>
-                      Week {week.num}
-                    </span>
-                    <span style={{
-                      fontSize: 12, fontWeight: 700,
-                      color: week.isComplete ? "#166534" : "var(--gray-600)",
-                    }}>
-                      {week.completed}/{week.total}
-                    </span>
-                  </div>
-                  <div style={{
-                    height: 4, background: "rgba(0,0,0,0.1)", borderRadius: 99, overflow: "hidden",
-                  }}>
-                    <div style={{
-                      height: "100%", background: week.isComplete ? "#10b981" : "var(--gray-600)",
-                      width: `${week.total > 0 ? (week.completed / week.total) * 100 : 0}%`,
-                      transition: "width 0.4s ease",
-                      borderRadius: 99,
-                    }} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
-        </>
-      )}
-    </div>
-  );
-}
-  const styles = {
-    default: { bg: "var(--gray-100)", color: "var(--gray-600)", border: "var(--gray-200)" },
-    success: { bg: "#f0fdf4", color: "#166534", border: "#bbf7d0" },
-    warning: { bg: "#fffbeb", color: "#92400e", border: "#fde68a" },
-    error: { bg: "#fef2f2", color: "#991b1b", border: "#fca5a5" },
-    neutral: { bg: "var(--gray-800)", color: "var(--white)", border: "var(--gray-800)" },
-  };
-  const s = styles[variant];
-  return (
-    <span style={{
-      display: "inline-flex", alignItems: "center", gap: 4,
-      padding: "2px 10px", borderRadius: 99,
-      fontSize: 11, fontWeight: 500, letterSpacing: "0.02em",
-      background: s.bg, color: s.color,
-      border: `1px solid ${s.border}`,
-      ...style,
-    }}>
-      {children}
-    </span>
-  );
-};
-
-const Btn = ({ children, variant = "primary", onClick, style = {}, disabled = false }) => {
-  const [hovered, setHovered] = useState(false);
-  const base = {
-    display: "inline-flex", alignItems: "center", justifyContent: "center",
-    gap: 8, padding: "10px 22px", borderRadius: 99,
-    fontSize: 13.5, fontWeight: 600, cursor: disabled ? "not-allowed" : "pointer",
-    transition: "all 0.2s ease", border: "none", fontFamily: "inherit",
-    letterSpacing: "-0.01em", opacity: disabled ? 0.6 : 1,
-  };
-  const variants = {
-    primary: {
-      background: hovered && !disabled ? "var(--gray-900)" : "var(--black)",
-      color: "var(--white)",
-      boxShadow: hovered && !disabled ? "0 6px 20px rgba(0,0,0,0.22)" : "0 2px 8px rgba(0,0,0,0.12)",
-      transform: hovered && !disabled ? "translateY(-1px)" : "none",
-    },
-    secondary: {
-      background: hovered && !disabled ? "var(--gray-100)" : "var(--white)",
-      color: "var(--gray-800)",
-      border: "1px solid var(--gray-200)",
-      boxShadow: "var(--shadow-sm)",
-    },
-  };
-  return (
-    <button onClick={onClick} disabled={disabled}
-      onMouseEnter={() => !disabled && setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{ ...base, ...variants[variant], ...style }}>
-      {children}
-    </button>
-  );
-};
-
-const Card = ({ children, style = {}, hover = false }) => (
-  <div style={{
-    background: "var(--white)",
-    border: "1px solid var(--gray-150)",
-    borderRadius: "var(--radius-lg)",
-    boxShadow: "var(--shadow-md)",
-    padding: 24,
-    ...style,
-  }}>
-    {children}
-  </div>
-);
-
-const Icon = ({ name, size = 18, color = "currentColor" }) => {
-  const icons = {
-    check: <><polyline points="20 6 9 17 4 12"/></>,
-    chevron: <><polyline points="9 18 15 12 9 6"/></>,
-    zap: <><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></>,
-  };
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24"
-      fill="none" stroke={color} strokeWidth="1.75"
-      strokeLinecap="round" strokeLinejoin="round">
-      {icons[name]}
-    </svg>
-  );
-};
-
-export default function Roadmap({ resumeId, jobDescription }) {
-  const [roadmap, setRoadmap] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [durationWeeks, setDurationWeeks] = useState(8);
-  const [taskProgress, setTaskProgress] = useState({});
-  const weeklyProgressRef = useRef({});
-
-  const generateRoadmap = async (weeks) => {
-    if (!resumeId) {
-      setError("Upload your resume in Resume Analyzer first.");
-      setRoadmap(null);
-      return;
-    }
-    if (!jobDescription) {
-      setError("Analyze a JD in JD Matcher first to generate a roadmap.");
-      setRoadmap(null);
-      return;
-    }
-
-    setLoading(true);
-    setError("");
-    try {
-      const formData = new FormData();
-      formData.append("resume_id", resumeId);
-      formData.append("job_description", jobDescription);
-      formData.append("daily_hours", 2);
-
-      // Use the AI service or fallback
-      const response = await fetch('/api/roadmap', {
-        method: 'POST',
-        body: formData,
+      setRoadmap({
+        ...data,
+        duration_weeks: weeks,
+        tasks: normalizedTasks,
+        milestones,
       });
-
-      if (!response.ok) {
-        throw new Error("Failed to generate roadmap");
-      }
-
-      const data = await response.json();
-      
-      // Validate and filter tasks by duration
-      if (data.tasks && Array.isArray(data.tasks)) {
-        data.tasks = data.tasks.filter(task => task.week <= weeks);
-      }
-      
-      data.duration_weeks = weeks;
-      setRoadmap(data);
       setTaskProgress({});
-      weeklyProgressRef.current = {};
-    } catch (e) {
-      console.error(e);
-      setError("Could not generate roadmap. Ensure API is configured and try again.");
+    } catch (error) {
+      console.error(error);
+      setError('Could not generate roadmap. Ensure API is configured and try again.');
       setRoadmap(null);
     } finally {
       setLoading(false);
     }
   };
 
-  const toggleTaskComplete = (weekNum, taskIdx) => {
-    const key = `${weekNum}-${taskIdx}`;
-    setTaskProgress(prev => ({ ...prev, [key]: !prev[key] }));
+  useEffect(() => {
+    if (!roadmap?.tasks?.length) return;
+    const allDone = roadmap.tasks.every((task, index) => taskProgress[`${task.week}-${index}`]);
+    if (allDone) {
+      const timer = setTimeout(() => setShowCongrats(true), 350);
+      return () => clearTimeout(timer);
+    }
+    setShowCongrats(false);
+    return undefined;
+  }, [roadmap, taskProgress]);
+
+  const groupedWeeks = useMemo(() => {
+    if (!roadmap?.tasks?.length) return [];
+
+    const groups = roadmap.tasks.reduce((acc, task, index) => {
+      const week = Number(task.week);
+      if (!acc[week]) acc[week] = [];
+      acc[week].push({ ...task, _index: index });
+      return acc;
+    }, {});
+
+    return Object.keys(groups)
+      .map(Number)
+      .sort((a, b) => a - b)
+      .map((week) => {
+        const tasks = groups[week];
+        const completed = tasks.filter((task) => taskProgress[`${task.week}-${task._index}`]).length;
+        return {
+          week,
+          tasks,
+          completed,
+          total: tasks.length,
+          topics: [...new Set(tasks.map((task) => task.skill).filter(Boolean))],
+        };
+      });
+  }, [roadmap, taskProgress]);
+
+  const completedTasks = groupedWeeks.reduce((sum, week) => sum + week.completed, 0);
+  const totalTasks = groupedWeeks.reduce((sum, week) => sum + week.total, 0);
+  const overallProgress = totalTasks ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+  const toggleTask = (task) => {
+    const key = `${task.week}-${task._index}`;
+    setTaskProgress((previous) => ({
+      ...previous,
+      [key]: !previous[key],
+    }));
   };
 
-  const handleDurationChange = (weeks) => {
-    setDurationWeeks(weeks);
-    generateRoadmap(weeks);
-  };
-
-  if (loading) return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: 40 }}>
-      <div style={{ width: 40, height: 40, border: "3px solid var(--gray-150)", borderTopColor: "var(--gray-700)", borderRadius: "50%", animation: "spin 1s linear infinite" }}></div>
-    </div>
-  );
-
-  // Group tasks by week
-  const weekGroups = roadmap ? (roadmap.tasks || []).reduce((acc, task) => {
-    if (!acc[task.week]) acc[task.week] = [];
-    acc[task.week].push(task);
-    return acc;
-  }, {}) : {};
-
-  const weeks = Object.keys(weekGroups)
-    .sort((a, b) => parseInt(a) - parseInt(b))
-    .map(weekNum => {
-      const num = parseInt(weekNum);
-      const tasks = weekGroups[weekNum];
-      const completedCount = tasks.filter((_, idx) => taskProgress[`${num}-${idx}`]).length;
-      const isWeekComplete = completedCount === tasks.length && tasks.length > 0;
-      
-      return {
-        num,
-        title: `Week ${weekNum}`,
-        topics: [...new Set(tasks.map(t => t.skill).filter(Boolean))],
-        tasks: tasks.map((t, idx) => ({ ...t, idx, isComplete: taskProgress[`${num}-${idx}`] })),
-        completed: completedCount,
-        total: tasks.length,
-        isComplete: isWeekComplete,
-        current: num === 1,
-      };
-    });
-
-  const totalTasks = weeks.reduce((sum, w) => sum + w.total, 0);
-  const completedTasks = weeks.reduce((sum, w) => sum + w.completed, 0);
-  const overallProgress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+  const timelineWidth = `${overallProgress}%`;
 
   return (
-    <div style={{ padding: 28, animation: "fadeIn 0.4s ease", display: "flex", flexDirection: "column", gap: 22 }}>
+    <div style={{ padding: 28, display: 'flex', flexDirection: 'column', gap: 22, animation: 'roadmapFadeIn 0.3s ease' }}>
+      <CelebrationPopup visible={showCongrats} onClose={() => setShowCongrats(false)} />
+
+      <style>{`
+        @keyframes roadmapFadeIn {
+          from { opacity: 0; transform: translateY(8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes roadmapPop {
+          from { opacity: 0; transform: scale(0.55); }
+          to { opacity: 1; transform: scale(1); }
+        }
+        @keyframes roadmapConfetti {
+          0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+          100% { transform: translateY(560px) rotate(540deg); opacity: 0; }
+        }
+      `}</style>
+
       <div>
-        <h2 style={{ fontSize: 20, fontWeight: 700, color: "var(--gray-900)", letterSpacing: "-0.04em", marginBottom: 4 }}>
-          {roadmap ? `${durationWeeks}-Week Roadmap` : 'Learning Roadmap'}
-        </h2>
-        <p style={{ fontSize: 13.5, color: "var(--gray-500)" }}>
-          {roadmap 
-            ? `Your personalized learning path (${roadmap.daily_hours || 2} hours/day)` 
-            : 'Generate a custom learning roadmap based on your resume and target JD'}
+        <h2 style={{ fontSize: 22, fontWeight: 800, color: '#111827', letterSpacing: '-0.04em' }}>Learning Roadmap</h2>
+        <p style={{ marginTop: 4, color: '#6b7280', fontSize: 13.5 }}>
+          Your personalized learning path based on your resume and JD.
         </p>
       </div>
 
-      {error && (
-        <Card style={{ background: "#fef2f2", border: "1px solid #fca5a5", padding: "14px 16px" }}>
-          <div style={{ fontSize: 13, color: "#991b1b", fontWeight: 600 }}>{error}</div>
+      {error ? (
+        <Card style={{ padding: 16, borderColor: '#fecaca', background: '#fef2f2' }}>
+          <div style={{ color: '#991b1b', fontSize: 13, fontWeight: 600 }}>{error}</div>
         </Card>
-      )}
+      ) : null}
 
-      {!roadmap ? (
-        <Card style={{ padding: "24px 28px" }}>
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 13.5, fontWeight: 650, color: "var(--gray-900)", marginBottom: 12 }}>Select Roadmap Duration</div>
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              {[4, 8, 12].map(weeks => (
-                <Btn 
+      <Card style={{ padding: 22 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#111827', marginBottom: 8 }}>Choose duration</div>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              {[4, 8, 12].map((weeks) => (
+                <Button
                   key={weeks}
-                  variant={durationWeeks === weeks ? "primary" : "secondary"}
-                  onClick={() => handleDurationChange(weeks)}
-                  style={{ padding: "10px 20px", fontSize: 13 }}
+                  active={durationWeeks === weeks}
+                  onClick={() => {
+                    setDurationWeeks(weeks);
+                    fetchRoadmap(weeks);
+                  }}
                 >
                   {weeks} weeks
-                </Btn>
+                </Button>
               ))}
             </div>
           </div>
+
+          <div style={{ minWidth: 190, textAlign: 'right' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#111827' }}>Overall Progress</div>
+            <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{completedTasks} of {totalTasks} tasks completed</div>
+          </div>
+        </div>
+
+        <div style={{ marginTop: 16 }}>
+          <div style={{ height: 6, borderRadius: 999, background: '#e5e7eb', overflow: 'hidden' }}>
+            <div style={{ width: timelineWidth, height: '100%', borderRadius: 999, background: 'linear-gradient(90deg, #111827, #10b981)', transition: 'width 0.35s ease' }} />
+          </div>
+        </div>
+      </Card>
+
+      {loading ? (
+        <Card style={{ padding: 24, textAlign: 'center' }}>
+          Loading roadmap...
         </Card>
-      ) : (
+      ) : null}
+
+      {!loading && groupedWeeks.length > 0 ? (
         <>
-          {/* Progress Overview */}
-          <Card style={{ padding: "20px 24px" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-              <div>
-                <div style={{ fontSize: 13.5, fontWeight: 650, color: "var(--gray-900)" }}>Overall Progress</div>
-                <div style={{ fontSize: 12, color: "var(--gray-500)", marginTop: 2 }}>
-                  {completedTasks} of {totalTasks} tasks completed
-                </div>
-              </div>
-              <div style={{ fontSize: 24, fontWeight: 700, color: "var(--gray-900)", textAlign: "right" }}>
-                {overallProgress}%
-              </div>
-            </div>
-            <div style={{ height: 6, background: "var(--gray-100)", borderRadius: 99, overflow: "hidden" }}>
-              <div style={{
-                height: "100%",
-                background: "linear-gradient(90deg, var(--gray-700), var(--gray-400))",
-                width: `${overallProgress}%`,
-                transition: "width 0.6s cubic-bezier(0.4, 0, 0.2, 1)",
-                borderRadius: 99,
-              }}/>
-            </div>
-            <div style={{ display: "flex", gap: 10, marginTop: 14, flexWrap: "wrap" }}>
-              {[4, 8, 12].map(w => (
-                <button
-                  key={w}
-                  onClick={() => handleDurationChange(w)}
+          <div style={{ display: 'flex', gap: 14, overflowX: 'auto', paddingBottom: 8, paddingTop: 4 }}>
+            {groupedWeeks.map((week) => {
+              const done = week.completed === week.total && week.total > 0;
+              const current = week.week === 1;
+              return (
+                <div
+                  key={week.week}
                   style={{
-                    padding: "8px 16px",
-                    borderRadius: 99,
-                    border: durationWeeks === w ? "2px solid var(--gray-900)" : "1px solid var(--gray-200)",
-                    background: durationWeeks === w ? "var(--gray-900)" : "var(--white)",
-                    color: durationWeeks === w ? "var(--white)" : "var(--gray-700)",
-                    fontSize: 12,
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    transition: "all 0.2s ease",
-                    fontFamily: "inherit",
+                    flex: '0 0 260px',
+                    borderRadius: 22,
+                    padding: 18,
+                    background: current ? '#111827' : '#ffffff',
+                    color: current ? '#ffffff' : '#111827',
+                    border: current ? '1px solid transparent' : '1px solid #ececec',
+                    boxShadow: '0 12px 30px rgba(0,0,0,0.08)',
                   }}
                 >
-                  {w}w
-                </button>
-              ))}
-            </div>
-          </Card>
-
-          {/* Weekly Cards */}
-          <div style={{ display: "flex", gap: 14, overflowX: "auto", paddingBottom: 16 }}>
-            {weeks.map(week => (
-              <div
-                key={week.num}
-                style={{
-                  flexShrink: 0, width: 260,
-                  background: week.current ? "var(--gray-900)" : "var(--white)",
-                  border: `1px solid ${week.current ? "transparent" : "var(--gray-150)"}`,
-                  borderRadius: "var(--radius-lg)", padding: "20px 18px",
-                  boxShadow: week.current ? "var(--shadow-lg)" : "var(--shadow-md)",
-                  transition: "transform 0.2s, box-shadow 0.2s",
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", color: week.current ? "rgba(255,255,255,0.5)" : "var(--gray-300)", fontFamily: "'DM Mono', monospace" }}>
-                    WEEK {week.num}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ fontSize: 11, letterSpacing: '0.08em', fontWeight: 800, color: current ? 'rgba(255,255,255,0.5)' : '#9ca3af' }}>
+                      WEEK {week.week}
+                    </div>
+                    {done ? <span style={{ color: '#10b981' }}><Icon check /></span> : null}
                   </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    {week.isComplete && (
-                      <div style={{ width: 18, height: 18, borderRadius: "50%", background: "#10b981", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        <Icon name="check" size={10} color="white"/>
-                      </div>
-                    )}
-                    {week.current && <Badge variant="neutral" style={{ fontSize: 10, padding: "2px 8px" }}>Now</Badge>}
-                  </div>
-                </div>
 
-                <div style={{ fontSize: 14.5, fontWeight: 650, color: week.current ? "var(--white)" : "var(--gray-900)", marginBottom: 4, letterSpacing: "-0.02em" }}>
-                  {week.title}
-                </div>
-                <div style={{ fontSize: 12, color: week.current ? "rgba(255,255,255,0.6)" : "var(--gray-500)", marginBottom: 12 }}>
-                  {week.completed}/{week.total} tasks
-                </div>
+                  <div style={{ marginTop: 12, fontSize: 15, fontWeight: 700 }}>{`Week ${week.week}`}</div>
+                  <div style={{ marginTop: 6, fontSize: 12, opacity: current ? 0.7 : 1 }}>{week.completed}/{week.total} tasks</div>
 
-                {/* Topics */}
-                {week.topics.length > 0 && (
-                  <div style={{ marginBottom: 12, paddingBottom: 12, borderBottom: `1px solid ${week.current ? "rgba(255,255,255,0.12)" : "var(--gray-100)"}` }}>
-                    {week.topics.slice(0, 3).map((t, i) => (
-                      <div key={i} style={{ fontSize: 11.5, color: week.current ? "rgba(255,255,255,0.65)" : "var(--gray-600)", padding: "2px 0", fontWeight: 500 }}>
-                        • {t}
+                  <div style={{ marginTop: 14, paddingTop: 12, borderTop: current ? '1px solid rgba(255,255,255,0.12)' : '1px solid #f3f4f6' }}>
+                    {week.topics.slice(0, 3).map((topic) => (
+                      <div key={topic} style={{ fontSize: 12, marginBottom: 6, opacity: current ? 0.8 : 1 }}>
+                        • {topic}
                       </div>
                     ))}
                   </div>
-                )}
 
-                {/* Tasks with Checkboxes */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {week.tasks.slice(0, 4).map((task) => (
-                    <div key={task.idx} style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
-                      <button
-                        onClick={() => toggleTaskComplete(week.num, task.idx)}
-                        style={{
-                          width: 16, height: 16, borderRadius: 4, flexShrink: 0, marginTop: 2,
-                          border: `1.5px solid ${week.current ? "rgba(255,255,255,0.4)" : task.isComplete ? "var(--gray-700)" : "var(--gray-300)"}`,
-                          background: task.isComplete ? (week.current ? "rgba(255,255,255,0.3)" : "var(--gray-700)") : "transparent",
-                          cursor: "pointer", transition: "all 0.2s",
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                          fontFamily: "inherit",
-                        }}
-                      >
-                        {task.isComplete && <Icon name="check" size={10} color={week.current ? "rgba(255,255,255,0.8)" : "white"}/>}
-                      </button>
-                      <span style={{
-                        fontSize: 12,
-                        color: week.current ? "rgba(255,255,255,0.7)" : "var(--gray-600)",
-                        textDecoration: task.isComplete ? "line-through" : "none",
-                        opacity: task.isComplete ? 0.6 : 1,
-                        lineHeight: 1.4,
-                      }}>
-                        {task.task}
-                      </span>
-                    </div>
-                  ))}
-                  {week.tasks.length > 4 && (
-                    <div style={{ fontSize: 11, color: week.current ? "rgba(255,255,255,0.5)" : "var(--gray-500)", fontWeight: 500 }}>
-                      +{week.tasks.length - 4} more tasks
-                    </div>
-                  )}
+                  <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {week.tasks.slice(0, 4).map((task) => {
+                      const checked = Boolean(taskProgress[`${task.week}-${task._index}`]);
+                      return (
+                        <button
+                          key={`${task.week}-${task._index}`}
+                          onClick={() => toggleTask(task)}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'flex-start',
+                            gap: 10,
+                            border: 'none',
+                            background: 'transparent',
+                            textAlign: 'left',
+                            color: 'inherit',
+                            padding: 0,
+                            cursor: 'pointer',
+                            fontFamily: 'inherit',
+                          }}
+                        >
+                          <span style={{ marginTop: 2, width: 18, height: 18, borderRadius: 5, border: `1.5px solid ${checked ? '#10b981' : current ? 'rgba(255,255,255,0.35)' : '#d1d5db'}`, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: checked ? '#10b981' : 'transparent', flex: '0 0 auto' }}>
+                            {checked ? <Icon check /> : null}
+                          </span>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 12.5, lineHeight: 1.45, opacity: checked ? 0.65 : current ? 0.9 : 1, textDecoration: checked ? 'line-through' : 'none' }}>
+                              {task.task}
+                            </div>
+                            <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 6, fontSize: 11, lineHeight: 1.4, opacity: checked ? 0.55 : current ? 0.72 : 0.8 }}>
+                              <span>{task.skill || 'Focus skill'}</span>
+                              <span>•</span>
+                              <span>{task.difficulty || 'Medium'}</span>
+                              <span>•</span>
+                              <span>{task.estimated_hours || 0} hrs</span>
+                              {task.milestone ? (
+                                <>
+                                  <span>•</span>
+                                  <span>Milestone</span>
+                                </>
+                              ) : null}
+                            </div>
+                            {Array.isArray(task.resources) && task.resources.length > 0 ? (
+                              <div style={{ marginTop: 4, fontSize: 10.5, lineHeight: 1.45, opacity: checked ? 0.5 : current ? 0.62 : 0.7 }}>
+                                {task.resources.slice(0, 2).join(' • ')}
+                              </div>
+                            ) : null}
+                          </div>
+                        </button>
+                      );
+                    })}
+                    {week.tasks.length > 4 ? (
+                      <div style={{ fontSize: 11, color: current ? 'rgba(255,255,255,0.5)' : '#6b7280' }}>
+                        +{week.tasks.length - 4} more tasks
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
-          {/* Tracking Section */}
-          <Card>
-            <div style={{ fontSize: 13.5, fontWeight: 650, color: "var(--gray-900)", marginBottom: 16 }}>Track Your Progress</div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14 }}>
-              {weeks.map(week => (
-                <div key={week.num} style={{
-                  padding: "14px 16px", borderRadius: "12px",
-                  background: week.isComplete ? "#f0fdf4" : "var(--gray-50)",
-                  border: week.isComplete ? "1px solid #bbf7d0" : "1px solid var(--gray-200)",
-                }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                    <span style={{
-                      fontSize: 13, fontWeight: 600,
-                      color: week.isComplete ? "#166534" : "var(--gray-700)",
-                    }}>
-                      Week {week.num}
-                    </span>
-                    <span style={{
-                      fontSize: 12, fontWeight: 700,
-                      color: week.isComplete ? "#166534" : "var(--gray-600)",
-                    }}>
-                      {week.completed}/{week.total}
-                    </span>
+          <Card style={{ padding: 20 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#111827', marginBottom: 14 }}>Track Your Progress</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14 }}>
+              {groupedWeeks.map((week) => {
+                const percent = week.total ? Math.round((week.completed / week.total) * 100) : 0;
+                const complete = percent === 100;
+                return (
+                  <div key={week.week} style={{ padding: 14, borderRadius: 16, border: complete ? '1px solid #bbf7d0' : '1px solid #e5e7eb', background: complete ? '#f0fdf4' : '#fafafa' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: complete ? '#166534' : '#374151' }}>Week {week.week}</span>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: complete ? '#166534' : '#6b7280' }}>{week.completed}/{week.total}</span>
+                    </div>
+                    <div style={{ height: 4, borderRadius: 999, background: '#e5e7eb', overflow: 'hidden' }}>
+                      <div style={{ width: `${percent}%`, height: '100%', borderRadius: 999, background: complete ? '#10b981' : '#111827', transition: 'width 0.25s ease' }} />
+                    </div>
                   </div>
-                  <div style={{
-                    height: 4, background: "rgba(0,0,0,0.1)", borderRadius: 99, overflow: "hidden",
-                  }}>
-                    <div style={{
-                      height: "100%", background: week.isComplete ? "#10b981" : "var(--gray-600)",
-                      width: `${week.total > 0 ? (week.completed / week.total) * 100 : 0}%`,
-                      transition: "width 0.4s ease",
-                      borderRadius: 99,
-                    }} />
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </Card>
         </>
-      )}
+      ) : null}
+
+      {!loading && !roadmap ? (
+        <Card style={{ padding: 22, textAlign: 'center', color: '#6b7280' }}>
+          Select a duration to generate a roadmap focused on your resume and job description.
+        </Card>
+      ) : null}
     </div>
   );
 }
