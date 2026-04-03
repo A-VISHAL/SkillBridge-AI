@@ -1,0 +1,6 @@
+Senior Software Engineer
+10 years of experience in backend development
+- Python, Go, JavaScript
+- Microservices, Kubernetes, Docker
+- AWS, Google Cloud
+- Team leadership

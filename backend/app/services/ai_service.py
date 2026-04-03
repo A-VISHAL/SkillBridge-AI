@@ -314,27 +314,53 @@ Return as JSON with keys: duration_weeks, daily_hours, tasks (array), milestones
         {"role": "user", "content": prompt}
     ]
     
-    response = await call_oxlo_chat(messages, temperature=0.6, max_tokens=3000)
-    
     try:
+        response = await call_oxlo_chat(messages, temperature=0.6, max_tokens=3000)
         return json.loads(response)
-    except:
+    except Exception as e:
+        # Log the error but return fallback data so users can still use the app
+        print(f"Error generating roadmap from AI: {str(e)}")
+        
+        # Generate skill-based fallback roadmap
+        gap_list = skill_gaps if skill_gaps else ["System Design", "Advanced DSA", "Production Deployment"]
+        tasks = []
+        week_num = 1
+        
+        for i, skill in enumerate(gap_list[:6]):
+            for week_offset in range(2):
+                actual_week = week_num + (i * 2) + week_offset
+                if actual_week <= 12:
+                    tasks.append({
+                        "week": actual_week,
+                        "task": f"Master {skill} - {'Basics' if week_offset == 0 else 'Advanced'}",
+                        "skill": skill,
+                        "difficulty": "Medium" if week_offset == 0 else "Hard",
+                        "estimated_hours": 12,
+                        "resources": [f"{skill} documentation", f"{skill} online course", "Practice problems"],
+                        "priority": "HIGH" if i < 3 else "MEDIUM"
+                    })
+        
+        # Add project weeks
+        for week in [4, 8, 12]:
+            tasks.append({
+                "week": week,
+                "task": "Build capstone project applying learned skills",
+                "skill": "Project Management",
+                "difficulty": "Hard",
+                "estimated_hours": 16,
+                "resources": ["GitHub", "Portfolio template"],
+                "priority": "CRITICAL",
+                "milestone": True
+            })
+        
+        tasks.sort(key=lambda x: x["week"])
+        
         return {
             "duration_weeks": 12,
             "daily_hours": 2,
-            "tasks": [
-                {
-                    "week": 1,
-                    "task": "Learn Docker basics and containerization",
-                    "skill": "Docker",
-                    "difficulty": "Medium",
-                    "estimated_hours": 14,
-                    "resources": ["Docker official docs", "Docker tutorial on YouTube"],
-                    "milestone": True
-                }
-            ],
-            "milestones": ["Week 1: Docker basics", "Week 4: First project", "Week 12: Job ready"],
-            "completion_criteria": "Complete all tasks and build 2 projects"
+            "tasks": tasks,
+            "milestones": ["Week 4: First project complete", "Week 8: Intermediate mastery", "Week 12: Job ready"],
+            "completion_criteria": "Complete all tasks and build 3 projects"
         }
 
 async def generate_quiz_questions(topic: str, difficulty: str, count: int = 5) -> List[Dict]:

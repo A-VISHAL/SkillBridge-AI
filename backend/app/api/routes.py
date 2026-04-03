@@ -281,12 +281,20 @@ async def generate_roadmap(
     """Generate personalized learning roadmap"""
     try:
         if resume_id not in resume_store:
-            raise HTTPException(404, "Resume not found")
+            raise HTTPException(404, "Resume not found. Please upload your resume first.")
         
         resume = resume_store[resume_id]
-        match_data = await ai_service.match_resume_to_jd(resume.raw_text, job_description)
         
-        missing_skills = match_data.get("missing_skills", [])
+        # Get missing skills from JD match
+        try:
+            match_data = await ai_service.match_resume_to_jd(resume.raw_text, job_description)
+            missing_skills = match_data.get("missing_skills", [])
+        except Exception as match_error:
+            # Fallback: use generic skill gaps if match fails
+            missing_skills = ["System Design", "Advanced Architecture", "Leadership"]
+            print(f"Warning: JD match failed, using default skills: {str(match_error)}")
+        
+        # Generate roadmap (with built-in fallback)
         roadmap_data = await ai_service.generate_roadmap(
             resume.raw_text,
             job_description,
@@ -305,8 +313,11 @@ async def generate_roadmap(
         
         return roadmap.dict()
         
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(500, f"Error generating roadmap: {str(e)}")
+        print(f"Error generating roadmap: {str(e)}")
+        raise HTTPException(500, "Error generating roadmap. Please try again.")
 
 # ============ Quiz System ============
 
