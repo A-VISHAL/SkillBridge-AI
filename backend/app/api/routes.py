@@ -323,17 +323,82 @@ async def generate_roadmap(
 
 @router.post("/api/quiz/generate")
 async def generate_quiz(
-    topic: str = Form(...),
-    difficulty: str = Form("Medium"),
-    count: int = Form(5)
+    topic: str = Form("Adaptive Quiz"),
+    difficulty: str = Form("Easy"),
+    count: int = Form(10),
+    domain: str = Form("Coding DSA"),
+    resume_id: Optional[str] = Form(None),
+    job_description: str = Form(""),
 ):
-    """Generate adaptive quiz questions"""
+    """Generate adaptive quiz questions with study material from resume/JD/roadmap context."""
     try:
-        questions_data = await ai_service.generate_quiz_questions(topic, difficulty, count)
+        normalized_count = max(10, count)
+
+        resume_text = ""
+        if resume_id and resume_id in resume_store:
+            resume_text = resume_store[resume_id].raw_text
+
+        roadmap_context = []
+        try:
+            if resume_text and job_description:
+                match_data = await ai_service.match_resume_to_jd(resume_text, job_description)
+                roadmap_data = await ai_service.generate_roadmap(
+                    resume_text,
+                    job_description,
+                    match_data.get("missing_skills", []),
+                )
+                roadmap_context = roadmap_data.get("tasks", [])
+        except Exception:
+            roadmap_context = []
+
+        questions_data = await ai_service.generate_quiz_questions(
+            topic=topic,
+            difficulty=difficulty,
+            count=normalized_count,
+            domain=domain,
+            resume_text=resume_text,
+            jd_text=job_description,
+            roadmap_context=roadmap_context,
+        )
         
         questions = [QuizQuestion(**q) for q in questions_data]
+
+        study_materials = []
+        if roadmap_context:
+            by_week = {}
+            for task in roadmap_context:
+                week = int(task.get("week", 0) or 0)
+                if week <= 0:
+                    continue
+                if week not in by_week:
+                    by_week[week] = []
+                by_week[week].append(task)
+
+            for week in sorted(by_week.keys())[:12]:
+                task = by_week[week][0]
+                study_materials.append({
+                    "week": week,
+                    "title": task.get("skill", f"Week {week} Focus"),
+                    "what_to_study": task.get("task", "Review roadmap task"),
+                    "resources": task.get("resources", [])[:3],
+                })
+
+        rules = [
+            "Read every question carefully before selecting an answer.",
+            "No tab switching or external assistance during the quiz.",
+            "Each section contains 10 questions.",
+            "Passing criteria is 80% or higher.",
+            "Review explanations after submission to improve weak areas.",
+        ]
         
-        return {"questions": [q.dict() for q in questions]}
+        return {
+            "domain": domain,
+            "difficulty": difficulty,
+            "passing_percentage": 80,
+            "rules": rules,
+            "study_materials": study_materials,
+            "questions": [q.dict() for q in questions[:normalized_count]],
+        }
         
     except Exception as e:
         raise HTTPException(500, f"Error generating quiz: {str(e)}")

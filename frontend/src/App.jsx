@@ -134,14 +134,15 @@ const globalStyles = `
 
 // ─── Shared micro-components ─────────────────────────────────────────────────
 
-const Badge = ({ children, variant = "default" }) => {
+const Badge = ({ children, variant = "default", style = {} }) => {
   const styles = {
     default: { bg: "var(--gray-100)", color: "var(--gray-600)", border: "var(--gray-200)" },
     success: { bg: "#f0fdf4", color: "#166534", border: "#bbf7d0" },
     warning: { bg: "#fffbeb", color: "#92400e", border: "#fde68a" },
+    error: { bg: "#fef2f2", color: "#991b1b", border: "#fecaca" },
     neutral: { bg: "var(--gray-800)", color: "var(--white)", border: "var(--gray-800)" },
   };
-  const s = styles[variant];
+  const s = styles[variant] ?? styles.default;
   return (
     <span style={{
       display: "inline-flex", alignItems: "center", gap: 4,
@@ -149,6 +150,7 @@ const Badge = ({ children, variant = "default" }) => {
       fontSize: 11, fontWeight: 500, letterSpacing: "0.02em",
       background: s.bg, color: s.color,
       border: `1px solid ${s.border}`,
+      ...style,
     }}>
       {children}
     </span>
@@ -1576,78 +1578,241 @@ const JDMatcher = ({ resumeId, onJobMatched }) => {
 };
 
 // ─── Quiz ────────────────────────────────────────────────────────────────────
-const Quiz = () => {
-  const [selected, setSelected] = useState(null);
-  const [showExpl, setShowExpl] = useState(false);
+const Quiz = ({ resumeId, resumeData, jobDescription }) => {
+  const [domain, setDomain] = useState("Coding DSA");
+  const [difficulty, setDifficulty] = useState("Easy");
+  const [phase, setPhase] = useState("setup"); // setup | rules | quiz | result
+  const [questions, setQuestions] = useState([]);
+  const [studyMaterials, setStudyMaterials] = useState([]);
+  const [rules, setRules] = useState([]);
+  const [answers, setAnswers] = useState({});
+  const [index, setIndex] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [score, setScore] = useState(0);
 
-  const q = {
-    q: "What is the time complexity of binary search in a sorted array?",
-    options: ["O(n)", "O(log n)", "O(n log n)", "O(1)"],
-    correct: 1,
-    expl: "Binary search repeatedly halves the search space, resulting in O(log n) time complexity. Each comparison eliminates half the remaining elements.",
+  const passingPercentage = 80;
+
+  const getOptionText = (opt) => (typeof opt === "string" ? opt : opt?.text || "");
+
+  const startQuizGeneration = async () => {
+    if (!resumeId) {
+      setError("Upload your resume first in Resume Analyzer.");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+    try {
+      const formData = new FormData();
+      formData.append("topic", `${domain} ${difficulty}`);
+      formData.append("domain", domain);
+      formData.append("difficulty", difficulty);
+      formData.append("count", 10);
+      formData.append("resume_id", resumeId);
+      formData.append("job_description", jobDescription || "");
+
+      const response = await fetch("/api/quiz/generate", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || "Failed to generate quiz");
+      }
+
+      const data = await response.json();
+      const quizQuestions = Array.isArray(data.questions) ? data.questions.slice(0, 10) : [];
+
+      setQuestions(quizQuestions);
+      setStudyMaterials(Array.isArray(data.study_materials) ? data.study_materials : []);
+      setRules(Array.isArray(data.rules) ? data.rules : [
+        "No external help during quiz.",
+        "Each section has 10 questions.",
+        "Passing criteria is 80%.",
+      ]);
+      setAnswers({});
+      setIndex(0);
+      setPhase("rules");
+    } catch (e) {
+      console.error(e);
+      setError("Could not generate quiz right now. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  return (
-    <div style={{ padding: 28, animation: "fadeIn 0.4s ease" }}>
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-          <h2 style={{ fontSize: 20, fontWeight: 700, color: "var(--gray-900)", letterSpacing: "-0.04em" }}>Adaptive Quiz</h2>
-          <Badge>Question 7 / 20</Badge>
-        </div>
-        <div style={{ height: 4, background: "var(--gray-100)", borderRadius: 99 }}>
-          <div style={{ height: "100%", borderRadius: 99, width: "35%", background: "var(--gray-700)", transition: "width 1s ease" }}/>
-        </div>
-      </div>
+  const submitQuiz = () => {
+    let correct = 0;
+    questions.forEach((q, idx) => {
+      const selected = answers[idx];
+      const optionObjs = Array.isArray(q.options) ? q.options : [];
+      const correctOption = optionObjs.find((o) => o?.is_correct);
+      const correctText = correctOption ? getOptionText(correctOption) : (q.correct_answer || "");
+      if (selected && selected === correctText) correct += 1;
+    });
 
-      <div style={{ maxWidth: 600 }}>
-        <Card style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: "var(--gray-400)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 14 }}>Data Structures & Algorithms</div>
-          <p style={{ fontSize: 16, fontWeight: 550, color: "var(--gray-900)", lineHeight: 1.6, letterSpacing: "-0.02em" }}>{q.q}</p>
+    const computed = questions.length > 0 ? Math.round((correct / questions.length) * 100) : 0;
+    setScore(computed);
+    setPhase("result");
+  };
+
+  const current = questions[index];
+  const progressPct = questions.length > 0 ? ((index + 1) / questions.length) * 100 : 0;
+
+  return (
+    <div style={{ padding: 28, animation: "fadeIn 0.4s ease", display: "grid", gridTemplateColumns: "1.7fr 1fr", gap: 18 }}>
+      <div>
+        <div style={{ marginBottom: 18 }}>
+          <h2 style={{ fontSize: 22, fontWeight: 700, color: "var(--gray-900)", letterSpacing: "-0.04em" }}>Adaptive Quiz</h2>
+          <p style={{ fontSize: 13.5, color: "var(--gray-500)", marginTop: 4 }}>
+            Resume + JD + roadmap-based quizzes by section and difficulty.
+          </p>
+        </div>
+
+        <Card style={{ padding: 18, marginBottom: 14 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "var(--gray-500)", marginBottom: 8 }}>Select Section</div>
+          <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
+            {["Coding DSA", "Development"].map((d) => (
+              <Btn key={d} variant={domain === d ? "primary" : "secondary"} onClick={() => setDomain(d)}>
+                {d}
+              </Btn>
+            ))}
+          </div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "var(--gray-500)", marginBottom: 8 }}>Difficulty</div>
+          <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
+            {["Easy", "Hard", "Advanced"].map((d) => (
+              <Btn key={d} variant={difficulty === d ? "primary" : "secondary"} onClick={() => setDifficulty(d)}>
+                {d}
+              </Btn>
+            ))}
+          </div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <Badge>10 questions per section</Badge>
+            <Badge variant="warning">Pass: {passingPercentage}%</Badge>
+          </div>
+          <div style={{ marginTop: 14 }}>
+            <Btn variant="primary" onClick={startQuizGeneration} disabled={loading} style={{ width: "100%", justifyContent: "center" }}>
+              {loading ? "Generating quiz..." : "Generate Quiz"}
+            </Btn>
+          </div>
+          {error && <div style={{ marginTop: 10, color: "#b91c1c", fontSize: 12.5, fontWeight: 600 }}>{error}</div>}
         </Card>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
-          {q.options.map((opt, i) => {
-            const isSelected = selected === i;
-            const isCorrect = i === q.correct;
-            const showResult = selected !== null;
-            let bg = "var(--white)", border = "var(--gray-200)", color = "var(--gray-700)";
-            if (showResult && isCorrect) { bg = "#f0fdf4"; border = "#86efac"; color = "#166534"; }
-            else if (showResult && isSelected && !isCorrect) { bg = "#fef2f2"; border = "#fca5a5"; color = "#991b1b"; }
-            else if (isSelected) { bg = "var(--gray-900)"; border = "var(--gray-900)"; color = "var(--white)"; }
-
-            return (
-              <button key={i} onClick={() => setSelected(i)}
-                style={{
-                  display: "flex", alignItems: "center", gap: 12,
-                  padding: "14px 18px", borderRadius: 12,
-                  border: `1.5px solid ${border}`, background: bg, color,
-                  cursor: "pointer", textAlign: "left", fontFamily: "inherit",
-                  fontSize: 14, fontWeight: 500, transition: "all var(--transition)",
-                }}>
-                <span style={{ width: 26, height: 26, borderRadius: 7, background: "rgba(0,0,0,0.06)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
-                  {["A","B","C","D"][i]}
-                </span>
-                {opt}
-              </button>
-            );
-          })}
-        </div>
-
-        {selected !== null && (
-          <Card style={{ background: "var(--gray-50)", borderStyle: "dashed" }}>
-            <button onClick={() => setShowExpl(!showExpl)}
-              style={{ display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "var(--gray-700)", fontFamily: "inherit", width: "100%", justifyContent: "space-between" }}>
-              <span style={{ display: "flex", alignItems: "center", gap: 8 }}><Icon name="zap" size={14} color="var(--gray-500)"/> Explanation</span>
-              <Icon name="chevron" size={14} color="var(--gray-400)" style={{ transform: showExpl ? "rotate(90deg)" : "none", transition: "transform 0.2s" }}/>
-            </button>
-            {showExpl && <p style={{ fontSize: 13, color: "var(--gray-600)", marginTop: 10, lineHeight: 1.65 }}>{q.expl}</p>}
+        {phase === "rules" && (
+          <Card style={{ padding: 18 }}>
+            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 10, color: "var(--gray-900)" }}>Rules & Regulations</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {rules.map((rule, i) => (
+                <div key={i} style={{ fontSize: 13.5, color: "var(--gray-700)", lineHeight: 1.6 }}>• {rule}</div>
+              ))}
+            </div>
+            <div style={{ marginTop: 16, display: "flex", gap: 10 }}>
+              <Btn variant="secondary" onClick={() => setPhase("setup")} style={{ flex: 1, justifyContent: "center" }}>Back</Btn>
+              <Btn variant="primary" onClick={() => setPhase("quiz")} style={{ flex: 2, justifyContent: "center" }}>Start Test</Btn>
+            </div>
           </Card>
         )}
 
-        <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
-          <Btn variant="secondary" style={{ flex: 1, justifyContent: "center" }}>Previous</Btn>
-          <Btn variant="primary" style={{ flex: 2, justifyContent: "center" }}>Next question</Btn>
-        </div>
+        {phase === "quiz" && current && (
+          <>
+            <Card style={{ padding: 18, marginBottom: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                <Badge>{domain}</Badge>
+                <Badge>Question {index + 1} / {questions.length}</Badge>
+              </div>
+              <div style={{ height: 4, background: "var(--gray-100)", borderRadius: 99, marginBottom: 14 }}>
+                <div style={{ width: `${progressPct}%`, height: "100%", borderRadius: 99, background: "var(--gray-800)" }}/>
+              </div>
+              <p style={{ fontSize: 17, fontWeight: 600, color: "var(--gray-900)", lineHeight: 1.55 }}>{current.question}</p>
+            </Card>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {(current.options || []).map((opt, i) => {
+                const label = getOptionText(opt);
+                const chosen = answers[index] === label;
+                return (
+                  <button
+                    key={i}
+                    onClick={() => setAnswers((prev) => ({ ...prev, [index]: label }))}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 12,
+                      borderRadius: 12, border: `1.5px solid ${chosen ? "var(--gray-900)" : "var(--gray-200)"}`,
+                      background: chosen ? "var(--gray-900)" : "var(--white)",
+                      color: chosen ? "var(--white)" : "var(--gray-700)",
+                      padding: "13px 16px", cursor: "pointer", textAlign: "left", fontFamily: "inherit",
+                      fontSize: 14,
+                    }}
+                  >
+                    <span style={{ width: 24, height: 24, borderRadius: 7, background: chosen ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.06)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700 }}>
+                      {String.fromCharCode(65 + i)}
+                    </span>
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+              <Btn variant="secondary" onClick={() => setIndex((p) => Math.max(0, p - 1))} style={{ flex: 1, justifyContent: "center" }}>
+                Previous
+              </Btn>
+              {index < questions.length - 1 ? (
+                <Btn variant="primary" onClick={() => setIndex((p) => Math.min(questions.length - 1, p + 1))} style={{ flex: 2, justifyContent: "center" }}>
+                  Next Question
+                </Btn>
+              ) : (
+                <Btn variant="primary" onClick={submitQuiz} style={{ flex: 2, justifyContent: "center" }}>
+                  Submit Test
+                </Btn>
+              )}
+            </div>
+          </>
+        )}
+
+        {phase === "result" && (
+          <Card style={{ padding: 20 }}>
+            <div style={{ fontSize: 18, fontWeight: 700, color: "var(--gray-900)", marginBottom: 8 }}>Quiz Result</div>
+            <div style={{ fontSize: 13, color: "var(--gray-500)", marginBottom: 14 }}>{domain} • {difficulty} • {questions.length} questions</div>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 12 }}>
+              <div style={{ fontSize: 36, fontWeight: 800, color: score >= passingPercentage ? "#166534" : "#b91c1c" }}>{score}%</div>
+              <Badge variant={score >= passingPercentage ? "success" : "error"}>{score >= passingPercentage ? "PASS" : "FAIL"}</Badge>
+            </div>
+            <div style={{ fontSize: 13.5, color: "var(--gray-700)", lineHeight: 1.6, marginBottom: 16 }}>
+              Passing criteria is <strong>{passingPercentage}%</strong>. {score >= passingPercentage ? "You cleared this section." : "Review study materials and retry."}
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <Btn variant="secondary" onClick={() => setPhase("setup")} style={{ flex: 1, justifyContent: "center" }}>Back to Setup</Btn>
+              <Btn variant="primary" onClick={startQuizGeneration} style={{ flex: 2, justifyContent: "center" }}>Retake Quiz</Btn>
+            </div>
+          </Card>
+        )}
+      </div>
+
+      <div>
+        <Card style={{ padding: 18 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: "var(--gray-900)", marginBottom: 10 }}>Study Material</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {studyMaterials.length === 0 && (
+              <div style={{ fontSize: 13, color: "var(--gray-500)", lineHeight: 1.6 }}>
+                Generate a quiz to load week-wise study materials based on resume, JD, and roadmap.
+              </div>
+            )}
+            {studyMaterials.map((item, i) => (
+              <div key={i} style={{ border: "1px solid var(--gray-150)", borderRadius: 12, padding: 12, background: "var(--gray-50)" }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "var(--gray-500)", letterSpacing: "0.06em", marginBottom: 6 }}>WEEK {item.week}</div>
+                <div style={{ fontSize: 13.5, fontWeight: 650, color: "var(--gray-900)", marginBottom: 6 }}>{item.title}</div>
+                <div style={{ fontSize: 12.5, color: "var(--gray-600)", lineHeight: 1.55, marginBottom: 8 }}>{item.what_to_study}</div>
+                {Array.isArray(item.resources) && item.resources.length > 0 && (
+                  <div style={{ fontSize: 11.5, color: "var(--gray-500)", lineHeight: 1.5 }}>
+                    {item.resources.slice(0, 3).join(" • ")}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </Card>
       </div>
     </div>
   );
@@ -2084,7 +2249,7 @@ const Dashboard = ({ onLogout }) => {
     resume: { component: <ResumeAnalyzer onResumeParsed={handleResumeParsed}/>, title: "Resume Analyzer" },
     matcher: { component: <JDMatcher resumeId={resumeContext.resumeId} onJobMatched={handleJobDescriptionMatched}/>, title: "JD Matcher" },
     roadmap: { component: <Roadmap resumeId={resumeContext.resumeId} jobDescription={resumeContext.jobDescription}/>, title: "Learning Roadmap" },
-    quiz: { component: <Quiz/>, title: "Adaptive Quiz" },
+    quiz: { component: <Quiz resumeId={resumeContext.resumeId} resumeData={resumeContext.resumeData} jobDescription={resumeContext.jobDescription}/>, title: "Adaptive Quiz" },
     interview: { component: <MockInterview/>, title: "Mock Interview" },
     jobs: { component: <JobFinder resumeId={resumeContext.resumeId} resumeData={resumeContext.resumeData}/>, title: "Job Finder" },
   };
