@@ -32,6 +32,11 @@ class Settings:
     OXLO_CHAT_ENDPOINT: str = _get_env("OXLO_CHAT_ENDPOINT", default="https://api.oxlo.ai/v1/chat/completions")
     OXLO_MODEL: str = _get_env("OXLO_MODEL", default="deepseek r1 8b")
     OXLO_EMBEDDINGS_ENDPOINT: str = os.getenv("OXLO_EMBEDDINGS_ENDPOINT", "https://api.oxlo.ai/v1/embeddings")
+
+    # Supabase
+    SUPABASE_URL: str = os.getenv("SUPABASE_URL", "")
+    SUPABASE_ANON_KEY: str = os.getenv("SUPABASE_ANON_KEY", "")
+    SUPABASE_SERVICE_ROLE_KEY: str = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
     
     # Job Search APIs
     ADZUNA_APP_ID: str = os.getenv("ADZUNA_APP_ID", "")

@@ -1650,7 +1650,7 @@ const Quiz = ({ resumeId, resumeData, jobDescription }) => {
       persistQuizContext({
         domain,
         difficulty,
-        topic,
+        topic: `${domain} ${difficulty}`,
         generatedAt: new Date().toISOString(),
         passingPercentage: data.passing_percentage ?? passingPercentage,
         studyMaterials: Array.isArray(data.study_materials) ? data.study_materials : [],
@@ -2418,6 +2418,7 @@ const JobFinder = ({ resumeId, resumeData }) => {
 // ─── Dashboard Shell ──────────────────────────────────────────────────────────
 const Dashboard = ({ onLogout }) => {
   const [active, setActive] = useState("resume");
+  const [learningStateVersion, setLearningStateVersion] = useState(0);
   const [resumeContext, setResumeContext] = useState({ 
     resumeId: null, 
     resumeData: null, 
@@ -2426,7 +2427,20 @@ const Dashboard = ({ onLogout }) => {
   });
 
   const handleResumeParsed = (resumeId, resumeData) => {
-    setResumeContext(prev => ({ ...prev, resumeId, resumeData }));
+    setResumeContext(prev => {
+      const isNewResume = Boolean(prev.resumeId && resumeId && prev.resumeId !== resumeId);
+      if (isNewResume) {
+        // Clear section states for roadmap/quiz/interview/jobs only on new resume upload.
+        setLearningStateVersion((value) => value + 1);
+      }
+
+      return {
+        ...prev,
+        resumeId,
+        resumeData,
+        ...(isNewResume ? { jobDescription: null, matchResult: null } : {}),
+      };
+    });
   };
 
   const handleJobDescriptionMatched = (jobDescription, matchResult) => {
@@ -2434,13 +2448,41 @@ const Dashboard = ({ onLogout }) => {
   };
 
   const pages = {
-    dashboard: { component: <DashboardOverview/>, title: "Overview" },
-    resume: { component: <ResumeAnalyzer onResumeParsed={handleResumeParsed}/>, title: "Resume Analyzer" },
-    matcher: { component: <JDMatcher resumeId={resumeContext.resumeId} onJobMatched={handleJobDescriptionMatched}/>, title: "JD Matcher" },
-    roadmap: { component: <Roadmap resumeId={resumeContext.resumeId} jobDescription={resumeContext.jobDescription}/>, title: "Learning Roadmap" },
-    quiz: { component: <Quiz resumeId={resumeContext.resumeId} resumeData={resumeContext.resumeData} jobDescription={resumeContext.jobDescription}/>, title: "Adaptive Quiz" },
-    interview: { component: <MockInterview resumeId={resumeContext.resumeId} resumeData={resumeContext.resumeData} jobDescription={resumeContext.jobDescription}/>, title: "Mock Interview" },
-    jobs: { component: <JobFinder resumeId={resumeContext.resumeId} resumeData={resumeContext.resumeData}/>, title: "Job Finder" },
+    dashboard: {
+      title: "Overview",
+      render: () => <DashboardOverview/>,
+      resetOnResumeChange: false,
+    },
+    resume: {
+      title: "Resume Analyzer",
+      render: () => <ResumeAnalyzer onResumeParsed={handleResumeParsed}/>,
+      resetOnResumeChange: false,
+    },
+    matcher: {
+      title: "JD Matcher",
+      render: () => <JDMatcher resumeId={resumeContext.resumeId} onJobMatched={handleJobDescriptionMatched}/>,
+      resetOnResumeChange: true,
+    },
+    roadmap: {
+      title: "Learning Roadmap",
+      render: () => <Roadmap resumeId={resumeContext.resumeId} jobDescription={resumeContext.jobDescription}/>,
+      resetOnResumeChange: true,
+    },
+    quiz: {
+      title: "Adaptive Quiz",
+      render: () => <Quiz resumeId={resumeContext.resumeId} resumeData={resumeContext.resumeData} jobDescription={resumeContext.jobDescription}/>,
+      resetOnResumeChange: true,
+    },
+    interview: {
+      title: "Mock Interview",
+      render: () => <MockInterview resumeId={resumeContext.resumeId} resumeData={resumeContext.resumeData} jobDescription={resumeContext.jobDescription}/>,
+      resetOnResumeChange: true,
+    },
+    jobs: {
+      title: "Job Finder",
+      render: () => <JobFinder resumeId={resumeContext.resumeId} resumeData={resumeContext.resumeData}/>,
+      resetOnResumeChange: true,
+    },
   };
 
   const current = pages[active];
@@ -2517,8 +2559,25 @@ const Dashboard = ({ onLogout }) => {
       <Sidebar active={active} setActive={setActive}/>
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", position: "relative", zIndex: 1 }}>
         <Topbar title={current.title} onLogout={onLogout}/>
-        <main style={{ flex: 1, overflowY: "auto" }}>
-          {current.component}
+        <main style={{ flex: 1, overflowY: "auto", position: "relative" }}>
+          {Object.entries(pages).map(([pageId, page]) => {
+            const isVisible = active === pageId;
+            const componentKey = page.resetOnResumeChange
+              ? `${pageId}-${learningStateVersion}`
+              : pageId;
+
+            return (
+              <section
+                key={pageId}
+                style={{
+                  display: isVisible ? "block" : "none",
+                  height: "100%",
+                }}
+              >
+                <div key={componentKey}>{page.render()}</div>
+              </section>
+            );
+          })}
         </main>
       </div>
     </div>

@@ -9,6 +9,7 @@ from datetime import datetime
 from app.core.config import settings
 from app.models.schemas import *
 from app.services import parser, ai_service, job_service
+from app.services.supabase_service import supabase_service
 
 router = APIRouter()
 
@@ -92,6 +93,19 @@ async def upload_resume(file: UploadFile = File(...)):
         
         # Store in memory
         resume_store[file_id] = parsed_resume
+
+        # Persist to Supabase (best-effort, non-blocking for user flow)
+        if supabase_service.enabled:
+            ok, err = supabase_service.save_resume(
+                resume_id=file_id,
+                filename=file.filename,
+                file_type=file.content_type or "application/octet-stream",
+                raw_text=parsed_resume.raw_text,
+                parsed_data=parsed_resume.dict(),
+                user_id=None,
+            )
+            if not ok:
+                print(f"Warning: failed to persist resume in Supabase: {err}")
         
         # Clean up file
         os.remove(file_path)
@@ -233,6 +247,24 @@ async def match_jd(
             strengths=match_data.get("strengths", []),
             weaknesses=match_data.get("weaknesses", [])
         )
+
+        # Persist JD + match details to Supabase (best-effort)
+        if supabase_service.enabled:
+            job_description_id = str(uuid.uuid4())
+            jd_ok, jd_err = supabase_service.save_job_description(
+                job_description_id=job_description_id,
+                raw_text=job_description,
+            )
+            if not jd_ok:
+                print(f"Warning: failed to persist job description: {jd_err}")
+            else:
+                match_ok, match_err = supabase_service.save_jd_match(
+                    resume_id=resume_id,
+                    job_description_id=job_description_id,
+                    match_data=match_data,
+                )
+                if not match_ok:
+                    print(f"Warning: failed to persist jd match: {match_err}")
         
         return result.dict()
         
@@ -311,6 +343,26 @@ async def generate_roadmap(
             milestones=roadmap_data.get("milestones", []),
             completion_criteria=roadmap_data.get("completion_criteria", "Complete all tasks")
         )
+
+        # Persist roadmap + tasks to Supabase (best-effort)
+        if supabase_service.enabled:
+            job_description_id = str(uuid.uuid4())
+            jd_ok, jd_err = supabase_service.save_job_description(
+                job_description_id=job_description_id,
+                raw_text=job_description,
+            )
+            if not jd_ok:
+                print(f"Warning: failed to persist roadmap job description: {jd_err}")
+            else:
+                roadmap_id = str(uuid.uuid4())
+                roadmap_ok, roadmap_err = supabase_service.save_roadmap(
+                    roadmap_id=roadmap_id,
+                    resume_id=resume_id,
+                    job_description_id=job_description_id,
+                    roadmap_data=roadmap.dict(),
+                )
+                if not roadmap_ok:
+                    print(f"Warning: failed to persist roadmap: {roadmap_err}")
         
         return roadmap.dict()
         
@@ -508,6 +560,32 @@ async def start_interview(
         )
         
         interview_sessions[session_id] = session
+
+        # Persist interview session + generated questions to Supabase (best-effort)
+        if supabase_service.enabled:
+            job_description_id = None
+            if job_description:
+                generated_id = str(uuid.uuid4())
+                jd_ok, jd_err = supabase_service.save_job_description(
+                    job_description_id=generated_id,
+                    raw_text=job_description,
+                )
+                if jd_ok:
+                    job_description_id = generated_id
+                else:
+                    print(f"Warning: failed to persist interview job description: {jd_err}")
+
+            interview_ok, interview_err = supabase_service.save_interview_session(
+                session_id=session_id,
+                resume_id=resume_id,
+                job_description_id=job_description_id,
+                mode=mode,
+                quiz_context=parsed_quiz_context,
+                roadmap_context=roadmap_context,
+                questions=[question.dict() for question in questions],
+            )
+            if not interview_ok:
+                print(f"Warning: failed to persist interview session: {interview_err}")
         
         return session.dict()
         
