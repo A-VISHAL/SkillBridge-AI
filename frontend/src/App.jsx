@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import Roadmap from "./components/Roadmap";
 
 // ─── Design tokens ───────────────────────────────────────────────────────────
 const tokens = {
@@ -1393,7 +1394,7 @@ const ResumeAnalyzer = ({ onResumeParsed }) => {
 }
 
 // ─── JD Matcher ───────────────────────────────────────────────────────────────
-const JDMatcher = ({ resumeId }) => {
+const JDMatcher = ({ resumeId, onJobMatched }) => {
   const [jd, setJD] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -1430,6 +1431,10 @@ const JDMatcher = ({ resumeId }) => {
 
       const data = await response.json();
       setMatchResult(data);
+      // Call the callback to update parent state with job description and match result
+      if (onJobMatched) {
+        onJobMatched(jd, data);
+      }
     } catch (e) {
       console.error(e);
       setError("Could not analyze JD match with real data. Please check API key/config and try again.");
@@ -1565,76 +1570,6 @@ const JDMatcher = ({ resumeId }) => {
             </div>
           </Card>
         )}
-      </div>
-    </div>
-  );
-};
-
-// ─── Roadmap ──────────────────────────────────────────────────────────────────
-const Roadmap = () => {
-  const weeks = [
-    { num: 1, title: "Foundations", topics: ["Data Structures", "Algorithms", "Big-O Notation"], tasks: ["LeetCode Easy × 10", "DSA notes"], done: true },
-    { num: 2, title: "Core CS", topics: ["OS Concepts", "Networking", "DB Basics"], tasks: ["Mock quiz × 3", "OS flashcards"], done: true },
-    { num: 3, title: "System Design", topics: ["Scalability", "Load Balancing", "Caching"], tasks: ["Design Twitter", "Design URL shortener"], done: false, current: true },
-    { num: 4, title: "Advanced", topics: ["Distributed Systems", "Consensus Algorithms"], tasks: ["Raft deep-dive", "Kafka exercise"], done: false },
-    { num: 5, title: "Interview Prep", topics: ["Behavioral", "STAR Method"], tasks: ["10 mock answers", "Record practice"], done: false },
-    { num: 6, title: "Mock Rounds", topics: ["Full simulations", "Feedback loop"], tasks: ["2 full mock interviews"], done: false },
-  ];
-
-  return (
-    <div style={{ padding: 28, animation: "fadeIn 0.4s ease" }}>
-      <div style={{ marginBottom: 24 }}>
-        <h2 style={{ fontSize: 20, fontWeight: 700, color: "var(--gray-900)", letterSpacing: "-0.04em", marginBottom: 4 }}>8-Week Roadmap</h2>
-        <p style={{ fontSize: 13.5, color: "var(--gray-500)" }}>Your personalised journey to becoming interview-ready.</p>
-      </div>
-
-      <div style={{ display: "flex", gap: 14, overflowX: "auto", paddingBottom: 16 }}>
-        {weeks.map(week => (
-          <div key={week.num}
-            className="card-hover"
-            style={{
-              flexShrink: 0, width: 220,
-              background: week.current ? "var(--gray-900)" : "var(--white)",
-              border: `1px solid ${week.current ? "transparent" : "var(--gray-150)"}`,
-              borderRadius: "var(--radius-lg)", padding: "20px 18px",
-              boxShadow: week.current ? "var(--shadow-lg)" : "var(--shadow-sm)",
-              opacity: week.done ? 0.6 : 1,
-            }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", color: week.current ? "rgba(255,255,255,0.5)" : "var(--gray-300)", fontFamily: "'DM Mono', monospace" }}>
-                WEEK {week.num}
-              </div>
-              {week.done && <div style={{ width: 18, height: 18, borderRadius: "50%", background: "var(--gray-200)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <Icon name="check" size={10} color="var(--gray-600)"/>
-              </div>}
-              {week.current && <Badge variant="neutral" style={{ fontSize: 10, padding: "2px 8px" }}>Now</Badge>}
-            </div>
-
-            <div style={{ fontSize: 14.5, fontWeight: 650, color: week.current ? "var(--white)" : "var(--gray-900)", marginBottom: 12, letterSpacing: "-0.02em" }}>{week.title}</div>
-
-            <div style={{ marginBottom: 14 }}>
-              {week.topics.map(t => (
-                <div key={t} style={{ fontSize: 12, color: week.current ? "rgba(255,255,255,0.65)" : "var(--gray-500)", padding: "2px 0" }}>· {t}</div>
-              ))}
-            </div>
-
-            <div style={{ borderTop: `1px solid ${week.current ? "rgba(255,255,255,0.12)" : "var(--gray-100)"}`, paddingTop: 12 }}>
-              {week.tasks.map((task, i) => (
-                <div key={i} style={{ display: "flex", alignItems: "center", gap: 7, padding: "4px 0" }}>
-                  <div style={{
-                    width: 14, height: 14, borderRadius: 4, flexShrink: 0,
-                    border: `1.5px solid ${week.current ? "rgba(255,255,255,0.4)" : "var(--gray-300)"}`,
-                    background: week.done ? "var(--gray-400)" : "transparent",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                  }}>
-                    {week.done && <Icon name="check" size={8} color="white"/>}
-                  </div>
-                  <span style={{ fontSize: 12, color: week.current ? "rgba(255,255,255,0.7)" : "var(--gray-600)" }}>{task}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
       </div>
     </div>
   );
@@ -2129,17 +2064,26 @@ const JobFinder = ({ resumeId, resumeData }) => {
 // ─── Dashboard Shell ──────────────────────────────────────────────────────────
 const Dashboard = ({ onLogout }) => {
   const [active, setActive] = useState("resume");
-  const [resumeContext, setResumeContext] = useState({ resumeId: null, resumeData: null });
+  const [resumeContext, setResumeContext] = useState({ 
+    resumeId: null, 
+    resumeData: null, 
+    jobDescription: null,
+    matchResult: null,
+  });
 
   const handleResumeParsed = (resumeId, resumeData) => {
-    setResumeContext({ resumeId, resumeData });
+    setResumeContext(prev => ({ ...prev, resumeId, resumeData }));
+  };
+
+  const handleJobDescriptionMatched = (jobDescription, matchResult) => {
+    setResumeContext(prev => ({ ...prev, jobDescription, matchResult }));
   };
 
   const pages = {
     dashboard: { component: <DashboardOverview/>, title: "Overview" },
     resume: { component: <ResumeAnalyzer onResumeParsed={handleResumeParsed}/>, title: "Resume Analyzer" },
-    matcher: { component: <JDMatcher resumeId={resumeContext.resumeId}/>, title: "JD Matcher" },
-    roadmap: { component: <Roadmap/>, title: "Learning Roadmap" },
+    matcher: { component: <JDMatcher resumeId={resumeContext.resumeId} onJobMatched={handleJobDescriptionMatched}/>, title: "JD Matcher" },
+    roadmap: { component: <Roadmap resumeId={resumeContext.resumeId} jobDescription={resumeContext.jobDescription}/>, title: "Learning Roadmap" },
     quiz: { component: <Quiz/>, title: "Adaptive Quiz" },
     interview: { component: <MockInterview/>, title: "Mock Interview" },
     jobs: { component: <JobFinder resumeId={resumeContext.resumeId} resumeData={resumeContext.resumeData}/>, title: "Job Finder" },
