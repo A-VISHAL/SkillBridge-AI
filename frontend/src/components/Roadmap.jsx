@@ -122,7 +122,7 @@ const CelebrationPopup = ({ visible, onClose }) => {
   );
 };
 
-export default function Roadmap({ resumeId, jobDescription }) {
+export default function Roadmap({ resumeId, jobDescription, onProgressChange }) {
   const [durationWeeks, setDurationWeeks] = useState(12);
   const [roadmap, setRoadmap] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -217,6 +217,14 @@ export default function Roadmap({ resumeId, jobDescription }) {
         milestones,
       });
       setTaskProgress({});
+      onProgressChange?.({
+        generated: true,
+        durationWeeks: weeks,
+        completedTasks: 0,
+        totalTasks: normalizedTasks.length,
+        overallProgress: 0,
+        updatedAt: new Date().toISOString(),
+      });
     } catch (error) {
       console.error(error);
       setError('Could not generate roadmap. Ensure API is configured and try again.');
@@ -266,6 +274,29 @@ export default function Roadmap({ resumeId, jobDescription }) {
   const completedTasks = groupedWeeks.reduce((sum, week) => sum + week.completed, 0);
   const totalTasks = groupedWeeks.reduce((sum, week) => sum + week.total, 0);
   const overallProgress = totalTasks ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+  useEffect(() => {
+    if (!roadmap) {
+      onProgressChange?.({
+        generated: false,
+        durationWeeks,
+        completedTasks: 0,
+        totalTasks: 0,
+        overallProgress: 0,
+        updatedAt: new Date().toISOString(),
+      });
+      return;
+    }
+
+    onProgressChange?.({
+      generated: true,
+      durationWeeks,
+      completedTasks,
+      totalTasks,
+      overallProgress,
+      updatedAt: new Date().toISOString(),
+    });
+  }, [roadmap, durationWeeks, completedTasks, totalTasks, overallProgress, onProgressChange]);
 
   const toggleTask = (task) => {
     const key = `${task.week}-${task._index}`;

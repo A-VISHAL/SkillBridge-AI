@@ -1,7 +1,276 @@
 import httpx
 import json
+import re
+from collections import Counter
 from typing import List, Dict, Any, Optional
 from app.core.config import settings
+
+
+STOPWORDS = {
+    "and", "the", "for", "with", "that", "this", "from", "you", "your", "are", "our", "will", "have",
+    "has", "had", "but", "not", "all", "any", "can", "may", "into", "onto", "using", "use", "used",
+    "about", "role", "job", "description", "requirement", "requirements", "preferred", "must", "should",
+    "years", "year", "experience", "responsibilities", "ability", "skills", "skill", "strong", "good",
+    "work", "working", "team", "teams", "candidate", "position", "plus", "including", "knowledge",
+}
+
+SKILL_ALIASES: Dict[str, List[str]] = {
+    "Python": ["python"],
+    "Java": ["java"],
+    "JavaScript": ["javascript", "js"],
+    "TypeScript": ["typescript", "ts"],
+    "React": ["react", "reactjs", "react.js"],
+    "Node.js": ["node", "node.js", "nodejs", "express"],
+    "HTML": ["html", "html5"],
+    "CSS": ["css", "css3"],
+    "SQL": ["sql"],
+    "PostgreSQL": ["postgres", "postgresql"],
+    "MySQL": ["mysql"],
+    "MongoDB": ["mongodb", "mongo"],
+    "Docker": ["docker"],
+    "Kubernetes": ["kubernetes", "k8s"],
+    "AWS": ["aws", "amazon web services"],
+    "GCP": ["gcp", "google cloud"],
+    "Azure": ["azure"],
+    "Git": ["git", "github", "gitlab"],
+    "REST API": ["rest", "restful", "api", "apis"],
+    "GraphQL": ["graphql"],
+    "Machine Learning": ["machine learning", "ml"],
+    "NLP": ["nlp", "natural language processing"],
+    "Data Structures": ["data structures", "dsa"],
+    "Algorithms": ["algorithms", "algorithmic"],
+    "System Design": ["system design", "scalability", "distributed systems"],
+    "Testing": ["testing", "unit test", "integration test", "pytest", "jest"],
+    "CI/CD": ["ci/cd", "ci", "cd", "pipeline"],
+}
+
+ROLE_DEFAULT_SKILLS: Dict[str, List[str]] = {
+    "software engineer": ["Python", "JavaScript", "SQL", "Git", "REST API", "Testing"],
+    "frontend": ["HTML", "CSS", "JavaScript", "React", "TypeScript", "Testing"],
+    "backend": ["Python", "Node.js", "SQL", "PostgreSQL", "REST API", "Docker"],
+    "full stack": ["React", "Node.js", "JavaScript", "SQL", "REST API", "Git"],
+    "data": ["Python", "SQL", "Machine Learning", "NLP"],
+    "ai": ["Python", "Machine Learning", "NLP", "SQL"],
+}
+
+
+def _normalize_space(text: str) -> str:
+    return re.sub(r"\s+", " ", (text or "")).strip()
+
+
+def _contains_alias(text_lower: str, alias: str) -> bool:
+    escaped = re.escape(alias.lower())
+    return re.search(rf"(?<!\w){escaped}(?!\w)", text_lower) is not None
+
+
+def _extract_skills(text: str) -> List[str]:
+    text_lower = (text or "").lower()
+    found: List[str] = []
+    for canonical, aliases in SKILL_ALIASES.items():
+        if any(_contains_alias(text_lower, alias) for alias in aliases):
+            found.append(canonical)
+    return found
+
+
+def _extract_required_years(jd_text: str, target_role: str) -> float:
+    jd = (jd_text or "").lower()
+    range_match = re.search(r"(\d+(?:\.\d+)?)\s*[-to]{1,3}\s*(\d+(?:\.\d+)?)\s*(?:\+)?\s*(?:years?|yrs?)", jd)
+    if range_match:
+        return float(range_match.group(1))
+
+    direct_match = re.search(r"(\d+(?:\.\d+)?)\s*(?:\+)?\s*(?:years?|yrs?)", jd)
+    if direct_match:
+        return float(direct_match.group(1))
+
+    role_lower = (target_role or "software engineer").lower()
+    if "intern" in role_lower or "fresher" in role_lower or "junior" in role_lower:
+        return 0.0
+    if "senior" in role_lower or "lead" in role_lower:
+        return 5.0
+    return 2.0
+
+
+def _years_from_duration(duration: str) -> float:
+    if not duration:
+        return 0.0
+
+    text = duration.lower()
+    years = 0.0
+    y_match = re.search(r"(\d+(?:\.\d+)?)\s*(?:years?|yrs?)", text)
+    if y_match:
+        years += float(y_match.group(1))
+
+    m_match = re.search(r"(\d+(?:\.\d+)?)\s*(?:months?|mos?)", text)
+    if m_match:
+        years += float(m_match.group(1)) / 12.0
+
+    if years > 0:
+        return years
+
+    date_match = re.findall(r"(20\d{2})", text)
+    if len(date_match) >= 2:
+        start_year = int(date_match[0])
+        end_year = int(date_match[-1])
+        if end_year >= start_year:
+            return float(end_year - start_year)
+
+    return 0.0
+
+
+def _extract_candidate_years(resume_text: str, resume_data: Optional[Dict[str, Any]]) -> float:
+    text_lower = (resume_text or "").lower()
+
+    explicit = re.search(r"(\d+(?:\.\d+)?)\s*(?:\+)?\s*(?:years?|yrs?)\s+(?:of\s+)?experience", text_lower)
+    if explicit:
+        return float(explicit.group(1))
+
+    total = 0.0
+    experiences = (resume_data or {}).get("experiences", []) if isinstance(resume_data, dict) else []
+    for exp in experiences:
+        if isinstance(exp, dict):
+            total += _years_from_duration(str(exp.get("duration", "")))
+
+    if total > 0:
+        return min(total, 25.0)
+
+    if experiences:
+        return float(min(len(experiences), 10))
+
+    return 0.0
+
+
+def _extract_education_requirements(jd_text: str) -> Dict[str, str]:
+    jd_lower = (jd_text or "").lower()
+    level = "any"
+    if "phd" in jd_lower or "doctorate" in jd_lower:
+        level = "phd"
+    elif "master" in jd_lower or "m.tech" in jd_lower or "ms" in jd_lower:
+        level = "master"
+    elif "bachelor" in jd_lower or "b.tech" in jd_lower or "bs" in jd_lower or "b.e" in jd_lower:
+        level = "bachelor"
+
+    field = ""
+    for candidate in ["computer science", "software engineering", "information technology", "data science", "electronics"]:
+        if candidate in jd_lower:
+            field = candidate
+            break
+
+    return {"level": level, "field": field}
+
+
+def _education_score(resume_data: Optional[Dict[str, Any]], jd_text: str) -> float:
+    requirements = _extract_education_requirements(jd_text)
+    level_required = requirements["level"]
+    field_required = requirements["field"]
+
+    education = (resume_data or {}).get("education", []) if isinstance(resume_data, dict) else []
+    edu_text = " ".join([_normalize_space(str(e.get("degree", ""))) for e in education if isinstance(e, dict)]).lower()
+
+    if not edu_text:
+        return 3.0
+
+    has_tech_field = any(keyword in edu_text for keyword in ["computer", "software", "information", "it", "electronics", "data"])
+    level_match = (
+        level_required == "any"
+        or (level_required == "bachelor" and any(k in edu_text for k in ["bachelor", "b.tech", "be", "b.e", "bs"]))
+        or (level_required == "master" and any(k in edu_text for k in ["master", "m.tech", "ms", "m.s"]))
+        or (level_required == "phd" and ("phd" in edu_text or "doctorate" in edu_text))
+    )
+    field_match = (not field_required) or (field_required in edu_text)
+
+    if level_match and field_match:
+        return 10.0
+    if has_tech_field:
+        return 7.0
+    return 3.0
+
+
+def _extract_keywords(jd_text: str, required_skills: List[str]) -> List[str]:
+    tokens = re.findall(r"[a-zA-Z][a-zA-Z0-9+#.-]{2,}", (jd_text or "").lower())
+    filtered = [token for token in tokens if token not in STOPWORDS and len(token) >= 3]
+    freq = Counter(filtered)
+
+    ranked = [word for word, _ in freq.most_common(25)]
+    skill_terms: List[str] = []
+    for skill in required_skills:
+        skill_terms.extend([part.lower() for part in re.split(r"\s+", skill) if part])
+
+    ordered = []
+    for token in skill_terms + ranked:
+        if token and token not in ordered and token not in STOPWORDS:
+            ordered.append(token)
+    return ordered[:30]
+
+
+def _project_relevance_score(required_skills: List[str], resume_text: str, resume_data: Optional[Dict[str, Any]]) -> float:
+    projects = (resume_data or {}).get("projects", []) if isinstance(resume_data, dict) else []
+    project_text = ""
+    if projects:
+        parts = []
+        for project in projects:
+            if isinstance(project, dict):
+                parts.append(str(project.get("name", "")))
+                parts.append(str(project.get("description", "")))
+                parts.extend([str(t) for t in project.get("technologies", [])])
+        project_text = _normalize_space(" ".join(parts)).lower()
+    else:
+        project_text = (resume_text or "").lower()
+
+    if not required_skills:
+        return 8.0
+
+    hits = sum(1 for skill in required_skills if skill.lower() in project_text)
+    ratio = hits / max(1, len(required_skills))
+    if ratio >= 0.6:
+        return 15.0
+    if ratio >= 0.45:
+        return 12.0
+    if ratio >= 0.3:
+        return 9.0
+    if ratio > 0:
+        return 5.0
+    return 3.0
+
+
+def _resume_quality_score(resume_text: str) -> float:
+    text = (resume_text or "").lower()
+    sections = ["summary", "skills", "experience", "education", "project"]
+    section_hits = sum(1 for section in sections if section in text)
+
+    quantified = len(re.findall(r"\b\d+\s*%\b|\b\d+(?:\.\d+)?\s*(?:x|k|m|million|users|hours|days|weeks|months)\b", text))
+    bullet_like = len(re.findall(r"(^\s*[-*•])|(;\s)|(:\s)", resume_text or "", flags=re.MULTILINE))
+
+    if section_hits >= 4 and quantified >= 3 and bullet_like >= 3:
+        return 10.0
+    if section_hits >= 3 and quantified >= 1:
+        return 8.0
+    if section_hits >= 2:
+        return 6.0
+    return 4.0
+
+
+def _keyword_stuffing_detected(resume_text: str, keywords: List[str]) -> bool:
+    text = (resume_text or "").lower()
+    repeated = 0
+    for keyword in keywords[:20]:
+        if len(keyword) < 3:
+            continue
+        count = len(re.findall(rf"(?<!\w){re.escape(keyword)}(?!\w)", text))
+        if count >= 12:
+            repeated += 1
+    return repeated >= 2
+
+
+def _infer_required_skills(jd_text: str, target_role: str) -> List[str]:
+    from_jd = _extract_skills(jd_text)
+    if from_jd:
+        return from_jd
+
+    role_lower = (target_role or "software engineer").lower()
+    for role_key, defaults in ROLE_DEFAULT_SKILLS.items():
+        if role_key in role_lower:
+            return defaults
+    return ROLE_DEFAULT_SKILLS["software engineer"]
 
 async def call_oxlo_chat(
     messages: List[Dict[str, str]],
@@ -972,178 +1241,183 @@ async def evaluate_interview_answer(question: str, answer: str, expected_keyword
     }
 
 
-async def calculate_ats_score(resume_text: str, target_role: str = "", job_description: str = "") -> Dict[str, Any]:
+async def calculate_ats_score(
+    resume_text: str,
+    target_role: str = "",
+    job_description: str = "",
+    resume_data: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
     """
     Calculate comprehensive ATS score based on multiple criteria.
     Returns detailed breakdown and actionable insights.
     """
     
-    prompt = f"""You are an advanced ATS (Applicant Tracking System) Resume Evaluator.
-Your task is to analyze a resume against a target job role and calculate a realistic ATS score based on multiple evaluation criteria.
+    jd_text = job_description or ""
+    required_skills = _infer_required_skills(jd_text, target_role)
 
-📥 INPUT:
-Resume Text: {resume_text}
-Target Job Role: {target_role if target_role else "General Software Engineer"}
-Job Description: {job_description if job_description else "Not provided - infer from target role"}
+    resume_structured_skills: List[str] = []
+    if isinstance(resume_data, dict):
+        resume_structured_skills.extend([
+            str(skill.get("name", "")).strip()
+            for skill in resume_data.get("skills", [])
+            if isinstance(skill, dict) and str(skill.get("name", "")).strip()
+        ])
 
-🎯 OBJECTIVE:
-1. Analyze the resume content deeply
-2. Compare it with the target role and job description
-3. Calculate a realistic ATS score (0–100)
-4. Provide detailed breakdown and actionable insights
-5. Ensure ALL results are dynamic and based ONLY on input
+    extracted_resume_skills = _extract_skills(resume_text)
+    for skill in resume_structured_skills:
+        if skill in SKILL_ALIASES:
+            extracted_resume_skills.append(skill)
 
-📊 SCORING CRITERIA (STRICT):
-Calculate ATS score based on:
-1. Keyword Match (30%) - Match resume skills with job role/JD keywords
-2. Skills Relevance (20%) - Are the skills relevant to the role?
-3. Experience Alignment (15%) - Projects / internships aligned with role?
-4. Education Fit (10%) - Relevant degree or coursework?
-5. Resume Structure & Clarity (10%) - Sections, readability, formatting
-6. Projects Quality (10%) - Real-world, tech stack usage, impact
-7. ATS Compatibility (5%) - Proper formatting, no tables/images-heavy text
+    resume_skill_set = sorted({skill for skill in extracted_resume_skills if skill})
+    matched_skills = sorted([skill for skill in required_skills if skill in resume_skill_set])
+    missing_skills = sorted([skill for skill in required_skills if skill not in resume_skill_set])
 
-📊 OUTPUT FORMAT (STRICT JSON):
-{{
-    "ats_score": 0,
-    "score_breakdown": {{
-        "keyword_match": 0,
-        "skills_relevance": 0,
-        "experience_alignment": 0,
-        "education_fit": 0,
-        "resume_structure": 0,
-        "projects_quality": 0,
-        "ats_compatibility": 0
-    }},
-    "matched_keywords": [],
-    "missing_keywords": [],
-    "analysis": {{
-        "strengths": [],
-        "weaknesses": [],
-        "red_flags": []
-    }},
-    "suggestions": {{
-        "improve_keywords": [],
-        "add_projects": [],
-        "enhance_experience": [],
-        "formatting_fixes": []
-    }},
-    "final_verdict": "",
-    "improvement_roadmap": {{
-        "duration_weeks": 4,
-        "target_score_increase": 20,
-        "weekly_tasks": []
-    }}
-}}
+    total_required_skills = max(1, len(required_skills))
+    skills_score = round((len(matched_skills) / total_required_skills) * 30, 2)
 
-⚠️ IMPORTANT RULES:
-- DO NOT generate random scores
-- Every score MUST be justified by resume content
-- Scores must vary based on different resumes
-- DO NOT use fixed or example data
-- Extract keywords from BOTH resume and job description
-- If JD is missing → infer from target role intelligently
-- Keep output structured and clean
+    required_years = _extract_required_years(jd_text, target_role)
+    candidate_years = _extract_candidate_years(resume_text, resume_data)
+    if required_years <= 0:
+        experience_score = 20.0
+    elif candidate_years >= required_years:
+        experience_score = 20.0
+    else:
+        experience_score = round((candidate_years / required_years) * 20, 2)
 
-📈 SCORING LOGIC:
-- If strong keyword match → increase score
-- If missing core skills → reduce score
-- If irrelevant experience → reduce score
-- If strong projects → boost score
-- If resume poorly formatted → reduce ATS compatibility
+    education_score = round(_education_score(resume_data, jd_text), 2)
 
-🚀 BONUS:
-Generate a 2–4 week improvement roadmap to increase ATS score by at least +20 points.
+    keywords = _extract_keywords(jd_text if jd_text else target_role, required_skills)
+    resume_text_lower = (resume_text or "").lower()
+    matched_keywords = [kw for kw in keywords if _contains_alias(resume_text_lower, kw)]
+    missing_keywords = [kw for kw in keywords if kw not in matched_keywords]
+    total_keywords = max(1, len(keywords))
+    keyword_score = round((len(matched_keywords) / total_keywords) * 15, 2)
 
-Return ONLY valid JSON, no additional text."""
-    
-    messages = [
-        {"role": "system", "content": "You are an expert ATS system analyzer with deep knowledge of recruitment processes and resume optimization."},
-        {"role": "user", "content": prompt}
-    ]
-    
-    try:
-        response = await call_oxlo_chat(messages, temperature=0.3, max_tokens=4000)
-    except Exception:
-        return {
-            "ats_score": 55,
-            "score_breakdown": {
-                "keyword_match": 50,
-                "skills_relevance": 60,
-                "experience_alignment": 55,
-                "education_fit": 60,
-                "resume_structure": 65,
-                "projects_quality": 55,
-                "ats_compatibility": 60
-            },
-            "matched_keywords": [],
-            "missing_keywords": ["Job-specific keywords"],
-            "analysis": {
-                "strengths": ["Resume was parsed and structured successfully"],
-                "weaknesses": ["Live AI ATS scoring unavailable due to API authentication"],
-                "red_flags": []
-            },
-            "suggestions": {
-                "improve_keywords": ["Add exact keywords from target job description"],
-                "add_projects": ["Add measurable project outcomes"],
-                "enhance_experience": ["Quantify impact with numbers"],
-                "formatting_fixes": ["Use ATS-friendly section headings"]
-            },
-            "final_verdict": "Fallback analysis used because AI provider authentication failed",
-            "improvement_roadmap": {
-                "duration_weeks": 4,
-                "target_score_increase": 20,
-                "weekly_tasks": []
-            }
-        }
-    
-    try:
-        result = json.loads(response)
-        # Ensure all required fields exist
-        if "ats_score" not in result:
-            result["ats_score"] = 0
-        if "score_breakdown" not in result:
-            result["score_breakdown"] = {
-                "keyword_match": 0,
-                "skills_relevance": 0,
-                "experience_alignment": 0,
-                "education_fit": 0,
-                "resume_structure": 0,
-                "projects_quality": 0,
-                "ats_compatibility": 0
-            }
-        return result
-    except Exception as e:
-        print(f"Error parsing ATS score response: {e}")
-        # Fallback response
-        return {
-            "ats_score": 0,
-            "score_breakdown": {
-                "keyword_match": 0,
-                "skills_relevance": 0,
-                "experience_alignment": 0,
-                "education_fit": 0,
-                "resume_structure": 0,
-                "projects_quality": 0,
-                "ats_compatibility": 0
-            },
-            "matched_keywords": [],
-            "missing_keywords": [],
-            "analysis": {
-                "strengths": [],
-                "weaknesses": ["Unable to analyze resume - please try again"],
-                "red_flags": []
-            },
-            "suggestions": {
-                "improve_keywords": [],
-                "add_projects": [],
-                "enhance_experience": [],
-                "formatting_fixes": []
-            },
-            "final_verdict": "Analysis failed - please ensure resume is properly formatted",
-            "improvement_roadmap": {
-                "duration_weeks": 4,
-                "target_score_increase": 20,
-                "weekly_tasks": []
-            }
-        }
+    project_score = round(_project_relevance_score(required_skills, resume_text, resume_data), 2)
+    quality_score = round(_resume_quality_score(resume_text), 2)
+
+    project_text = " ".join(
+        [
+            str(project.get("description", ""))
+            for project in (resume_data or {}).get("projects", [])
+            if isinstance(project, dict)
+        ]
+    ).lower() if isinstance(resume_data, dict) else ""
+    real_world_aligned = project_score >= 13 and any(
+        token in project_text
+        for token in ["production", "deployed", "real-time", "realtime", "users", "scalable", "cloud", "api"]
+    )
+    bonus = 5.0 if real_world_aligned else 0.0
+
+    stuffing = _keyword_stuffing_detected(resume_text, keywords)
+    penalty = 5.0 if stuffing else 0.0
+
+    total_score = round(skills_score + experience_score + education_score + keyword_score + project_score + quality_score + bonus - penalty, 2)
+    total_score = max(0.0, min(100.0, total_score))
+
+    strengths: List[str] = []
+    weaknesses: List[str] = []
+    recommendations: List[str] = []
+
+    if skills_score >= 20:
+        strengths.append("Strong overlap with required technical skills")
+    else:
+        weaknesses.append("Skills coverage is below the role requirements")
+        recommendations.append("Add and demonstrate missing role-specific skills in projects and experience bullets")
+
+    if experience_score >= 15:
+        strengths.append("Experience level aligns well with expected years")
+    else:
+        weaknesses.append("Experience depth appears lower than role expectations")
+        recommendations.append("Highlight relevant internship or project ownership to bridge experience gap")
+
+    if education_score >= 9:
+        strengths.append("Education is a close match for the role")
+    elif education_score <= 5:
+        weaknesses.append("Education alignment is limited for this role")
+        recommendations.append("Add relevant coursework/certifications tied to the target job")
+
+    if keyword_score >= 10:
+        strengths.append("Good keyword alignment with target job language")
+    else:
+        weaknesses.append("Important JD keywords are missing or underrepresented")
+        recommendations.append("Mirror key JD terms naturally in summary, skills, and experience sections")
+
+    if project_score >= 12:
+        strengths.append("Projects are relevant to the target role")
+    else:
+        weaknesses.append("Projects need stronger role alignment")
+        recommendations.append("Build one project that directly maps to top missing skills")
+
+    if quality_score >= 8:
+        strengths.append("Resume structure and quantification quality are solid")
+    else:
+        weaknesses.append("Resume quality can improve with clearer structure and measurable impact")
+        recommendations.append("Use action verbs and quantified achievements in each experience bullet")
+
+    if stuffing:
+        weaknesses.append("Keyword stuffing pattern detected")
+        recommendations.append("Reduce repeated keyword usage and prioritize natural context")
+
+    if real_world_aligned:
+        strengths.append("Projects show practical real-world application")
+
+    if not recommendations:
+        recommendations.append("Continue tailoring resume per job and keep impact metrics updated")
+
+    final_verdict = (
+        "Excellent ATS alignment"
+        if total_score >= 85
+        else "Good ATS alignment with improvement opportunities"
+        if total_score >= 65
+        else "ATS alignment needs improvement"
+    )
+
+    return {
+        "match_percentage": total_score,
+        "skills_score": skills_score,
+        "experience_score": round(experience_score, 2),
+        "education_score": education_score,
+        "keyword_score": keyword_score,
+        "project_score": project_score,
+        "quality_score": quality_score,
+        "matched_skills": matched_skills,
+        "missing_skills": missing_skills,
+        "strengths": strengths,
+        "weaknesses": weaknesses,
+        "recommendations": recommendations,
+        "ats_score": int(round(total_score)),
+        "score_breakdown": {
+            "keyword_match": round((len(matched_keywords) / total_keywords) * 100, 2),
+            "skills_relevance": round((skills_score / 30.0) * 100, 2),
+            "experience_alignment": round((experience_score / 20.0) * 100, 2),
+            "education_fit": round((education_score / 10.0) * 100, 2),
+            "resume_structure": round((quality_score / 10.0) * 100, 2),
+            "projects_quality": round((project_score / 15.0) * 100, 2),
+            "ats_compatibility": round((quality_score / 10.0) * 100, 2),
+        },
+        "matched_keywords": matched_keywords,
+        "missing_keywords": missing_keywords,
+        "analysis": {
+            "strengths": strengths,
+            "weaknesses": weaknesses,
+            "red_flags": ["Potential keyword stuffing"] if stuffing else [],
+        },
+        "suggestions": {
+            "improve_keywords": recommendations[:3],
+            "add_projects": ["Create at least one role-specific end-to-end project with measurable impact"],
+            "enhance_experience": ["Add impact metrics like % improvements, latency reduction, or user growth"],
+            "formatting_fixes": ["Use ATS-friendly headers: Summary, Skills, Experience, Projects, Education"],
+        },
+        "final_verdict": final_verdict,
+        "improvement_roadmap": {
+            "duration_weeks": 4,
+            "target_score_increase": 20,
+            "weekly_tasks": [
+                "Week 1: Add top missing skills to learning plan and update resume summary",
+                "Week 2: Rewrite experience bullets with quantified outcomes",
+                "Week 3: Build or refine one project aligned with target JD",
+                "Week 4: Tailor keywords for specific job postings and re-evaluate",
+            ],
+        },
+    }

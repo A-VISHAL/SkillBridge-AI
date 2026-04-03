@@ -887,19 +887,79 @@ const Topbar = ({ title, onLogout }) => {
 };
 
 // ─── Dashboard Overview ───────────────────────────────────────────────────────
-const DashboardOverview = () => {
+const DashboardOverview = ({ resumeContext, overviewMetrics }) => {
+  const atsScore = Number(overviewMetrics.resume?.atsScore || 0);
+  const jdMatch = Math.round(Number(resumeContext.matchResult?.match_percentage || 0));
+  const quizScore = Number(overviewMetrics.quiz?.score || 0);
+  const interviewScore = Number(overviewMetrics.interview?.score || 0);
+  const jobsSaved = Number(overviewMetrics.jobs?.saved || 0);
+  const jobsTotal = Number(overviewMetrics.jobs?.total || 0);
+
   const stats = [
-    { label: "ATS Score", value: "82", unit: "/100", icon: "award", trend: "+6 this week" },
-    { label: "JD Match", value: "74", unit: "%", icon: "target", trend: "+12 since last JD" },
-    { label: "Quiz Streak", value: "7", unit: "days", icon: "zap", trend: "Personal best!" },
-    { label: "Jobs Applied", value: "4", unit: "/ 12 shortlisted", icon: "jobs", trend: "2 in review" },
+    {
+      label: "ATS Score",
+      value: overviewMetrics.resume ? `${atsScore}` : "--",
+      unit: overviewMetrics.resume ? "/100" : "",
+      icon: "award",
+      trend: overviewMetrics.resume ? "Resume analyzed" : "Upload resume to start",
+    },
+    {
+      label: "JD Match",
+      value: resumeContext.matchResult ? `${jdMatch}` : "--",
+      unit: resumeContext.matchResult ? "%" : "",
+      icon: "target",
+      trend: resumeContext.matchResult ? "Latest JD analysis" : "Analyze a JD",
+    },
+    {
+      label: "Quiz Score",
+      value: overviewMetrics.quiz ? `${quizScore}` : "--",
+      unit: overviewMetrics.quiz ? "%" : "",
+      icon: "zap",
+      trend: overviewMetrics.quiz
+        ? `${overviewMetrics.quiz.domain || "Quiz"} • ${overviewMetrics.quiz.difficulty || ""}`
+        : "Complete a quiz",
+    },
+    {
+      label: "Jobs Saved",
+      value: `${jobsSaved}`,
+      unit: jobsTotal > 0 ? `/ ${jobsTotal} found` : "",
+      icon: "jobs",
+      trend: jobsTotal > 0 ? "From latest search" : "Search jobs to populate",
+    },
+  ];
+
+  const progressRows = [
+    { label: "Resume strength", value: atsScore, sublabel: overviewMetrics.resume ? `${atsScore}%` : "No data" },
+    { label: "JD match rate", value: jdMatch, sublabel: resumeContext.matchResult ? `${jdMatch}%` : "No data" },
+    {
+      label: "Roadmap completion",
+      value: Number(overviewMetrics.roadmap?.overallProgress || 0),
+      sublabel: overviewMetrics.roadmap?.generated
+        ? `${overviewMetrics.roadmap.completedTasks || 0}/${overviewMetrics.roadmap.totalTasks || 0} tasks`
+        : "No roadmap yet",
+    },
+    {
+      label: "Interview score",
+      value: interviewScore,
+      sublabel: overviewMetrics.interview?.completed ? `${interviewScore}%` : "Not completed",
+    },
+  ];
+
+  const tasks = [
+    { task: "Upload and parse resume", done: Boolean(resumeContext.resumeId) },
+    { task: "Run ATS analysis", done: Boolean(overviewMetrics.resume) },
+    { task: "Analyze JD match", done: Boolean(resumeContext.matchResult) },
+    { task: "Generate roadmap", done: Boolean(overviewMetrics.roadmap?.generated) },
+    { task: "Complete adaptive quiz", done: Boolean(overviewMetrics.quiz?.completed) },
+    { task: "Complete mock interview", done: Boolean(overviewMetrics.interview?.completed) },
+    { task: "Save at least one job", done: jobsSaved > 0 },
   ];
 
   return (
     <div style={{ padding: "28px", display: "flex", flexDirection: "column", gap: 24, animation: "fadeIn 0.4s ease" }}>
       <div>
         <h2 style={{ fontSize: 22, fontWeight: 700, color: "var(--gray-900)", letterSpacing: "-0.04em", marginBottom: 4 }}>Good morning, Aryan ✦</h2>
-        <p style={{ fontSize: 13.5, color: "var(--gray-500)" }}>Here's your career progress at a glance.</p>
+        <p style={{ fontSize: 13.5, color: "var(--gray-500)" }}>This view updates from your real resume, JD, roadmap, quiz, interview, and jobs activity.</p>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
@@ -923,21 +983,15 @@ const DashboardOverview = () => {
         <Card>
           <div style={{ fontSize: 13.5, fontWeight: 650, color: "var(--gray-900)", marginBottom: 18, letterSpacing: "-0.02em" }}>Weekly Progress</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            <ProgressBar value={82} label="Resume strength" sublabel="82%"/>
-            <ProgressBar value={74} label="JD match rate" sublabel="74%"/>
-            <ProgressBar value={65} label="Roadmap completion" sublabel="Week 3 / 8"/>
-            <ProgressBar value={91} label="Quiz accuracy" sublabel="91%"/>
+            {progressRows.map((row) => (
+              <ProgressBar key={row.label} value={Math.max(0, Math.min(100, row.value))} label={row.label} sublabel={row.sublabel}/>
+            ))}
           </div>
         </Card>
         <Card>
           <div style={{ fontSize: 13.5, fontWeight: 650, color: "var(--gray-900)", marginBottom: 18, letterSpacing: "-0.02em" }}>Today's Tasks</div>
-          {[
-            { task: "Complete React module quiz", done: true },
-            { task: "Update resume summary", done: true },
-            { task: "Practice system design Q&A", done: false },
-            { task: "Apply to 2 new jobs", done: false },
-          ].map((t, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderBottom: i < 3 ? "1px solid var(--gray-100)" : "none" }}>
+          {tasks.map((t, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderBottom: i < tasks.length - 1 ? "1px solid var(--gray-100)" : "none" }}>
               <div style={{
                 width: 18, height: 18, borderRadius: 5, border: `1.5px solid ${t.done ? "var(--gray-700)" : "var(--gray-250)"}`,
                 background: t.done ? "var(--gray-900)" : "transparent",
@@ -956,7 +1010,7 @@ const DashboardOverview = () => {
 };
 
 // ─── Resume Analyzer ──────────────────────────────────────────────────────────
-const ResumeAnalyzer = ({ onResumeParsed }) => {
+const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed }) => {
   const [uploaded, setUploaded] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [fileName, setFileName] = useState("");
@@ -1025,11 +1079,19 @@ const ResumeAnalyzer = ({ onResumeParsed }) => {
         const analyzeData = await analyzeResponse.json();
         
         // Update state with real data
-        setAtsScore(analyzeData.ats_analysis?.score || 0);
-        setScoreBreakdown({
+        const nextAtsScore = analyzeData.ats_analysis?.score || 0;
+        const nextBreakdown = {
           formatting_score: analyzeData.ats_analysis?.formatting_score || 0,
           keyword_match: Math.round((analyzeData.ats_analysis?.keyword_match || 0) * 100),
           readability_score: analyzeData.ats_analysis?.readability_score || 0
+        };
+        setAtsScore(nextAtsScore);
+        setScoreBreakdown(nextBreakdown);
+        onResumeAnalyzed?.({
+          atsScore: nextAtsScore,
+          scoreBreakdown: nextBreakdown,
+          analyzedAt: new Date().toISOString(),
+          source: "upload",
         });
         
         // Set issues from problems
@@ -1110,11 +1172,19 @@ const ResumeAnalyzer = ({ onResumeParsed }) => {
       const analyzeData = await analyzeResponse.json();
       
       // Update state with real data
-      setAtsScore(analyzeData.ats_analysis?.score || 0);
-      setScoreBreakdown({
+      const nextAtsScore = analyzeData.ats_analysis?.score || 0;
+      const nextBreakdown = {
         formatting_score: analyzeData.ats_analysis?.formatting_score || 0,
         keyword_match: Math.round((analyzeData.ats_analysis?.keyword_match || 0) * 100),
         readability_score: analyzeData.ats_analysis?.readability_score || 0
+      };
+      setAtsScore(nextAtsScore);
+      setScoreBreakdown(nextBreakdown);
+      onResumeAnalyzed?.({
+        atsScore: nextAtsScore,
+        scoreBreakdown: nextBreakdown,
+        analyzedAt: new Date().toISOString(),
+        source: "sample",
       });
       
       const problemIssues = (analyzeData.problems || []).map(p => ({
@@ -1578,7 +1648,7 @@ const JDMatcher = ({ resumeId, onJobMatched }) => {
 };
 
 // ─── Quiz ────────────────────────────────────────────────────────────────────
-const Quiz = ({ resumeId, resumeData, jobDescription }) => {
+const Quiz = ({ resumeId, resumeData, jobDescription, onQuizComplete }) => {
   const [domain, setDomain] = useState("Coding DSA");
   const [difficulty, setDifficulty] = useState("Easy");
   const [phase, setPhase] = useState("setup"); // setup | rules | quiz | result
@@ -1691,6 +1761,14 @@ const Quiz = ({ resumeId, resumeData, jobDescription }) => {
     persistQuizContext({
       score: computed,
       weakTopics: Array.from(new Set(weakTopics)),
+      completedAt: new Date().toISOString(),
+    });
+    onQuizComplete?.({
+      score: computed,
+      domain,
+      difficulty,
+      questionsCount: questions.length,
+      completed: true,
       completedAt: new Date().toISOString(),
     });
     setPhase("result");
@@ -1857,7 +1935,7 @@ const Quiz = ({ resumeId, resumeData, jobDescription }) => {
 };
 
 // ─── Mock Interview ───────────────────────────────────────────────────────────
-const MockInterview = ({ resumeId, resumeData, jobDescription }) => {
+const MockInterview = ({ resumeId, resumeData, jobDescription, onInterviewProgress }) => {
   const [mode, setMode] = useState("Technical");
   const [session, setSession] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -1926,6 +2004,14 @@ const MockInterview = ({ resumeId, resumeData, jobDescription }) => {
       setScore(0);
       setFeedbackScores([]);
       setCurrentIndex(0);
+      onInterviewProgress?.({
+        mode: selectedMode,
+        score: 0,
+        completed: false,
+        answered: 0,
+        totalQuestions: nextSession?.questions?.length || 0,
+        updatedAt: new Date().toISOString(),
+      });
       scrollToBottom();
     } catch (e) {
       console.error(e);
@@ -1971,6 +2057,15 @@ const MockInterview = ({ resumeId, resumeData, jobDescription }) => {
 
       setFeedbackScores(nextScores);
       setScore(nextAverage);
+      const hasNextQuestion = Boolean(session.questions?.[currentIndex + 1]);
+      onInterviewProgress?.({
+        mode,
+        score: nextAverage,
+        completed: !hasNextQuestion,
+        answered: nextScores.length,
+        totalQuestions: session.questions?.length || 0,
+        updatedAt: new Date().toISOString(),
+      });
 
       const feedbackText = `Score: ${feedback.score ?? 0}/10. ${feedback.model_answer || "Review the expected keywords and try again."}`;
       const nextQuestion = session.questions?.[currentIndex + 1];
@@ -2096,7 +2191,7 @@ const MockInterview = ({ resumeId, resumeData, jobDescription }) => {
 };
 
 // ─── Job Finder ───────────────────────────────────────────────────────────────
-const JobFinder = ({ resumeId, resumeData }) => {
+const JobFinder = ({ resumeId, resumeData, onJobsUpdated }) => {
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -2190,6 +2285,15 @@ const JobFinder = ({ resumeId, resumeData }) => {
   const toggleSave = (jobId) => {
     setSavedJobs((prev) => ({ ...prev, [jobId]: !prev[jobId] }));
   };
+
+  useEffect(() => {
+    onJobsUpdated?.({
+      total: jobs.length,
+      filtered: filteredJobs.length,
+      saved: Object.values(savedJobs).filter(Boolean).length,
+      updatedAt: new Date().toISOString(),
+    });
+  }, [jobs, filteredJobs.length, savedJobs, onJobsUpdated]);
 
   const quickChips = [
     { id: "all", label: "All jobs" },
@@ -2425,6 +2529,13 @@ const Dashboard = ({ onLogout }) => {
     jobDescription: null,
     matchResult: null,
   });
+  const [overviewMetrics, setOverviewMetrics] = useState({
+    resume: null,
+    roadmap: null,
+    quiz: null,
+    interview: null,
+    jobs: { total: 0, filtered: 0, saved: 0 },
+  });
 
   const handleResumeParsed = (resumeId, resumeData) => {
     setResumeContext(prev => {
@@ -2432,6 +2543,13 @@ const Dashboard = ({ onLogout }) => {
       if (isNewResume) {
         // Clear section states for roadmap/quiz/interview/jobs only on new resume upload.
         setLearningStateVersion((value) => value + 1);
+        setOverviewMetrics((previous) => ({
+          ...previous,
+          roadmap: null,
+          quiz: null,
+          interview: null,
+          jobs: { total: 0, filtered: 0, saved: 0 },
+        }));
       }
 
       return {
@@ -2447,15 +2565,35 @@ const Dashboard = ({ onLogout }) => {
     setResumeContext(prev => ({ ...prev, jobDescription, matchResult }));
   };
 
+  const handleResumeAnalyzed = (payload) => {
+    setOverviewMetrics((previous) => ({ ...previous, resume: payload }));
+  };
+
+  const handleRoadmapProgress = (payload) => {
+    setOverviewMetrics((previous) => ({ ...previous, roadmap: payload }));
+  };
+
+  const handleQuizComplete = (payload) => {
+    setOverviewMetrics((previous) => ({ ...previous, quiz: payload }));
+  };
+
+  const handleInterviewProgress = (payload) => {
+    setOverviewMetrics((previous) => ({ ...previous, interview: payload }));
+  };
+
+  const handleJobsUpdated = (payload) => {
+    setOverviewMetrics((previous) => ({ ...previous, jobs: payload }));
+  };
+
   const pages = {
     dashboard: {
       title: "Overview",
-      render: () => <DashboardOverview/>,
+      render: () => <DashboardOverview resumeContext={resumeContext} overviewMetrics={overviewMetrics}/>,
       resetOnResumeChange: false,
     },
     resume: {
       title: "Resume Analyzer",
-      render: () => <ResumeAnalyzer onResumeParsed={handleResumeParsed}/>,
+      render: () => <ResumeAnalyzer onResumeParsed={handleResumeParsed} onResumeAnalyzed={handleResumeAnalyzed}/>,
       resetOnResumeChange: false,
     },
     matcher: {
@@ -2465,22 +2603,22 @@ const Dashboard = ({ onLogout }) => {
     },
     roadmap: {
       title: "Learning Roadmap",
-      render: () => <Roadmap resumeId={resumeContext.resumeId} jobDescription={resumeContext.jobDescription}/>,
+      render: () => <Roadmap resumeId={resumeContext.resumeId} jobDescription={resumeContext.jobDescription} onProgressChange={handleRoadmapProgress}/>,
       resetOnResumeChange: true,
     },
     quiz: {
       title: "Adaptive Quiz",
-      render: () => <Quiz resumeId={resumeContext.resumeId} resumeData={resumeContext.resumeData} jobDescription={resumeContext.jobDescription}/>,
+      render: () => <Quiz resumeId={resumeContext.resumeId} resumeData={resumeContext.resumeData} jobDescription={resumeContext.jobDescription} onQuizComplete={handleQuizComplete}/>,
       resetOnResumeChange: true,
     },
     interview: {
       title: "Mock Interview",
-      render: () => <MockInterview resumeId={resumeContext.resumeId} resumeData={resumeContext.resumeData} jobDescription={resumeContext.jobDescription}/>,
+      render: () => <MockInterview resumeId={resumeContext.resumeId} resumeData={resumeContext.resumeData} jobDescription={resumeContext.jobDescription} onInterviewProgress={handleInterviewProgress}/>,
       resetOnResumeChange: true,
     },
     jobs: {
       title: "Job Finder",
-      render: () => <JobFinder resumeId={resumeContext.resumeId} resumeData={resumeContext.resumeData}/>,
+      render: () => <JobFinder resumeId={resumeContext.resumeId} resumeData={resumeContext.resumeData} onJobsUpdated={handleJobsUpdated}/>,
       resetOnResumeChange: true,
     },
   };

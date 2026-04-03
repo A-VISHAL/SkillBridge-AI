@@ -153,7 +153,8 @@ async def analyze_resume(
         ats_result = await ai_service.calculate_ats_score(
             resume.raw_text,
             target_role,
-            job_description
+            job_description,
+            resume.dict(),
         )
         
         # Convert to structured format
