@@ -75,14 +75,29 @@ export function AdminDashboard({ onLogout }) {
   const [showJobModal, setShowJobModal] = useState(false);
   const [jobForm, setJobForm] = useState({ title: '', company: '', location: '' });
   const [toast, setToast] = useState('');
+  const [newSkill, setNewSkill] = useState('');
 
   useEffect(() => {
     setSavedSettings(settings);
   }, [settings]);
 
+  // Calculate dynamic eligibility based on current savedSettings
+  const eligibleStudents = useMemo(() => {
+    return students.filter(student => {
+      const cgpa = Number(student.cgpa);
+      const meetsCGPA = !isNaN(cgpa) && cgpa >= savedSettings.min_cgpa;
+      const meetsATS = Number(student.ats_score || 0) >= savedSettings.min_ats_score;
+      const meetsSkills = (savedSettings.required_skills || []).length === 0 || 
+        (savedSettings.required_skills || []).every(req => 
+          student.skills.some(skill => skill.toLowerCase().includes(req.toLowerCase()))
+        );
+      return meetsCGPA && meetsATS && meetsSkills;
+    });
+  }, [students, savedSettings]);
+
   const totalStudents = students.length;
   const averageAts = totalStudents ? students.reduce((sum, student) => sum + Number(student.ats_score || 0), 0) / totalStudents : 0;
-  const placementReadiness = totalStudents ? Math.round((students.filter((student) => student.eligible).length / totalStudents) * 100) : 0;
+  const placementReadiness = totalStudents ? Math.round((eligibleStudents.length / totalStudents) * 100) : 0;
   const activeJobs = jobs.length;
 
   const chartData = useMemo(() => {
@@ -108,13 +123,13 @@ export function AdminDashboard({ onLogout }) {
     const required = savedSettings.required_skills || [];
     return required.map((skill) => {
       const matchCount = students.filter((student) => student.skills.some((value) => value.toLowerCase().includes(skill.toLowerCase()))).length;
-      return { skill, missing: Math.max(0, students.length - matchCount) };
+      return { skill, students: Math.max(0, students.length - matchCount) };
     });
   }, [students, savedSettings]);
 
   const trendData = useMemo(() => {
     return students.slice(0, 6).map((student, index) => ({
-      name: student.name.split(' ')[0],
+      name: `Student ${index + 1}`,
       ats: Number(student.ats_score || 0),
       progress: Number(student.progress || 0),
       order: index + 1,
@@ -296,15 +311,182 @@ export function AdminDashboard({ onLogout }) {
 
                     <div>
                       <div style={{ marginBottom: 12, fontWeight: 700 }}>Required Skills</div>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
                         {(savedSettings.required_skills || []).map((skill) => (
-                          <span key={skill} style={{ padding: '8px 12px', borderRadius: 999, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)' }}>{skill}</span>
+                          <span 
+                            key={skill} 
+                            style={{ 
+                              padding: '8px 12px', 
+                              borderRadius: 999, 
+                              background: 'rgba(255,255,255,0.08)', 
+                              border: '1px solid rgba(255,255,255,0.1)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 8
+                            }}
+                          >
+                            {skill}
+                            <button
+                              onClick={() => {
+                                setSavedSettings(prev => ({
+                                  ...prev,
+                                  required_skills: prev.required_skills.filter(s => s !== skill)
+                                }));
+                              }}
+                              style={{
+                                border: 'none',
+                                background: 'transparent',
+                                color: 'rgba(255,255,255,0.6)',
+                                cursor: 'pointer',
+                                padding: 0,
+                                fontSize: 16,
+                                lineHeight: 1
+                              }}
+                            >
+                              ×
+                            </button>
+                          </span>
                         ))}
+                      </div>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <input
+                          type="text"
+                          value={newSkill}
+                          onChange={(e) => setNewSkill(e.target.value)}
+                          onKeyPress={(e) => {
+                            if (e.key === 'Enter' && newSkill.trim()) {
+                              setSavedSettings(prev => ({
+                                ...prev,
+                                required_skills: [...(prev.required_skills || []), newSkill.trim()]
+                              }));
+                              setNewSkill('');
+                            }
+                          }}
+                          placeholder="Add a skill (e.g., Docker, AWS)"
+                          style={{
+                            flex: 1,
+                            padding: '10px 14px',
+                            borderRadius: 12,
+                            border: '1px solid rgba(255,255,255,0.12)',
+                            background: 'rgba(255,255,255,0.08)',
+                            color: 'white',
+                            fontSize: 13,
+                            outline: 'none'
+                          }}
+                        />
+                        <button
+                          onClick={() => {
+                            if (newSkill.trim()) {
+                              setSavedSettings(prev => ({
+                                ...prev,
+                                required_skills: [...(prev.required_skills || []), newSkill.trim()]
+                              }));
+                              setNewSkill('');
+                            }
+                          }}
+                          style={{
+                            border: 'none',
+                            borderRadius: 12,
+                            padding: '10px 18px',
+                            background: 'rgba(139,92,246,0.2)',
+                            border: '1px solid rgba(139,92,246,0.3)',
+                            color: '#a78bfa',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            fontSize: 13
+                          }}
+                        >
+                          Add
+                        </button>
                       </div>
                     </div>
 
                     <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                       <button onClick={saveEligibility} style={{ border: 'none', borderRadius: 999, padding: '12px 16px', background: 'linear-gradient(135deg, #8b5cf6, #38bdf8)', color: 'white', fontWeight: 800, cursor: 'pointer' }}>Save criteria</button>
+                    </div>
+                  </div>
+                </SectionShell>
+
+                <SectionShell title="Eligibility statistics" subtitle="Visual breakdown of student eligibility based on current criteria.">
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14 }}>
+                    <div style={{ ...metricStyle, padding: 20 }}>
+                      <div style={{ fontWeight: 700, marginBottom: 14, fontSize: 15 }}>Eligibility breakdown</div>
+                      <ResponsiveContainer width="100%" height={200}>
+                        <PieChart>
+                          <Pie
+                            data={[
+                              { name: 'Eligible', value: eligibleStudents.length, fill: '#22c55e' },
+                              { name: 'Not Eligible', value: students.length - eligibleStudents.length, fill: '#ef4444' }
+                            ]}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={50}
+                            outerRadius={80}
+                            paddingAngle={4}
+                            dataKey="value"
+                          >
+                          </Pie>
+                          <Tooltip contentStyle={{ background: '#0f172a', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12 }} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                      <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginTop: 10 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#22c55e' }} />
+                          <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>Eligible: {eligibleStudents.length}</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#ef4444' }} />
+                          <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>Not Eligible: {students.length - eligibleStudents.length}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ ...metricStyle, padding: 20 }}>
+                      <div style={{ fontWeight: 700, marginBottom: 14, fontSize: 15 }}>CGPA distribution</div>
+                      <ResponsiveContainer width="100%" height={200}>
+                        <BarChart data={[
+                          { range: '4-5', count: students.filter(s => !isNaN(Number(s.cgpa)) && Number(s.cgpa) >= 4 && Number(s.cgpa) < 5).length },
+                          { range: '5-6', count: students.filter(s => !isNaN(Number(s.cgpa)) && Number(s.cgpa) >= 5 && Number(s.cgpa) < 6).length },
+                          { range: '6-7', count: students.filter(s => !isNaN(Number(s.cgpa)) && Number(s.cgpa) >= 6 && Number(s.cgpa) < 7).length },
+                          { range: '7-8', count: students.filter(s => !isNaN(Number(s.cgpa)) && Number(s.cgpa) >= 7 && Number(s.cgpa) < 8).length },
+                          { range: '8-9', count: students.filter(s => !isNaN(Number(s.cgpa)) && Number(s.cgpa) >= 8 && Number(s.cgpa) < 9).length },
+                          { range: '9-10', count: students.filter(s => !isNaN(Number(s.cgpa)) && Number(s.cgpa) >= 9).length },
+                        ]}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
+                          <XAxis dataKey="range" stroke="rgba(255,255,255,0.48)" style={{ fontSize: 11 }} />
+                          <YAxis stroke="rgba(255,255,255,0.48)" style={{ fontSize: 11 }} />
+                          <Tooltip contentStyle={{ background: '#0f172a', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12 }} />
+                          <Bar dataKey="count" radius={[8, 8, 0, 0]} fill="#38bdf8" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+
+                    <div style={{ ...metricStyle, padding: 20 }}>
+                      <div style={{ fontWeight: 700, marginBottom: 14, fontSize: 15 }}>Students meeting criteria</div>
+                      <div style={{ display: 'grid', gap: 12 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', borderRadius: 12, background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)' }}>
+                          <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)' }}>CGPA ≥ {savedSettings.min_cgpa}</span>
+                          <span style={{ fontSize: 18, fontWeight: 800, color: '#22c55e' }}>{students.filter(s => !isNaN(Number(s.cgpa)) && Number(s.cgpa) >= savedSettings.min_cgpa).length}</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', borderRadius: 12, background: 'rgba(56,189,248,0.1)', border: '1px solid rgba(56,189,248,0.2)' }}>
+                          <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)' }}>ATS ≥ {savedSettings.min_ats_score}%</span>
+                          <span style={{ fontSize: 18, fontWeight: 800, color: '#38bdf8' }}>{students.filter(s => Number(s.ats_score || 0) >= savedSettings.min_ats_score).length}</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', borderRadius: 12, background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)' }}>
+                          <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)' }}>Has required skills</span>
+                          <span style={{ fontSize: 18, fontWeight: 800, color: '#8b5cf6' }}>
+                            {students.filter(s => 
+                              (savedSettings.required_skills || []).every(req => 
+                                s.skills.some(skill => skill.toLowerCase().includes(req.toLowerCase()))
+                              )
+                            ).length}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px', borderRadius: 12, background: 'linear-gradient(135deg, rgba(139,92,246,0.15), rgba(56,189,248,0.15))', border: '1px solid rgba(139,92,246,0.3)' }}>
+                          <span style={{ fontSize: 14, fontWeight: 700, color: 'white' }}>Total Eligible</span>
+                          <span style={{ fontSize: 22, fontWeight: 800, color: 'white' }}>{eligibleStudents.length}</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </SectionShell>
@@ -415,7 +597,7 @@ export function AdminDashboard({ onLogout }) {
                           <XAxis dataKey="skill" stroke="rgba(255,255,255,0.48)" />
                           <YAxis stroke="rgba(255,255,255,0.48)" />
                           <Tooltip contentStyle={{ background: '#0f172a', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12 }} />
-                          <Bar dataKey="missing" radius={[10, 10, 0, 0]} fill="#8b5cf6" />
+                          <Bar dataKey="students" radius={[10, 10, 0, 0]} fill="#8b5cf6" />
                         </BarChart>
                       </ResponsiveContainer>
                     </div>

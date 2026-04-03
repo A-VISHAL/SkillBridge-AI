@@ -253,16 +253,22 @@ export default function StudentsSection({ students, settings, loading, error, on
 
       <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr 0.8fr', gap: 12 }}>
         <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search students..." style={inputStyle} />
-        <select value={skillFilter} onChange={(e) => setSkillFilter(e.target.value)} style={inputStyle}>
-          <option value="all">All skills</option>
-          {skillOptions.map((skill) => <option key={skill} value={skill}>{skill}</option>)}
+        <select value={skillFilter} onChange={(e) => setSkillFilter(e.target.value)} style={selectStyle}>
+          <option value="all" style={{ background: '#0f172a', color: 'white' }}>All skills</option>
+          {skillOptions.map((skill) => <option key={skill} value={skill} style={{ background: '#0f172a', color: 'white' }}>{skill}</option>)}
         </select>
-        <select value={eligibilityFilter} onChange={(e) => setEligibilityFilter(e.target.value)} style={inputStyle}>
-          <option value="all">All statuses</option>
-          <option value="eligible">Eligible</option>
-          <option value="not">Not eligible</option>
+        <select value={eligibilityFilter} onChange={(e) => setEligibilityFilter(e.target.value)} style={selectStyle}>
+          <option value="all" style={{ background: '#0f172a', color: 'white' }}>All statuses</option>
+          <option value="eligible" style={{ background: '#0f172a', color: 'white' }}>Eligible</option>
+          <option value="not" style={{ background: '#0f172a', color: 'white' }}>Not eligible</option>
         </select>
-        <input type="range" min="0" max="100" value={scoreFilter} onChange={(e) => setScoreFilter(Number(e.target.value))} style={{ accentColor: '#7c3aed' }} />
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>
+            <span>Min ATS Score</span>
+            <span style={{ fontWeight: 700, color: '#a78bfa' }}>{scoreFilter}%</span>
+          </div>
+          <input type="range" min="0" max="100" value={scoreFilter} onChange={(e) => setScoreFilter(Number(e.target.value))} style={{ width: '100%', accentColor: '#7c3aed' }} />
+        </div>
       </div>
 
       <div style={{ display: 'grid', gap: 14, gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
@@ -330,6 +336,16 @@ const inputStyle = {
   padding: '13px 14px',
   outline: 'none',
   fontSize: 14,
+};
+
+const selectStyle = {
+  ...inputStyle,
+  cursor: 'pointer',
+  appearance: 'none',
+  backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'12\' height=\'12\' viewBox=\'0 0 12 12\'%3E%3Cpath fill=\'white\' d=\'M6 9L1 4h10z\'/%3E%3C/svg%3E")',
+  backgroundRepeat: 'no-repeat',
+  backgroundPosition: 'right 14px center',
+  paddingRight: '40px',
 };
 
 function MiniList({ label, items, empty }) {
