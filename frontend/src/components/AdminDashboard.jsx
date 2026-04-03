@@ -67,6 +67,24 @@ function Gauge({ value, label }) {
   );
 }
 
+function evaluateEligibility(student, settings) {
+  const cgpa = Number(student.cgpa);
+  const requiredSkills = settings.required_skills || [];
+  const skillList = student.skills || [];
+  const meetsCGPA = !Number.isNaN(cgpa) && cgpa >= Number(settings.min_cgpa);
+  const meetsATS = Number(student.ats_score || 0) >= Number(settings.min_ats_score);
+  const meetsSkills = requiredSkills.length === 0 || requiredSkills.every((requiredSkill) =>
+    skillList.some((skill) => skill.toLowerCase().includes(requiredSkill.toLowerCase())),
+  );
+
+  return {
+    meetsCGPA,
+    meetsATS,
+    meetsSkills,
+    eligible: meetsCGPA && meetsATS && meetsSkills,
+  };
+}
+
 export function AdminDashboard({ onLogout }) {
   const { students, jobs, roadmaps, roadmapTasks, settings, loading, error, refetch } = useAdminData();
   const [active, setActive] = useState('overview');
@@ -81,23 +99,49 @@ export function AdminDashboard({ onLogout }) {
     setSavedSettings(settings);
   }, [settings]);
 
-  // Calculate dynamic eligibility based on current savedSettings
-  const eligibleStudents = useMemo(() => {
-    return students.filter(student => {
-      const cgpa = Number(student.cgpa);
-      const meetsCGPA = !isNaN(cgpa) && cgpa >= savedSettings.min_cgpa;
-      const meetsATS = Number(student.ats_score || 0) >= savedSettings.min_ats_score;
-      const meetsSkills = (savedSettings.required_skills || []).length === 0 || 
-        (savedSettings.required_skills || []).every(req => 
-          student.skills.some(skill => skill.toLowerCase().includes(req.toLowerCase()))
-        );
-      return meetsCGPA && meetsATS && meetsSkills;
-    });
-  }, [students, savedSettings]);
+  const eligibilitySnapshot = useMemo(() => {
+    return students.map((student) => ({
+      student,
+      ...evaluateEligibility(student, savedSettings),
+    }));
+  }, [students, savedSettings.min_cgpa, savedSettings.min_ats_score, savedSettings.required_skills]);
+
+  // Calculate bottleneck eligibility (minimum of all criteria)
+  const eligibilityBreakdown = useMemo(() => {
+    const cgpaCount = eligibilitySnapshot.filter(e => e.meetsCGPA).length;
+    const atsCount = eligibilitySnapshot.filter(e => e.meetsATS).length;
+    const skillsCount = eligibilitySnapshot.filter(e => e.meetsSkills).length;
+    
+    // Total eligible is the minimum (bottleneck)
+    const totalEligible = Math.min(cgpaCount, atsCount, skillsCount);
+    
+    return {
+      cgpaCount,
+      atsCount,
+      skillsCount,
+      totalEligible,
+      notEligible: students.length - totalEligible
+    };
+  }, [eligibilitySnapshot, students.length]);
+
+  const eligibleStudents = useMemo(
+    () => ({ length: eligibilityBreakdown.totalEligible }),
+    [eligibilityBreakdown.totalEligible],
+  );
+
+  const eligibilityCounts = useMemo(() => {
+    return eligibilitySnapshot.reduce((counts, entry) => {
+      if (entry.meetsCGPA) counts.cgpa += 1;
+      if (entry.meetsATS) counts.ats += 1;
+      if (entry.meetsSkills) counts.skills += 1;
+      if (entry.eligible) counts.eligible += 1;
+      return counts;
+    }, { cgpa: 0, ats: 0, skills: 0, eligible: 0 });
+  }, [eligibilitySnapshot]);
 
   const totalStudents = students.length;
   const averageAts = totalStudents ? students.reduce((sum, student) => sum + Number(student.ats_score || 0), 0) / totalStudents : 0;
-  const placementReadiness = totalStudents ? Math.round((eligibleStudents.length / totalStudents) * 100) : 0;
+  const placementReadiness = totalStudents ? Math.round((eligibilityCounts.eligible / totalStudents) * 100) : 0;
   const activeJobs = jobs.length;
 
   const chartData = useMemo(() => {
@@ -385,7 +429,6 @@ export function AdminDashboard({ onLogout }) {
                             }
                           }}
                           style={{
-                            border: 'none',
                             borderRadius: 12,
                             padding: '10px 18px',
                             background: 'rgba(139,92,246,0.2)',
@@ -412,11 +455,11 @@ export function AdminDashboard({ onLogout }) {
                     <div style={{ ...metricStyle, padding: 20 }}>
                       <div style={{ fontWeight: 700, marginBottom: 14, fontSize: 15 }}>Eligibility breakdown</div>
                       <ResponsiveContainer width="100%" height={200}>
-                        <PieChart>
+                        <PieChart key={`pie-${eligibilityBreakdown.totalEligible}-${students.length}`}>
                           <Pie
                             data={[
-                              { name: 'Eligible', value: eligibleStudents.length, fill: '#22c55e' },
-                              { name: 'Not Eligible', value: students.length - eligibleStudents.length, fill: '#ef4444' }
+                              { name: 'Eligible', value: eligibilityBreakdown.totalEligible, fill: '#22c55e' },
+                              { name: 'Not Eligible', value: eligibilityBreakdown.notEligible, fill: '#ef4444' }
                             ]}
                             cx="50%"
                             cy="50%"
@@ -424,6 +467,8 @@ export function AdminDashboard({ onLogout }) {
                             outerRadius={80}
                             paddingAngle={4}
                             dataKey="value"
+                            animationBegin={0}
+                            animationDuration={800}
                           >
                           </Pie>
                           <Tooltip contentStyle={{ background: '#0f172a', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12 }} />
@@ -432,12 +477,15 @@ export function AdminDashboard({ onLogout }) {
                       <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginTop: 10 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#22c55e' }} />
-                          <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>Eligible: {eligibleStudents.length}</span>
+                          <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>Eligible: {eligibilityBreakdown.totalEligible}</span>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#ef4444' }} />
-                          <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>Not Eligible: {students.length - eligibleStudents.length}</span>
+                          <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>Not Eligible: {eligibilityBreakdown.notEligible}</span>
                         </div>
+                      </div>
+                      <div style={{ marginTop: 10, textAlign: 'center', fontSize: 12, color: 'rgba(255,255,255,0.52)' }}>
+                        Total eligible is the bottleneck (minimum) of all three criteria.
                       </div>
                     </div>
 
@@ -466,25 +514,21 @@ export function AdminDashboard({ onLogout }) {
                       <div style={{ display: 'grid', gap: 12 }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', borderRadius: 12, background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)' }}>
                           <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)' }}>CGPA ≥ {savedSettings.min_cgpa}</span>
-                          <span style={{ fontSize: 18, fontWeight: 800, color: '#22c55e' }}>{students.filter(s => !isNaN(Number(s.cgpa)) && Number(s.cgpa) >= savedSettings.min_cgpa).length}</span>
+                          <span style={{ fontSize: 18, fontWeight: 800, color: '#22c55e' }}>{eligibilityBreakdown.cgpaCount}</span>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', borderRadius: 12, background: 'rgba(56,189,248,0.1)', border: '1px solid rgba(56,189,248,0.2)' }}>
                           <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)' }}>ATS ≥ {savedSettings.min_ats_score}%</span>
-                          <span style={{ fontSize: 18, fontWeight: 800, color: '#38bdf8' }}>{students.filter(s => Number(s.ats_score || 0) >= savedSettings.min_ats_score).length}</span>
+                          <span style={{ fontSize: 18, fontWeight: 800, color: '#38bdf8' }}>{eligibilityBreakdown.atsCount}</span>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', borderRadius: 12, background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)' }}>
                           <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)' }}>Has required skills</span>
                           <span style={{ fontSize: 18, fontWeight: 800, color: '#8b5cf6' }}>
-                            {students.filter(s => 
-                              (savedSettings.required_skills || []).every(req => 
-                                s.skills.some(skill => skill.toLowerCase().includes(req.toLowerCase()))
-                              )
-                            ).length}
+                            {eligibilityBreakdown.skillsCount}
                           </span>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px', borderRadius: 12, background: 'linear-gradient(135deg, rgba(139,92,246,0.15), rgba(56,189,248,0.15))', border: '1px solid rgba(139,92,246,0.3)' }}>
                           <span style={{ fontSize: 14, fontWeight: 700, color: 'white' }}>Total Eligible</span>
-                          <span style={{ fontSize: 22, fontWeight: 800, color: 'white' }}>{eligibleStudents.length}</span>
+                          <span style={{ fontSize: 22, fontWeight: 800, color: 'white' }}>{eligibilityBreakdown.totalEligible}</span>
                         </div>
                       </div>
                     </div>
