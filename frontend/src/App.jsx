@@ -1595,6 +1595,19 @@ const Quiz = ({ resumeId, resumeData, jobDescription }) => {
 
   const getOptionText = (opt) => (typeof opt === "string" ? opt : opt?.text || "");
 
+  const persistQuizContext = (nextContext) => {
+    if (typeof window === "undefined") return;
+    try {
+      const existing = JSON.parse(window.localStorage.getItem("skillbridge.lastQuizContext") || "{}");
+      window.localStorage.setItem("skillbridge.lastQuizContext", JSON.stringify({
+        ...existing,
+        ...nextContext,
+      }));
+    } catch {
+      // Ignore storage failures in private/incognito contexts.
+    }
+  };
+
   const startQuizGeneration = async () => {
     if (!resumeId) {
       setError("Upload your resume first in Resume Analyzer.");
@@ -1634,6 +1647,21 @@ const Quiz = ({ resumeId, resumeData, jobDescription }) => {
       ]);
       setAnswers({});
       setIndex(0);
+      persistQuizContext({
+        domain,
+        difficulty,
+        topic,
+        generatedAt: new Date().toISOString(),
+        passingPercentage: data.passing_percentage ?? passingPercentage,
+        studyMaterials: Array.isArray(data.study_materials) ? data.study_materials : [],
+        weakTopics: [],
+        questions: quizQuestions.map((question) => ({
+          id: question.id,
+          topic: question.topic,
+          difficulty: question.difficulty,
+          question: question.question,
+        })),
+      });
       setPhase("rules");
     } catch (e) {
       console.error(e);
@@ -1645,16 +1673,26 @@ const Quiz = ({ resumeId, resumeData, jobDescription }) => {
 
   const submitQuiz = () => {
     let correct = 0;
+    const weakTopics = [];
     questions.forEach((q, idx) => {
       const selected = answers[idx];
       const optionObjs = Array.isArray(q.options) ? q.options : [];
       const correctOption = optionObjs.find((o) => o?.is_correct);
       const correctText = correctOption ? getOptionText(correctOption) : (q.correct_answer || "");
-      if (selected && selected === correctText) correct += 1;
+      if (selected && selected === correctText) {
+        correct += 1;
+      } else {
+        weakTopics.push(q.topic || q.question || `Question ${idx + 1}`);
+      }
     });
 
     const computed = questions.length > 0 ? Math.round((correct / questions.length) * 100) : 0;
     setScore(computed);
+    persistQuizContext({
+      score: computed,
+      weakTopics: Array.from(new Set(weakTopics)),
+      completedAt: new Date().toISOString(),
+    });
     setPhase("result");
   };
 
@@ -1819,89 +1857,240 @@ const Quiz = ({ resumeId, resumeData, jobDescription }) => {
 };
 
 // ─── Mock Interview ───────────────────────────────────────────────────────────
-const MockInterview = () => {
-  const [messages, setMessages] = useState([
-    { role: "ai", text: "Welcome to your mock interview! I'll be playing the role of a senior engineer at a top tech company. Let's begin with a classic: Tell me about yourself and why you're interested in this Software Engineer role." },
-  ]);
+const MockInterview = ({ resumeId, resumeData, jobDescription }) => {
+  const [mode, setMode] = useState("Technical");
+  const [session, setSession] = useState(null);
+  const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const [score, setScore] = useState(0);
+  const [feedbackScores, setFeedbackScores] = useState([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [completed, setCompleted] = useState(false);
   const chatRef = useRef(null);
 
-  const handleSend = () => {
-    if (!input.trim()) return;
-    const newMsgs = [
-      ...messages,
-      { role: "user", text: input },
-      { role: "ai", text: "Great answer! You clearly articulated your background. Let me follow up: Can you describe a challenging technical problem you faced and how you solved it? Focus on your thought process and the outcome." },
-    ];
-    setMessages(newMsgs);
-    setInput("");
-    setTimeout(() => chatRef.current?.scrollTo({ top: 9999, behavior: "smooth" }), 100);
+  const loadQuizContext = () => {
+    if (typeof window === "undefined") return {};
+    try {
+      return JSON.parse(window.localStorage.getItem("skillbridge.lastQuizContext") || "{}");
+    } catch {
+      return {};
+    }
   };
+
+  const scrollToBottom = () => {
+    window.setTimeout(() => chatRef.current?.scrollTo({ top: 9999, behavior: "smooth" }), 60);
+  };
+
+  const startInterview = async (selectedMode) => {
+    if (!resumeId) {
+      setError("Upload your resume first in Resume Analyzer.");
+      return;
+    }
+
+    setMode(selectedMode);
+    setLoading(true);
+    setError("");
+    setCompleted(false);
+
+    try {
+      const formData = new FormData();
+      formData.append("resume_id", resumeId);
+      formData.append("job_description", jobDescription || "");
+      formData.append("mode", selectedMode);
+      formData.append("count", 5);
+      formData.append("quiz_context", JSON.stringify(loadQuizContext()));
+
+      const response = await fetch("/api/interview/start", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || "Failed to start interview");
+      }
+
+      const data = await response.json();
+      const nextSession = data?.session_id ? data : null;
+      const firstQuestion = nextSession?.questions?.[0]?.question || "Tell me about yourself and the most relevant project from your resume.";
+
+      setSession(nextSession);
+      setMessages([
+        { role: "ai", text: "Interview started from your resume, quiz history, and roadmap context. Your score begins at 0." },
+        { role: "ai", text: firstQuestion },
+      ]);
+      setInput("");
+      setScore(0);
+      setFeedbackScores([]);
+      setCurrentIndex(0);
+      scrollToBottom();
+    } catch (e) {
+      console.error(e);
+      setError("Could not start the interview right now. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSend = async () => {
+    if (!session || completed || !input.trim() || submitting) return;
+
+    const currentQuestion = session.questions?.[currentIndex];
+    if (!currentQuestion) return;
+
+    const answerText = input.trim();
+    setSubmitting(true);
+    setInput("");
+    setMessages((prev) => [...prev, { role: "user", text: answerText }]);
+
+    try {
+      const formData = new FormData();
+      formData.append("session_id", session.session_id);
+      formData.append("question_id", currentQuestion.id);
+      formData.append("answer", answerText);
+      formData.append("time_taken", 20);
+
+      const response = await fetch("/api/interview/evaluate", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || "Failed to evaluate answer");
+      }
+
+      const feedback = await response.json();
+      const nextScores = [...feedbackScores, Number(feedback.score || 0)];
+      const nextAverage = nextScores.length > 0
+        ? Math.round((nextScores.reduce((sum, value) => sum + value, 0) / (nextScores.length * 10)) * 100)
+        : 0;
+
+      setFeedbackScores(nextScores);
+      setScore(nextAverage);
+
+      const feedbackText = `Score: ${feedback.score ?? 0}/10. ${feedback.model_answer || "Review the expected keywords and try again."}`;
+      const nextQuestion = session.questions?.[currentIndex + 1];
+
+      setMessages((prev) => {
+        const updated = [...prev, { role: "ai", text: feedbackText }];
+        if (nextQuestion) {
+          updated.push({ role: "ai", text: nextQuestion.question });
+        } else {
+          updated.push({ role: "ai", text: `Interview complete. Final score: ${nextAverage}%` });
+        }
+        return updated;
+      });
+
+      if (nextQuestion) {
+        setCurrentIndex((value) => value + 1);
+      } else {
+        setCompleted(true);
+      }
+
+      scrollToBottom();
+    } catch (e) {
+      console.error(e);
+      setError("Could not evaluate your answer right now. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const currentQuestion = session?.questions?.[currentIndex];
 
   return (
     <div style={{ padding: 28, animation: "fadeIn 0.4s ease", height: "calc(100vh - 60px)", display: "flex", flexDirection: "column" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18, flexShrink: 0 }}>
         <div>
           <h2 style={{ fontSize: 20, fontWeight: 700, color: "var(--gray-900)", letterSpacing: "-0.04em", marginBottom: 4 }}>Mock Interview</h2>
-          <p style={{ fontSize: 13.5, color: "var(--gray-500)" }}>AI-powered interview simulation with real-time feedback.</p>
+          <p style={{ fontSize: 13.5, color: "var(--gray-500)" }}>Questions are based on your resume, quiz history, and roadmap progress.</p>
         </div>
-        <div style={{ display: "flex", gap: 10 }}>
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           <div style={{ textAlign: "right" }}>
-            <div style={{ fontSize: 20, fontWeight: 700, color: "var(--gray-900)", letterSpacing: "-0.04em" }}>84</div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: "var(--gray-900)", letterSpacing: "-0.04em" }}>{score}</div>
             <div style={{ fontSize: 11, color: "var(--gray-400)", fontWeight: 500 }}>Interview score</div>
           </div>
-          <div style={{ width: 1, background: "var(--gray-150)" }}/>
+          <div style={{ width: 1, background: "var(--gray-150)", height: 28 }}/>
           <Btn variant="outline" style={{ padding: "8px 16px", fontSize: 13 }} icon={<Icon name="mic" size={14}/>}>Voice mode</Btn>
         </div>
       </div>
 
-      {/* Chat */}
-      <div ref={chatRef} style={{
-        flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 16,
-        padding: "4px 0 20px",
-      }}>
-        {messages.map((msg, i) => (
-          <div key={i} style={{
-            display: "flex", gap: 12,
-            flexDirection: msg.role === "user" ? "row-reverse" : "row",
-            maxWidth: 640,
-            alignSelf: msg.role === "user" ? "flex-end" : "flex-start",
-          }}>
-            {msg.role === "ai" && (
-              <div style={{ width: 32, height: 32, borderRadius: "50%", background: "var(--gray-900)", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <Icon name="brain" size={14} color="white"/>
-              </div>
-            )}
-            <div style={{
-              padding: "13px 16px", borderRadius: msg.role === "ai" ? "4px 16px 16px 16px" : "16px 4px 16px 16px",
-              background: msg.role === "ai" ? "var(--white)" : "var(--gray-900)",
-              color: msg.role === "ai" ? "var(--gray-800)" : "var(--white)",
-              border: msg.role === "ai" ? "1px solid var(--gray-150)" : "none",
-              boxShadow: "var(--shadow-sm)",
-              fontSize: 13.5, lineHeight: 1.65, maxWidth: 500,
-            }}>
-              {msg.text}
-            </div>
+      {!session && (
+        <div style={{ background: "var(--white)", border: "1px solid var(--gray-150)", borderRadius: "var(--radius-lg)", boxShadow: "var(--shadow-md)", padding: 24, marginBottom: 16 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "var(--gray-500)", marginBottom: 12 }}>Select Interview Mode</div>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+            <Btn onClick={() => startInterview("Technical")} disabled={loading}>
+              Start Technical Interview
+            </Btn>
+            <Btn variant="outline" onClick={() => startInterview("HR")} disabled={loading}>
+              Start HR Interview
+            </Btn>
           </div>
-        ))}
-      </div>
-
-      {/* Input */}
-      <div style={{
-        display: "flex", gap: 10, padding: "14px 0 0",
-        borderTop: "1px solid var(--gray-150)", flexShrink: 0,
-      }}>
-        <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 10, background: "var(--gray-50)", border: "1px solid var(--gray-200)", borderRadius: 99, padding: "10px 18px" }}>
-          <input
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && handleSend()}
-            placeholder="Type your answer..."
-            style={{ flex: 1, border: "none", background: "transparent", fontSize: 13.5, color: "var(--gray-700)", outline: "none", fontFamily: "inherit" }}
-          />
+          {error && <div style={{ marginTop: 12, color: "#b91c1c", fontSize: 12.5, fontWeight: 600 }}>{error}</div>}
+          {!resumeId && <div style={{ marginTop: 10, color: "#b91c1c", fontSize: 12.5 }}>Upload your resume first so the interview can use your profile.</div>}
+          {resumeData?.name && <div style={{ marginTop: 10, color: "var(--gray-500)", fontSize: 12.5 }}>Interview profile: {resumeData.name}</div>}
         </div>
-        <Btn variant="primary" onClick={handleSend} style={{ borderRadius: "50%", width: 44, height: 44, padding: 0 }} icon={<Icon name="send" size={16}/>}></Btn>
-      </div>
+      )}
+
+      {session && (
+        <>
+          <div ref={chatRef} style={{
+            flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 16,
+            padding: "4px 0 20px",
+          }}>
+            {messages.map((msg, i) => (
+              <div key={i} style={{
+                display: "flex", gap: 12,
+                flexDirection: msg.role === "user" ? "row-reverse" : "row",
+                maxWidth: 720,
+                alignSelf: msg.role === "user" ? "flex-end" : "flex-start",
+              }}>
+                {msg.role === "ai" && (
+                  <div style={{ width: 32, height: 32, borderRadius: "50%", background: "var(--gray-900)", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <Icon name="brain" size={14} color="white"/>
+                  </div>
+                )}
+                <div style={{
+                  padding: "13px 16px", borderRadius: msg.role === "ai" ? "4px 16px 16px 16px" : "16px 4px 16px 16px",
+                  background: msg.role === "ai" ? "var(--white)" : "var(--gray-900)",
+                  color: msg.role === "ai" ? "var(--gray-800)" : "var(--white)",
+                  border: msg.role === "ai" ? "1px solid var(--gray-150)" : "none",
+                  boxShadow: "var(--shadow-sm)",
+                  fontSize: 13.5, lineHeight: 1.65, maxWidth: 560,
+                }}>
+                  {msg.text}
+                </div>
+              </div>
+            ))}
+            {loading && <div style={{ color: "var(--gray-500)", fontSize: 12.5 }}>Starting interview...</div>}
+            {submitting && <div style={{ color: "var(--gray-500)", fontSize: 12.5 }}>Scoring answer...</div>}
+          </div>
+
+          <div style={{
+            display: "flex", gap: 10, padding: "14px 0 0",
+            borderTop: "1px solid var(--gray-150)", flexShrink: 0,
+          }}>
+            <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 10, background: "var(--gray-50)", border: "1px solid var(--gray-200)", borderRadius: 99, padding: "10px 18px" }}>
+              <input
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSend()}
+                placeholder={completed ? "Interview complete" : "Type your answer..."}
+                disabled={completed || submitting}
+                style={{ flex: 1, border: "none", background: "transparent", fontSize: 13.5, color: "var(--gray-700)", outline: "none", fontFamily: "inherit" }}
+              />
+            </div>
+            <Btn variant="primary" onClick={handleSend} disabled={completed || submitting} style={{ borderRadius: "50%", width: 44, height: 44, padding: 0 }} icon={<Icon name="send" size={16}/>}></Btn>
+          </div>
+
+          {error && <div style={{ marginTop: 12, color: "#b91c1c", fontSize: 12.5, fontWeight: 600 }}>{error}</div>}
+          {completed && <div style={{ marginTop: 10, color: "var(--gray-500)", fontSize: 12.5 }}>You can restart the interview to generate a new session.</div>}
+        </>
+      )}
     </div>
   );
 };
@@ -2250,7 +2439,7 @@ const Dashboard = ({ onLogout }) => {
     matcher: { component: <JDMatcher resumeId={resumeContext.resumeId} onJobMatched={handleJobDescriptionMatched}/>, title: "JD Matcher" },
     roadmap: { component: <Roadmap resumeId={resumeContext.resumeId} jobDescription={resumeContext.jobDescription}/>, title: "Learning Roadmap" },
     quiz: { component: <Quiz resumeId={resumeContext.resumeId} resumeData={resumeContext.resumeData} jobDescription={resumeContext.jobDescription}/>, title: "Adaptive Quiz" },
-    interview: { component: <MockInterview/>, title: "Mock Interview" },
+    interview: { component: <MockInterview resumeId={resumeContext.resumeId} resumeData={resumeContext.resumeData} jobDescription={resumeContext.jobDescription}/>, title: "Mock Interview" },
     jobs: { component: <JobFinder resumeId={resumeContext.resumeId} resumeData={resumeContext.resumeData}/>, title: "Job Finder" },
   };
 

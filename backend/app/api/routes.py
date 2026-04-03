@@ -1,6 +1,7 @@
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from fastapi.responses import JSONResponse
 from typing import List, Optional
+import json
 import os
 import uuid
 from datetime import datetime
@@ -456,16 +457,45 @@ async def evaluate_quiz(answers: List[QuizAnswer]):
 
 @router.post("/api/interview/start")
 async def start_interview(
-    job_description: str = Form(...),
+    job_description: str = Form(""),
     mode: str = Form("Technical"),
-    count: int = Form(5)
+    count: int = Form(5),
+    resume_id: Optional[str] = Form(None),
+    quiz_context: str = Form(""),
 ):
     """Start mock interview session"""
     try:
+        resume_text = ""
+        if resume_id and resume_id in resume_store:
+            resume_text = resume_store[resume_id].raw_text
+
+        parsed_quiz_context = {}
+        if quiz_context:
+            try:
+                parsed_quiz_context = json.loads(quiz_context)
+            except Exception:
+                parsed_quiz_context = {}
+
+        roadmap_context = []
+        try:
+            if resume_text and job_description:
+                match_data = await ai_service.match_resume_to_jd(resume_text, job_description)
+                roadmap_data = await ai_service.generate_roadmap(
+                    resume_text,
+                    job_description,
+                    match_data.get("missing_skills", []),
+                )
+                roadmap_context = roadmap_data.get("tasks", [])
+        except Exception:
+            roadmap_context = []
+
         questions_data = await ai_service.generate_interview_questions(
             job_description,
             mode,
-            count
+            count,
+            resume_text=resume_text,
+            quiz_context=parsed_quiz_context,
+            roadmap_context=roadmap_context,
         )
         
         questions = [InterviewQuestion(**q) for q in questions_data]

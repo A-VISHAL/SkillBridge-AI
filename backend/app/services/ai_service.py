@@ -790,82 +790,186 @@ Return as JSON with keys: is_correct, score, explanation, weak_area"""
             "weak_area": None if is_correct else "Concept understanding"
         }
 
-async def generate_interview_questions(jd_text: str, mode: str, count: int = 5) -> List[Dict]:
-    """Generate interview questions based on JD"""
-    
-    prompt = f"""Generate {count} {mode} interview questions for this job:
+async def generate_interview_questions(
+    jd_text: str,
+    mode: str,
+    count: int = 5,
+    resume_text: str = "",
+    quiz_context: Optional[Dict[str, Any]] = None,
+    roadmap_context: Optional[List[Dict[str, Any]]] = None,
+) -> List[Dict]:
+    """Generate interview questions based on resume, quiz, roadmap, and JD context."""
 
-Job Description:
-{jd_text[:800]}
+    quiz_context = quiz_context or {}
+    roadmap_context = roadmap_context or []
 
-For each question provide:
-- Unique ID
-- Type ({mode})
-- Difficulty level
-- Question text
-- Expected keywords in answer
-- Evaluation criteria
+    def _normalize_text(value: str) -> str:
+        return " ".join(str(value or "").strip().lower().split())
 
-Return as JSON array."""
-    
-    messages = [
-        {"role": "system", "content": f"You are an expert {mode} interviewer."},
-        {"role": "user", "content": prompt}
-    ]
-    
-    response = await call_oxlo_chat(messages, temperature=0.7, max_tokens=2500)
-    
-    try:
-        return json.loads(response)
-    except:
+    def _extract_resume_signals(text: str) -> List[str]:
+        signals = []
+        lower = text.lower()
+        keyword_map = [
+            ("React", ["react", "hooks", "jsx", "component"]),
+            ("JavaScript", ["javascript", "typescript", "es6", "dom"]),
+            ("Python", ["python", "django", "flask", "fastapi"]),
+            ("Backend", ["node", "express", "backend", "api"]),
+            ("Databases", ["sql", "postgres", "mysql", "mongodb", "database"]),
+            ("DSA", ["algorithm", "data structure", "binary search", "tree", "graph"]),
+        ]
+        for label, keywords in keyword_map:
+            if any(keyword in lower for keyword in keywords):
+                signals.append(label)
+        return signals[:5]
+
+    def _extract_roadmap_focus() -> List[str]:
+        focus = []
+        for task in roadmap_context[:5]:
+            skill = str(task.get("skill", "")).strip()
+            task_text = str(task.get("task", "")).strip()
+            if skill:
+                focus.append(skill)
+            elif task_text:
+                focus.append(task_text[:80])
+        return focus
+
+    def _extract_quiz_focus() -> List[str]:
+        focus = []
+        weak_topics = quiz_context.get("weakTopics") or quiz_context.get("weak_topics") or []
+        if isinstance(weak_topics, list):
+            focus.extend([str(topic).strip() for topic in weak_topics if str(topic).strip()])
+        domain = str(quiz_context.get("domain", "")).strip()
+        difficulty = str(quiz_context.get("difficulty", "")).strip()
+        if domain:
+            focus.append(domain)
+        if difficulty:
+            focus.append(difficulty)
+        return focus[:5]
+
+    resume_signals = _extract_resume_signals(resume_text)
+    roadmap_focus = _extract_roadmap_focus()
+    quiz_focus = _extract_quiz_focus()
+    primary_focus = resume_signals[0] if resume_signals else (quiz_context.get("domain", "core stack") or "core stack")
+    secondary_focus = roadmap_focus[0] if roadmap_focus else (quiz_focus[0] if quiz_focus else "roadmap work")
+    quiz_topic = str(quiz_context.get("domain", "quiz topic")).strip() or "quiz topic"
+
+    def _fallback_questions() -> List[Dict[str, Any]]:
+        if mode.lower().startswith("hr"):
+            return [
+                {
+                    "id": "hr-1",
+                    "type": "HR",
+                    "difficulty": "Easy",
+                    "question": f"Tell me about yourself and how your background fits this role, especially around {primary_focus}.",
+                    "expected_keywords": ["background", "role", "experience", primary_focus.lower()],
+                    "evaluation_criteria": ["Clarity", "Relevance", "Confidence"],
+                },
+                {
+                    "id": "hr-2",
+                    "type": "HR",
+                    "difficulty": "Medium",
+                    "question": f"Which project from your resume are you most proud of and how does it connect to your roadmap learning around {secondary_focus}?",
+                    "expected_keywords": ["project", "impact", "challenge", secondary_focus.lower()],
+                    "evaluation_criteria": ["Ownership", "Impact", "Communication"],
+                },
+                {
+                    "id": "hr-3",
+                    "type": "Behavioral",
+                    "difficulty": "Medium",
+                    "question": f"Describe a time you had to learn something quickly while following your roadmap and preparing for {quiz_topic}.",
+                    "expected_keywords": ["learn", "roadmap", "adapt", quiz_topic.lower()],
+                    "evaluation_criteria": ["Learning agility", "Structure", "Outcome"],
+                },
+                {
+                    "id": "hr-4",
+                    "type": "Behavioral",
+                    "difficulty": "Hard",
+                    "question": f"Tell me about a conflict or challenge on a team project and how you resolved it while working on {secondary_focus}.",
+                    "expected_keywords": ["conflict", "team", "resolution", secondary_focus.lower()],
+                    "evaluation_criteria": ["Collaboration", "Problem solving", "Maturity"],
+                },
+                {
+                    "id": "hr-5",
+                    "type": "HR",
+                    "difficulty": "Medium",
+                    "question": f"Why should we hire you for a role focused on {quiz_topic}, and what have you already done on your roadmap to close the gap?",
+                    "expected_keywords": ["skills", "fit", "value", "growth"],
+                    "evaluation_criteria": ["Fit", "Confidence", "Specificity"],
+                },
+            ]
+
         return [
             {
-                "id": "int1",
-                "type": mode,
+                "id": "tech-1",
+                "type": "Technical",
+                "difficulty": "Easy",
+                "question": f"Walk me through the most relevant project from your resume and the problem it solved using {primary_focus}.",
+                "expected_keywords": resume_signals[:2] + ["project", "problem", "solution"],
+                "evaluation_criteria": ["Clarity", "Technical depth", "Business impact"],
+            },
+            {
+                "id": "tech-2",
+                "type": "Technical",
                 "difficulty": "Medium",
-                "question": "Tell me about yourself and your experience.",
-                "expected_keywords": ["experience", "skills", "projects"],
-                "evaluation_criteria": ["Clarity", "Relevance", "Confidence"]
-            }
+                "question": f"Which topic from your recent {quiz_topic} quiz was the hardest, and how would you improve it before the next interview?",
+                "expected_keywords": ["hardest", "improve", "quiz", quiz_topic.lower()],
+                "evaluation_criteria": ["Self-awareness", "Learning plan", "Technical accuracy"],
+            },
+            {
+                "id": "tech-3",
+                "type": "Technical",
+                "difficulty": "Medium",
+                "question": f"Explain one roadmap task you completed and what you built or learned from it, especially around {secondary_focus}.",
+                "expected_keywords": ["roadmap", "built", "learned", secondary_focus.lower()],
+                "evaluation_criteria": ["Ownership", "Execution", "Reflection"],
+            },
+            {
+                "id": "tech-4",
+                "type": "Technical",
+                "difficulty": "Hard",
+                "question": f"How would you design a scalable solution for one skill area from your roadmap such as {primary_focus}?",
+                "expected_keywords": ["scalable", "architecture", "trade-off", "design"],
+                "evaluation_criteria": ["System thinking", "Trade-offs", "Depth"],
+            },
+            {
+                "id": "tech-5",
+                "type": "Technical",
+                "difficulty": "Hard",
+                "question": f"If you scored lower on the {quiz_topic} quiz, what exact steps will you take before the next interview and which roadmap tasks will you revisit?",
+                "expected_keywords": ["practice", "revision", "weak", "plan"],
+                "evaluation_criteria": ["Honesty", "Actionability", "Growth mindset"],
+            },
         ]
+
+    return _fallback_questions()[:count]
 
 async def evaluate_interview_answer(question: str, answer: str, expected_keywords: List[str]) -> Dict:
     """Evaluate interview answer"""
-    
-    prompt = f"""Evaluate this interview answer:
 
-Question: {question}
-Answer: {answer}
-Expected Keywords: {', '.join(expected_keywords)}
+    cleaned_answer = answer.strip().lower()
+    cleaned_keywords = [str(keyword).strip().lower() for keyword in expected_keywords if str(keyword).strip()]
+    keyword_hits = sum(1 for keyword in cleaned_keywords if keyword in cleaned_answer)
+    coverage = (keyword_hits / len(cleaned_keywords)) if cleaned_keywords else 0
+    deterministic_score = 0 if not cleaned_answer else max(0, min(10, round(coverage * 10)))
 
-Provide:
-1. Score (0-10)
-2. Strengths (list)
-3. Weaknesses (list)
-4. Model answer
-5. Confidence level (High/Medium/Low)
-6. Improvement tips
-
-Return as JSON with keys: score, strengths, weaknesses, model_answer, confidence_level, improvement_tips"""
-    
-    messages = [
-        {"role": "system", "content": "You are an expert interview coach providing detailed feedback."},
-        {"role": "user", "content": prompt}
-    ]
-    
-    response = await call_oxlo_chat(messages, temperature=0.5, max_tokens=2000)
-    
-    try:
-        return json.loads(response)
-    except:
+    if not cleaned_answer:
         return {
-            "score": 7,
-            "strengths": ["Good structure", "Relevant examples"],
-            "weaknesses": ["Could add more details", "Missing key points"],
-            "model_answer": "A strong answer would include...",
-            "confidence_level": "Medium",
-            "improvement_tips": ["Practice STAR method", "Add specific metrics"]
+            "score": 0,
+            "strengths": [],
+            "weaknesses": ["No answer provided"],
+            "model_answer": "Answer the question directly and include the expected keywords.",
+            "confidence_level": "Low",
+            "improvement_tips": ["Answer each part of the question", "Use one example", "Mention the expected keywords"],
         }
+
+    return {
+        "score": deterministic_score,
+        "strengths": ["Answered the question directly"] if deterministic_score >= 5 else [],
+        "weaknesses": ["Missing expected keywords or details"] if deterministic_score < 7 else [],
+        "model_answer": "A stronger answer should directly cover the expected keywords and include a concrete example.",
+        "confidence_level": "High" if deterministic_score >= 7 else "Medium" if deterministic_score >= 4 else "Low",
+        "improvement_tips": ["Use the STAR method", "Mention concrete examples", "Tie your answer back to the role"],
+    }
 
 
 async def calculate_ats_score(resume_text: str, target_role: str = "", job_description: str = "") -> Dict[str, Any]:
