@@ -17,44 +17,62 @@ const roleLabels = {
   },
 };
 
-const cubeFaces = [
-  { transform: 'translateZ(70px)', background: 'linear-gradient(135deg, rgba(255,255,255,0.28), rgba(255,255,255,0.08))' },
-  { transform: 'rotateY(180deg) translateZ(70px)', background: 'linear-gradient(135deg, rgba(120,200,255,0.24), rgba(255,255,255,0.06))' },
-  { transform: 'rotateY(90deg) translateZ(70px)', background: 'linear-gradient(135deg, rgba(170,120,255,0.22), rgba(255,255,255,0.06))' },
-  { transform: 'rotateY(-90deg) translateZ(70px)', background: 'linear-gradient(135deg, rgba(70,180,255,0.24), rgba(255,255,255,0.06))' },
-  { transform: 'rotateX(90deg) translateZ(70px)', background: 'linear-gradient(135deg, rgba(255,255,255,0.2), rgba(120,120,255,0.08))' },
-  { transform: 'rotateX(-90deg) translateZ(70px)', background: 'linear-gradient(135deg, rgba(50,50,70,0.5), rgba(10,10,18,0.75))' },
+const flowNodes = [
+  { key: 'resume', label: 'Resume Upload', hint: 'Extract profile', color: '#7dd3fc' },
+  { key: 'match', label: 'JD Match', hint: 'Measure fit score', color: '#22d3ee' },
+  { key: 'roadmap', label: 'Roadmap', hint: 'Personalized plan', color: '#34d399' },
+  { key: 'interview', label: 'Interview', hint: 'Practice + feedback', color: '#facc15' },
 ];
 
-function FloatingCube() {
+function CareerFlowPanel() {
   return (
-    <div style={{ perspective: 1200, width: '100%', height: '100%', display: 'grid', placeItems: 'center' }}>
-      <motion.div
-        animate={{ rotateX: [0, 18, 0], rotateY: [0, 35, 360], y: [0, -12, 0] }}
-        transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut' }}
-        style={{
-          width: 140,
-          height: 140,
-          position: 'relative',
-          transformStyle: 'preserve-3d',
-        }}
-      >
-        {cubeFaces.map((face, index) => (
-          <div
-            key={index}
+    <div style={{ width: '100%', height: '100%', display: 'grid', gridTemplateRows: 'auto 1fr', gap: 16, padding: 22 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ fontSize: 13, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.7)', fontWeight: 700 }}>
+          Career Pipeline
+        </div>
+        <motion.div
+          animate={{ opacity: [0.35, 1, 0.35] }}
+          transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
+          style={{ fontSize: 12, color: '#86efac', fontWeight: 700 }}
+        >
+          Live
+        </motion.div>
+      </div>
+
+      <div style={{ position: 'relative', display: 'grid', gap: 10 }}>
+        {flowNodes.map((node, index) => (
+          <motion.div
+            key={node.key}
+            initial={{ opacity: 0, x: -12 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.35, delay: index * 0.08 }}
             style={{
-              position: 'absolute',
-              inset: 0,
-              borderRadius: 28,
-              border: '1px solid rgba(255,255,255,0.22)',
-              backdropFilter: 'blur(10px)',
-              transform: face.transform,
-              background: face.background,
-              boxShadow: '0 20px 60px rgba(0,0,0,0.35)',
+              position: 'relative',
+              zIndex: 1,
+              display: 'grid',
+              gridTemplateColumns: '18px 1fr auto',
+              alignItems: 'center',
+              gap: 12,
+              borderRadius: 16,
+              padding: '12px 14px',
+              background: 'rgba(255,255,255,0.06)',
+              border: '1px solid rgba(255,255,255,0.14)',
             }}
-          />
+          >
+            <motion.span
+              animate={{ scale: [1, 1.2, 1] }}
+              transition={{ duration: 2.4, repeat: Infinity, delay: index * 0.3 }}
+              style={{ width: 10, height: 10, borderRadius: '50%', background: node.color, boxShadow: `0 0 18px ${node.color}` }}
+            />
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.94)' }}>{node.label}</div>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.62)' }}>{node.hint}</div>
+            </div>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.62)', fontWeight: 700 }}>{index + 1}/4</div>
+          </motion.div>
         ))}
-      </motion.div>
+      </div>
     </div>
   );
 }
@@ -92,7 +110,7 @@ export function AuthPage({ onLogin }) {
       <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', opacity: 0.5, background:
         'radial-gradient(circle at 20% 20%, rgba(98, 171, 255, 0.18), transparent 25%), radial-gradient(circle at 80% 10%, rgba(155, 107, 255, 0.16), transparent 24%), radial-gradient(circle at 80% 80%, rgba(33, 212, 180, 0.12), transparent 28%)' }} />
 
-      <div style={{ position: 'relative', zIndex: 1, minHeight: '100vh', display: 'grid', gridTemplateColumns: '1.2fr 0.9fr' }}>
+      <div style={{ position: 'relative', zIndex: 1, minHeight: '100vh', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))' }}>
         <motion.div
           initial={{ opacity: 0, x: -30 }}
           animate={{ opacity: 1, x: 0 }}
@@ -124,8 +142,8 @@ export function AuthPage({ onLogin }) {
           </div>
 
           <div style={{ width: '100%', maxWidth: 520, alignSelf: 'center', marginTop: 10 }}>
-            <div style={{ height: 320, borderRadius: 32, background: 'linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02))', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 28px 90px rgba(0,0,0,0.32)', backdropFilter: 'blur(18px)', display: 'grid', placeItems: 'center' }}>
-              <FloatingCube />
+            <div style={{ minHeight: 320, borderRadius: 32, background: 'linear-gradient(180deg, rgba(255,255,255,0.09), rgba(255,255,255,0.03))', border: '1px solid rgba(255,255,255,0.16)', boxShadow: '0 28px 90px rgba(0,0,0,0.32)', backdropFilter: 'blur(18px)', display: 'grid' }}>
+              <CareerFlowPanel />
             </div>
           </div>
 
@@ -148,12 +166,12 @@ export function AuthPage({ onLogin }) {
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 0.12 }}
-            style={{ width: '100%', maxWidth: 480, background: 'rgba(10,14,26,0.72)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 32, padding: 28, boxShadow: '0 28px 100px rgba(0,0,0,0.5)', backdropFilter: 'blur(24px)' }}
+            style={{ width: '100%', maxWidth: 480, background: 'linear-gradient(160deg, rgba(15,24,45,0.88), rgba(16,34,57,0.82))', border: '1px solid rgba(125,211,252,0.22)', borderRadius: 32, padding: 28, boxShadow: '0 28px 100px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08)', backdropFilter: 'blur(24px)' }}
           >
-            <div style={{ display: 'flex', gap: 8, padding: 6, borderRadius: 999, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <div style={{ display: 'flex', gap: 8, padding: 6, borderRadius: 999, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.14)' }}>
               <button
                 onClick={() => switchRole('student')}
-                style={{ flex: 1, border: 'none', cursor: 'pointer', padding: '12px 16px', borderRadius: 999, background: role === 'student' ? 'linear-gradient(135deg, #ffffff, #c7d2fe)' : 'transparent', color: role === 'student' ? '#0b1020' : 'rgba(255,255,255,0.7)', fontWeight: 700 }}
+                style={{ flex: 1, border: 'none', cursor: 'pointer', padding: '12px 16px', borderRadius: 999, background: role === 'student' ? 'linear-gradient(135deg, #ffffff, #dbeafe)' : 'transparent', color: role === 'student' ? '#0b1020' : 'rgba(255,255,255,0.78)', fontWeight: 700 }}
               >
                 Student Login
               </button>
@@ -186,7 +204,7 @@ export function AuthPage({ onLogin }) {
                     <input
                       value={username}
                       onChange={(e) => setUsername(e.target.value)}
-                      style={{ width: '100%', borderRadius: 18, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.06)', color: 'white', padding: '14px 16px', outline: 'none', fontSize: 14 }}
+                      style={{ width: '100%', borderRadius: 18, border: '1px solid rgba(125,211,252,0.24)', background: 'rgba(255,255,255,0.1)', color: 'white', padding: '14px 16px', outline: 'none', fontSize: 14 }}
                     />
                   </label>
 
@@ -196,7 +214,7 @@ export function AuthPage({ onLogin }) {
                       type="password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      style={{ width: '100%', borderRadius: 18, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.06)', color: 'white', padding: '14px 16px', outline: 'none', fontSize: 14 }}
+                      style={{ width: '100%', borderRadius: 18, border: '1px solid rgba(125,211,252,0.24)', background: 'rgba(255,255,255,0.1)', color: 'white', padding: '14px 16px', outline: 'none', fontSize: 14 }}
                     />
                   </label>
 
