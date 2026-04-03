@@ -283,71 +283,188 @@ Return as JSON with keys: match_percentage, hire_probability, matched_skills, mi
 
 
 async def generate_roadmap(resume_text: str, jd_text: str, skill_gaps: List[str]) -> Dict[str, Any]:
-    """Generate personalized learning roadmap"""
+    """Generate personalized learning roadmap based on resume & JD gap analysis"""
     
-    prompt = f"""Create a personalized 12-week learning roadmap for this candidate:
+    prompt = f"""Create a HIGHLY PERSONALIZED 12-week learning roadmap for this candidate.
 
-Resume Summary:
-{resume_text[:500]}
+Resume Skills & Experience:
+{resume_text[:600]}
 
-Target Job:
-{jd_text[:500]}
+Target Job Description:
+{jd_text[:600]}
 
-Skill Gaps:
-{', '.join(skill_gaps)}
+Missing Skills to Master:
+{', '.join(skill_gaps[:8])}
 
-Create a week-by-week plan with:
-- Week number
-- Task description
-- Skill being learned
-- Difficulty (Easy/Medium/Hard)
+CRITICAL: Create a roadmap that:
+1. Directly addresses the skill gaps needed for the JD
+2. Builds on their existing experience
+3. Each task should be specific to the company/role requirements
+4. Include real project work relevant to the target job
+
+For each week, provide:
+- Week number (1-12)
+- Specific task description (NOT generic - tie to JD keywords)
+- Skill category
+- Difficulty (Easy/Medium/Hard) 
 - Estimated hours
-- Learning resources
-- Milestones (mark important weeks)
+- Learning resources specific to the skill
+- If milestone week (weeks 3, 6, 9, 12), mark as milestone
 
-Assume 2 hours/day study time.
-
-Return as JSON with keys: duration_weeks, daily_hours, tasks (array), milestones (array), completion_criteria"""
+Return ONLY valid JSON with keys: duration_weeks, daily_hours, tasks (array), milestones (array), completion_criteria"""
     
     messages = [
-        {"role": "system", "content": "You are an expert career coach creating personalized learning paths."},
+        {"role": "system", "content": "You are an expert career development coach. Create SPECIFIC, PERSONALIZED learning roadmaps that directly map resume gaps to job requirements."},
         {"role": "user", "content": prompt}
     ]
     
     try:
-        response = await call_oxlo_chat(messages, temperature=0.6, max_tokens=3000)
+        response = await call_oxlo_chat(messages, temperature=0.7, max_tokens=4000)
         return json.loads(response)
     except Exception as e:
         # Log the error but return fallback data so users can still use the app
         print(f"Error generating roadmap from AI: {str(e)}")
         
-        # Generate skill-based fallback roadmap
-        gap_list = skill_gaps if skill_gaps else ["System Design", "Advanced DSA", "Production Deployment"]
+        # Extract keywords from JD for more personalized fallback
+        jd_lower = jd_text.lower()
+        resume_lower = resume_text.lower()
+        
+        # Smart skill gap detection
+        skill_keywords = {
+            "React": ["react", "frontend", "component", "jsx"],
+            "System Design": ["system design", "scalability", "architecture", "design"],
+            "Python": ["python", "backend", "django", "flask"],
+            "AWS": ["aws", "cloud", "ec2", "lambda"],
+            "Docker": ["docker", "container", "kubernetes"],
+            "SQL": ["sql", "database", "postgres", "mysql"],
+            "APIs": ["api", "rest", "graphql", "endpoint"],
+            "DevOps": ["devops", "ci/cd", "deployment", "terraform"],
+        }
+        
+        # Find missing skills personalized to JD
+        missing_in_resume = []
+        for skill, keywords in skill_keywords.items():
+            in_jd = any(kw in jd_lower for kw in keywords)
+            in_resume = any(kw in resume_lower for kw in keywords)
+            if in_jd and not in_resume:
+                missing_in_resume.append(skill)
+        
+        # Use detected skills or fallback to provided gaps
+        prioritized_skills = missing_in_resume[:6] if missing_in_resume else skill_gaps[:6]
+        if not prioritized_skills:
+            prioritized_skills = ["System Design", "Advanced Architecture", "Production Deployment"]
+        
+        # Generate personalized tasks
         tasks = []
-        week_num = 1
         
-        for i, skill in enumerate(gap_list[:6]):
-            for week_offset in range(2):
-                actual_week = week_num + (i * 2) + week_offset
-                if actual_week <= 12:
-                    tasks.append({
-                        "week": actual_week,
-                        "task": f"Master {skill} - {'Basics' if week_offset == 0 else 'Advanced'}",
-                        "skill": skill,
-                        "difficulty": "Medium" if week_offset == 0 else "Hard",
-                        "estimated_hours": 12,
-                        "resources": [f"{skill} documentation", f"{skill} online course", "Practice problems"],
-                        "priority": "HIGH" if i < 3 else "MEDIUM"
-                    })
-        
-        # Add project weeks
-        for week in [4, 8, 12]:
+        # Weeks 1-3: Deep dive on primary skill
+        primary_skill = prioritized_skills[0] if prioritized_skills else "Key Skill"
+        for week in range(1, 4):
+            if week == 1:
+                task_desc = f"Master {primary_skill} fundamentals - Complete online course & build starter project"
+                diff = "Easy"
+            elif week == 2:
+                task_desc = f"Deep dive into {primary_skill} - Real production patterns & best practices"
+                diff = "Medium"
+            else:
+                task_desc = f"First {primary_skill} project milestone - Create portfolio-worthy project"
+                diff = "Medium"
+            
             tasks.append({
                 "week": week,
-                "task": "Build capstone project applying learned skills",
-                "skill": "Project Management",
-                "difficulty": "Hard",
+                "task": task_desc,
+                "skill": primary_skill,
+                "difficulty": diff,
+                "estimated_hours": 14 if week < 3 else 16,
+                "resources": [f"{primary_skill} official docs", f"Advanced {primary_skill} course", "Real-world examples"],
+                "priority": "CRITICAL",
+                "milestone": week == 3
+            })
+        
+        # Weeks 4-6: Secondary skill
+        secondary_skill = prioritized_skills[1] if len(prioritized_skills) > 1 else "Integration Skill"
+        for week in range(4, 7):
+            if week == 4:
+                task_desc = f"Learn {secondary_skill} basics - Understand fundamentals & use cases"
+                diff = "Easy"
+            elif week == 5:
+                task_desc = f"Integrate {secondary_skill} with {primary_skill} - Build combined feature"
+                diff = "Medium"
+            else:
+                task_desc = f"Complete {secondary_skill} integration project - Job-ready implementation"
+                diff = "Medium"
+            
+            tasks.append({
+                "week": week,
+                "task": task_desc,
+                "skill": secondary_skill,
+                "difficulty": diff,
+                "estimated_hours": 14 if week < 6 else 16,
+                "resources": [f"{secondary_skill} tutorial", "Integration patterns", "Code examples"],
+                "priority": "HIGH",
+                "milestone": week == 6
+            })
+        
+        # Weeks 7-9: Tertiary skill + system design
+        tertiary_skill = prioritized_skills[2] if len(prioritized_skills) > 2 else "Advanced Pattern"
+        for week in range(7, 10):
+            if week == 7:
+                task_desc = f"Learn {tertiary_skill} concepts - Understand why it matters for the role"
+                diff = "Medium"
+            elif week == 8:
+                task_desc = f"Implement {tertiary_skill} in a real scenario - Job interview prep"
+                diff = "Hard"
+            else:
+                task_desc = f"Full-stack project using all three skills - Production-level code"
+                diff = "Hard"
+            
+            tasks.append({
+                "week": week,
+                "task": task_desc,
+                "skill": tertiary_skill,
+                "difficulty": diff,
                 "estimated_hours": 16,
+                "resources": [f"{tertiary_skill} documentation", "Advanced tutorials", "Leetcode/HackerRank"],
+                "priority": "HIGH",
+                "milestone": week == 9
+            })
+        
+        # Weeks 10-12: Practice & Interview prep
+        project_skills = ", ".join(prioritized_skills[:3])
+        for week in range(10, 13):
+            if week == 10:
+                task_desc = f"Complete system design exercises - Practice architectural thinking"
+                diff = "Hard"
+            elif week == 11:
+                task_desc = f"Mock interviews using {project_skills} - Get feedback from peers"
+                diff = "Hard"
+            else:
+                task_desc = f"FINAL PROJECT: Build complete application for portfolio - Ready for interviews!"
+                diff = "Hard"
+            
+            tasks.append({
+                "week": week,
+                "task": task_desc,
+                "skill": "Interview Prep" if week < 12 else "Capstone Project",
+                "difficulty": diff,
+                "estimated_hours": 16 if week < 12 else 20,
+                "resources": ["Mock interview platforms", "System design videos", "Portfolio templates"],
+                "priority": "CRITICAL",
+                "milestone": week == 12
+            })
+        
+        return {
+            "duration_weeks": 12,
+            "daily_hours": 2,
+            "tasks": tasks,
+            "milestones": [
+                f"Week 3: {primary_skill} foundation complete",
+                f"Week 6: {secondary_skill} integration done",
+                f"Week 9: Full-stack project milestone",
+                "Week 12: Ready for interviews with portfolio!"
+            ],
+            "completion_criteria": f"Complete all {len(tasks)} tasks and build portfolio projects using {project_skills}"
+        }
                 "resources": ["GitHub", "Portfolio template"],
                 "priority": "CRITICAL",
                 "milestone": True
