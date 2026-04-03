@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import Roadmap from "./components/Roadmap";
+import { AuthPage } from "./components/AuthPage";
+import { AdminDashboard } from "./components/AdminDashboard";
 
 // ─── Design tokens ───────────────────────────────────────────────────────────
 const tokens = {
@@ -2723,22 +2725,56 @@ const Dashboard = ({ onLogout }) => {
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// ROOT
+// STUDENT PORTAL ROOT
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export default function App() {
+function StudentPortal({ onExit }) {
   const [view, setView] = useState("landing"); // "landing" | "app"
 
   const handleLogout = () => {
     setView("landing");
+    onExit?.();
+  };
+
+  return (
+    <>
+      {view === "landing"
+        ? <LandingPage onEnterApp={() => setView("app")}/>
+        : <Dashboard onLogout={handleLogout}/>}
+    </>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ROOT
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export default function App() {
+  const [authRole, setAuthRole] = useState(() => {
+    if (typeof window === "undefined") return "";
+    return window.localStorage.getItem("skillbridge.authRole") || "";
+  });
+
+  const handleLogin = (role) => {
+    setAuthRole(role);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("skillbridge.authRole", role);
+    }
+  };
+
+  const handleLogout = () => {
+    setAuthRole("");
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem("skillbridge.authRole");
+    }
   };
 
   return (
     <>
       <style>{globalStyles}</style>
-      {view === "landing"
-        ? <LandingPage onEnterApp={() => setView("app")}/>
-        : <Dashboard onLogout={handleLogout}/>}
+      {!authRole && <AuthPage onLogin={handleLogin} />}
+      {authRole === "student" && <StudentPortal onExit={handleLogout} />}
+      {authRole === "admin" && <AdminDashboard onLogout={handleLogout} />}
     </>
   );
 }

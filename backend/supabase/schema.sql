@@ -37,6 +37,32 @@ create table if not exists public.jd_matches (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.progress_metrics (
+  id uuid primary key default gen_random_uuid(),
+  resume_id uuid not null references public.resumes(id) on delete cascade,
+  completed_tasks int not null default 0,
+  total_tasks int not null default 0,
+  progress numeric(5,2) not null default 0,
+  weak_areas jsonb not null default '[]'::jsonb,
+  eligibility_note text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (resume_id)
+);
+
+create table if not exists public.admin_settings (
+  id int primary key default 1,
+  min_cgpa numeric(4,2) not null default 7.00,
+  min_ats_score numeric(5,2) not null default 65.00,
+  required_skills jsonb not null default '["Python", "React", "SQL"]'::jsonb,
+  company_name text,
+  updated_at timestamptz not null default now()
+);
+
+insert into public.admin_settings (id, min_cgpa, min_ats_score, required_skills, company_name)
+values (1, 7.00, 65.00, '["Python", "React", "SQL"]'::jsonb, 'SkillBridge')
+on conflict (id) do nothing;
+
 create table if not exists public.roadmaps (
   id uuid primary key default gen_random_uuid(),
   resume_id uuid not null references public.resumes(id) on delete cascade,
