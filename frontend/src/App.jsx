@@ -449,7 +449,6 @@ const LandingPage = ({ onEnterApp }) => {
           </div>
 
           <div style={{ display: "flex", gap: 10 }}>
-            <Btn variant="ghost" style={{ fontSize: 13.5, padding: "8px 18px" }}>Sign in</Btn>
             <Btn variant="primary" onClick={onEnterApp} style={{ padding: "8px 18px", fontSize: 13.5 }}>Get started</Btn>
           </div>
         </div>
