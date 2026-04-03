@@ -161,12 +161,15 @@ export default function Roadmap({ resumeId, jobDescription }) {
 
       const data = await response.json();
 
-      const taskMap = new Map();
+      const tasksByWeek = new Map();
       if (Array.isArray(data.tasks)) {
         data.tasks.forEach((task) => {
           const week = Number(task.week);
-          if (week >= 1 && week <= weeks && !taskMap.has(week)) {
-            taskMap.set(week, {
+          if (week >= 1 && week <= weeks) {
+            if (!tasksByWeek.has(week)) {
+              tasksByWeek.set(week, []);
+            }
+            const cleaned = {
               ...task,
               week,
               task: String(task.task || '').trim(),
@@ -174,26 +177,32 @@ export default function Roadmap({ resumeId, jobDescription }) {
               difficulty: String(task.difficulty || 'Medium').trim(),
               estimated_hours: Number(task.estimated_hours || 12),
               resources: Array.isArray(task.resources) ? task.resources : [],
-            });
+            };
+            const existingTexts = new Set(tasksByWeek.get(week).map((item) => item.task.toLowerCase()));
+            if (cleaned.task && !existingTexts.has(cleaned.task.toLowerCase())) {
+              tasksByWeek.get(week).push(cleaned);
+            }
           }
         });
       }
 
       const normalizedTasks = [];
       for (let week = 1; week <= weeks; week += 1) {
-        if (taskMap.has(week)) {
-          normalizedTasks.push(taskMap.get(week));
-        } else {
+        const weekTasks = tasksByWeek.get(week) || [];
+
+        if (weekTasks.length === 0) {
           normalizedTasks.push({
             week,
-            task: `Week ${week}: Focused implementation sprint tied to the JD and your resume gaps. Review the role requirements, study one missing skill in depth, and finish with a small project or interview answer tied to the target company.`,
-            skill: week <= 3 ? 'Core skill' : week <= 6 ? 'Integration skill' : week <= 9 ? 'Advanced skill' : 'Interview prep',
-            difficulty: week <= 3 ? 'Easy' : week <= 6 ? 'Medium' : 'Hard',
-            estimated_hours: week <= 3 ? 12 : week <= 6 ? 14 : week <= 9 ? 16 : 18,
-            resources: ['JD keywords', 'Resume gap review', 'Practical exercise'],
-            priority: week === weeks ? 'CRITICAL' : 'HIGH',
-            milestone: week === 3 || week === 6 || week === 9 || week === weeks,
+            task: `Week ${week}: Analyze JD requirements against your resume and implement one focused task to close the highest-priority gap for your target role.`,
+            skill: week <= 4 ? 'Foundation' : week <= 8 ? 'Build' : 'Industry',
+            difficulty: week <= 3 ? 'Easy' : week <= 8 ? 'Medium' : 'Hard',
+            estimated_hours: week <= 4 ? 12 : week <= 8 ? 14 : 16,
+            resources: ['JD requirements', 'Resume gap analysis', 'Weekly implementation checklist'],
+            priority: 'HIGH',
+            milestone: week === 4 || week === 8 || week === weeks,
           });
+        } else {
+          weekTasks.forEach((task) => normalizedTasks.push(task));
         }
       }
 

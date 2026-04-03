@@ -283,30 +283,30 @@ Return as JSON with keys: match_percentage, hire_probability, matched_skills, mi
 
 
 async def generate_roadmap(resume_text: str, jd_text: str, skill_gaps: List[str]) -> Dict[str, Any]:
-    """Generate personalized learning roadmap based on resume and JD gaps."""
+    """Generate a detailed weekly roadmap from resume and JD, with complete week coverage."""
 
     def _unique_items(items: List[str]) -> List[str]:
-        unique: List[str] = []
+        output: List[str] = []
         for item in items:
-            cleaned = item.strip()
-            if cleaned and cleaned not in unique:
-                unique.append(cleaned)
-        return unique
+            cleaned = str(item).strip()
+            if cleaned and cleaned not in output:
+                output.append(cleaned)
+        return output
 
-    def _detect_skills() -> List[str]:
+    def _infer_focus_skills() -> List[str]:
         jd_lower = jd_text.lower()
         resume_lower = resume_text.lower()
         skill_keywords = {
-            "React": ["react", "frontend", "component", "jsx"],
-            "System Design": ["system design", "scalability", "architecture", "design"],
-            "Python": ["python", "backend", "django", "flask"],
-            "AWS": ["aws", "cloud", "ec2", "lambda"],
-            "Docker": ["docker", "container", "kubernetes"],
-            "SQL": ["sql", "database", "postgres", "mysql"],
-            "APIs": ["api", "rest", "graphql", "endpoint"],
-            "DevOps": ["devops", "ci/cd", "deployment", "terraform"],
-            "Testing": ["test", "testing", "jest", "pytest", "automation"],
-            "Leadership": ["leadership", "mentor", "mentorship", "owner", "lead"],
+            "HTML/CSS": ["html", "css", "responsive", "semantic"],
+            "JavaScript": ["javascript", "js", "dom", "es6", "typescript"],
+            "React": ["react", "hooks", "component", "redux", "context"],
+            "APIs": ["api", "rest", "graphql", "integration", "endpoint"],
+            "Backend": ["node", "express", "python", "django", "flask", "backend"],
+            "Databases": ["sql", "postgres", "mysql", "mongodb", "database"],
+            "DevOps": ["docker", "kubernetes", "ci/cd", "deployment", "aws", "cloud"],
+            "Testing": ["test", "testing", "jest", "pytest", "unit"],
+            "System Design": ["system design", "architecture", "scalability", "design"],
+            "Interview Prep": ["interview", "communication", "behavioral", "dsa"],
         }
 
         detected: List[str] = []
@@ -316,258 +316,195 @@ async def generate_roadmap(resume_text: str, jd_text: str, skill_gaps: List[str]
             if in_jd and not in_resume:
                 detected.append(skill)
 
-        prioritized = _unique_items(detected + skill_gaps)
-        if not prioritized:
-            prioritized = ["System Design", "APIs", "Production Deployment"]
-        return prioritized[:6]
+        merged = _unique_items(detected + skill_gaps)
+        if not merged:
+            merged = ["JavaScript", "React", "APIs", "Backend", "System Design"]
+        return merged[:6]
 
-    def _build_week_task(week: int, primary: str, secondary: str, tertiary: str) -> Dict[str, Any]:
-        if week == 1:
-            return {
-                "week": 1,
-                "task": f"Audit the JD, map your current experience to the role requirements, and build a week-by-week React foundation plan. Finish with a small UI exercise that mirrors one JD keyword or component pattern.",
-                "skill": primary,
-                "difficulty": "Easy",
-                "estimated_hours": 12,
-                "resources": [f"{primary} official documentation", "Role-based UI examples", "Short guided project"],
-                "priority": "CRITICAL",
-                "milestone": False,
-            }
-        if week == 2:
-            return {
-                "week": 2,
-                "task": f"Build reusable components and state flows around {primary}, then refactor one resume project bullet to describe the implementation clearly for the target job.",
-                "skill": primary,
-                "difficulty": "Medium",
-                "estimated_hours": 14,
-                "resources": [f"{primary} component patterns", "State management examples", "Resume bullet rewrite practice"],
-                "priority": "CRITICAL",
-                "milestone": False,
-            }
-        if week == 3:
-            return {
-                "week": 3,
-                "task": f"Ship a portfolio mini-project that combines {primary} with the JD's most important workflow. Document tradeoffs, architecture choices, and how this work matches the target role.",
-                "skill": primary,
-                "difficulty": "Medium",
-                "estimated_hours": 16,
-                "resources": [f"{primary} project tutorial", "Portfolio writeup template", "Architecture notes"],
-                "priority": "CRITICAL",
-                "milestone": True,
-            }
-        if week == 4:
-            return {
-                "week": 4,
-                "task": f"Learn {secondary} fundamentals and connect them to your first project. Focus on the exact JD keywords that are missing from the resume, then implement one integration example.",
-                "skill": secondary,
-                "difficulty": "Easy",
-                "estimated_hours": 12,
-                "resources": [f"{secondary} beginner guide", "Integration patterns", "Real code example"],
-                "priority": "HIGH",
-                "milestone": False,
-            }
-        if week == 5:
-            return {
-                "week": 5,
-                "task": f"Combine {primary} and {secondary} in a feature that would make sense in the target company's product. Add tests or validation and note it in your resume bullets.",
-                "skill": secondary,
-                "difficulty": "Medium",
-                "estimated_hours": 14,
-                "resources": [f"{secondary} integration examples", "Testing checklist", "Feature planning notes"],
-                "priority": "HIGH",
-                "milestone": False,
-            }
-        if week == 6:
-            return {
-                "week": 6,
-                "task": f"Complete a job-ready project that proves you can use {secondary} with production-quality habits. Prepare a short demo script and a resume bullet for it.",
-                "skill": secondary,
-                "difficulty": "Medium",
-                "estimated_hours": 16,
-                "resources": [f"{secondary} advanced tutorial", "Demo script template", "Resume impact metrics guide"],
-                "priority": "HIGH",
-                "milestone": True,
-            }
-        if week == 7:
-            return {
-                "week": 7,
-                "task": f"Study {tertiary} concepts in the context of the JD and explain how they improve scalability, reliability, or maintainability in your own words.",
-                "skill": tertiary,
-                "difficulty": "Medium",
-                "estimated_hours": 12,
-                "resources": [f"{tertiary} overview", "Architecture notes", "Interview explanation prompts"],
-                "priority": "HIGH",
-                "milestone": False,
-            }
-        if week == 8:
-            return {
-                "week": 8,
-                "task": f"Apply {tertiary} in a realistic scenario from the JD. Build a solution summary, diagram the flow, and prepare to defend your choices in an interview.",
-                "skill": tertiary,
-                "difficulty": "Hard",
-                "estimated_hours": 16,
-                "resources": [f"{tertiary} deep dive", "System design practice", "Interview question bank"],
-                "priority": "HIGH",
-                "milestone": False,
-            }
-        if week == 9:
-            return {
-                "week": 9,
-                "task": f"Build a full-stack project that combines {primary}, {secondary}, and {tertiary}. Focus on deployment, observability, and a clean README that matches the JD language.",
-                "skill": tertiary,
-                "difficulty": "Hard",
-                "estimated_hours": 18,
-                "resources": ["Full-stack project checklist", "Deployment guide", "README template"],
-                "priority": "CRITICAL",
-                "milestone": True,
-            }
-        if week == 10:
-            return {
-                "week": 10,
-                "task": f"Prepare system design and behavioral stories based on your resume projects. Create two interview stories that directly reference measurable outcomes and the JD's priorities.",
-                "skill": "Interview Prep",
-                "difficulty": "Medium",
-                "estimated_hours": 12,
-                "resources": ["STAR story template", "System design drills", "Impact metrics worksheet"],
-                "priority": "HIGH",
-                "milestone": False,
-            }
-        if week == 11:
-            return {
-                "week": 11,
-                "task": f"Run mock interviews and revise weak areas. Use the JD as a checklist and close any remaining resume gaps with focused practice, concise explanations, and crisp project summaries.",
-                "skill": "Interview Prep",
-                "difficulty": "Hard",
-                "estimated_hours": 14,
-                "resources": ["Mock interview platform", "Feedback tracker", "Answer improvement checklist"],
-                "priority": "HIGH",
-                "milestone": False,
-            }
-        return {
-            "week": 12,
-            "task": f"Deliver your final capstone: deploy the project, polish the portfolio, and rehearse a complete walkthrough that ties your resume, the JD, and the roadmap together.",
-            "skill": "Capstone Project",
-            "difficulty": "Hard",
-            "estimated_hours": 20,
-            "resources": ["Deployment checklist", "Portfolio review", "Mock interview recap"],
-            "priority": "CRITICAL",
-            "milestone": True,
+    def _week_phase(week: int) -> str:
+        if week <= 4:
+            return "foundation"
+        if week <= 8:
+            return "build"
+        return "industry"
+
+    def _difficulty_for_week(week: int) -> str:
+        if week <= 3:
+            return "Easy"
+        if week <= 8:
+            return "Medium"
+        return "Hard"
+
+    def _hours_for_week(week: int) -> int:
+        if week <= 4:
+            return 12
+        if week <= 8:
+            return 14
+        return 16
+
+    def _build_week_tasks(week: int, primary: str, secondary: str, tertiary: str) -> List[Dict[str, Any]]:
+        phase = _week_phase(week)
+        difficulty = _difficulty_for_week(week)
+        hours = _hours_for_week(week)
+        focus = primary if week <= 4 else secondary if week <= 8 else tertiary
+        jd_hint = ", ".join(_unique_items(skill_gaps)[:3]) or "JD core requirements"
+
+        learn_task = {
+            "week": week,
+            "task": f"Week {week} learning track: master {focus} concepts mapped to {jd_hint}. Create concise notes explaining how this skill appears in your target role and where your resume currently lacks evidence.",
+            "skill": focus,
+            "difficulty": difficulty,
+            "estimated_hours": hours,
+            "resources": [f"{focus} official docs", "Role-aligned tutorial", "JD keyword checklist"],
+            "priority": "HIGH" if phase != "industry" else "CRITICAL",
+            "milestone": week in [4, 8, 12],
         }
 
+        build_task = {
+            "week": week,
+            "task": f"Week {week} build task: implement a practical feature using {focus} and connect it to one real requirement from the job description. Capture measurable output for a resume bullet (performance, reliability, or user impact).",
+            "skill": focus,
+            "difficulty": "Medium" if difficulty == "Easy" else difficulty,
+            "estimated_hours": hours + 2,
+            "resources": ["Feature implementation checklist", "Project structure template", "Code review notes"],
+            "priority": "CRITICAL" if week in [4, 8, 12] else "HIGH",
+            "milestone": week in [4, 8, 12],
+        }
+
+        prep_task = {
+            "week": week,
+            "task": f"Week {week} interview alignment: convert this week's work into interview-ready explanations. Prepare one technical story and one resume bullet that clearly links your implementation to the JD expectations.",
+            "skill": "Interview Prep" if week >= 9 else focus,
+            "difficulty": difficulty,
+            "estimated_hours": max(8, hours - 2),
+            "resources": ["STAR method template", "Mock Q&A prompts", "Resume bullet optimizer"],
+            "priority": "HIGH",
+            "milestone": week in [6, 10, 12],
+        }
+
+        return [learn_task, build_task, prep_task]
+
     def _normalize_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
-        skills = _detect_skills()
+        skills = _infer_focus_skills()
         primary = skills[0]
         secondary = skills[1] if len(skills) > 1 else f"{primary} Integration"
         tertiary = skills[2] if len(skills) > 2 else "System Design"
 
         incoming_tasks = payload.get("tasks", []) if isinstance(payload, dict) else []
-        tasks_by_week: Dict[int, Dict[str, Any]] = {}
+        tasks_by_week: Dict[int, List[Dict[str, Any]]] = {week: [] for week in range(1, 13)}
 
         for item in incoming_tasks:
             try:
                 week = int(item.get("week"))
             except Exception:
                 continue
-            if 1 <= week <= 12 and week not in tasks_by_week:
-                tasks_by_week[week] = {
-                    "week": week,
-                    "task": str(item.get("task", "")).strip(),
-                    "skill": str(item.get("skill", primary)).strip() or primary,
-                    "difficulty": str(item.get("difficulty", "Medium")).strip() or "Medium",
-                    "estimated_hours": int(item.get("estimated_hours", 12) or 12),
-                    "resources": item.get("resources", []) if isinstance(item.get("resources", []), list) else [],
-                    "priority": str(item.get("priority", "MEDIUM")).strip() or "MEDIUM",
-                    "milestone": bool(item.get("milestone", False)),
-                }
+            if not (1 <= week <= 12):
+                continue
+
+            task_text = str(item.get("task", "")).strip()
+            if not task_text:
+                continue
+
+            cleaned = {
+                "week": week,
+                "task": task_text,
+                "skill": str(item.get("skill", primary)).strip() or primary,
+                "difficulty": str(item.get("difficulty", _difficulty_for_week(week))).strip() or _difficulty_for_week(week),
+                "estimated_hours": int(item.get("estimated_hours", _hours_for_week(week)) or _hours_for_week(week)),
+                "resources": item.get("resources", []) if isinstance(item.get("resources", []), list) else [],
+                "priority": str(item.get("priority", "HIGH")).strip() or "HIGH",
+                "milestone": bool(item.get("milestone", week in [4, 8, 12])),
+            }
+
+            lower_texts = {existing["task"].lower() for existing in tasks_by_week[week]}
+            if cleaned["task"].lower() not in lower_texts:
+                tasks_by_week[week].append(cleaned)
+
+        for week in range(1, 13):
+            if len(tasks_by_week[week]) < 3:
+                fallback_tasks = _build_week_tasks(week, primary, secondary, tertiary)
+                existing_lower = {task["task"].lower() for task in tasks_by_week[week]}
+                for fallback in fallback_tasks:
+                    if fallback["task"].lower() not in existing_lower:
+                        tasks_by_week[week].append(fallback)
+                        existing_lower.add(fallback["task"].lower())
+                    if len(tasks_by_week[week]) >= 3:
+                        break
 
         normalized_tasks: List[Dict[str, Any]] = []
+        global_seen = set()
         for week in range(1, 13):
-            if week in tasks_by_week and tasks_by_week[week].get("task"):
-                normalized_tasks.append(tasks_by_week[week])
-            else:
-                fallback_task = _build_week_task(week, primary, secondary, tertiary)
-                normalized_tasks.append(fallback_task)
-                print(f"Using fallback task for week {week}")
-
-        print(f"Generated {len(normalized_tasks)} tasks, weeks: {[t['week'] for t in normalized_tasks]}")
-
-        # Ensure task text is unique even if the upstream response repeated content.
-        seen_texts = set()
-        for task in normalized_tasks:
-            text = task["task"].strip()
-            if text in seen_texts:
-                task["task"] = f"Week {task['week']} focused implementation sprint: {text}"
-            seen_texts.add(task["task"].strip())
+            for task in tasks_by_week[week]:
+                task_text = task["task"].strip()
+                if task_text.lower() in global_seen:
+                    task_text = f"Week {week}: {task_text}"
+                    task["task"] = task_text
+                global_seen.add(task_text.lower())
+                normalized_tasks.append(task)
 
         milestones = payload.get("milestones", []) if isinstance(payload, dict) else []
-        if not isinstance(milestones, list):
-            milestones = []
-        if len(milestones) < 4:
+        if not isinstance(milestones, list) or len(milestones) < 4:
             milestones = [
-                f"Week 3: {primary} foundation complete",
-                f"Week 6: {secondary} integration complete",
-                f"Week 9: Portfolio project milestone",
-                "Week 12: Interview-ready capstone complete",
+                f"Week 4: {primary} foundation milestone",
+                f"Week 8: {secondary} build milestone",
+                f"Week 10: interview readiness checkpoint",
+                "Week 12: capstone and portfolio completion",
             ]
 
-        completion_criteria = payload.get("completion_criteria") if isinstance(payload, dict) else None
+        completion_criteria = payload.get("completion_criteria") if isinstance(payload, dict) else ""
         if not isinstance(completion_criteria, str) or not completion_criteria.strip():
-            completion_criteria = f"Complete all 12 weeks and build a portfolio project using {primary}, {secondary}, and {tertiary}."
-
-        duration_weeks = payload.get("duration_weeks", 12) if isinstance(payload, dict) else 12
-        try:
-            duration_weeks = int(duration_weeks)
-        except Exception:
-            duration_weeks = 12
-        duration_weeks = max(4, min(12, duration_weeks))
-
-        daily_hours = payload.get("daily_hours", 2) if isinstance(payload, dict) else 2
-        try:
-            daily_hours = int(daily_hours)
-        except Exception:
-            daily_hours = 2
+            completion_criteria = (
+                "Complete all weekly learning, build, and interview-alignment tasks; "
+                "publish portfolio artifacts and keep evidence for JD keyword coverage."
+            )
 
         return {
-            "duration_weeks": duration_weeks,
-            "daily_hours": daily_hours,
+            "duration_weeks": 12,
+            "daily_hours": 2,
             "tasks": normalized_tasks,
             "milestones": milestones,
             "completion_criteria": completion_criteria,
         }
 
-    prompt = f"""Create a highly personalized 12-week learning roadmap for this candidate.
+    prompt = f"""Create a personalized 12-week roadmap from the resume and JD.
 
-Resume Skills & Experience:
-{resume_text[:600]}
+Resume:
+{resume_text[:700]}
 
-Target Job Description:
-{jd_text[:600]}
+Job Description:
+{jd_text[:700]}
 
-Missing Skills to Master:
+Missing skills:
 {', '.join(skill_gaps[:8])}
 
-Return valid JSON with keys: duration_weeks, daily_hours, tasks (array), milestones (array), completion_criteria.
-Each task must be unique, specific, and tied to the JD."""
+Return valid JSON with keys:
+- duration_weeks
+- daily_hours
+- tasks (array of objects with week, task, skill, difficulty, estimated_hours, resources, priority, milestone)
+- milestones
+- completion_criteria
+
+Rules:
+1) Include ALL weeks 1..12.
+2) At least 3 unique tasks per week.
+3) No repeated task text.
+4) Task content must be specific and tied to resume/JD gaps."""
 
     messages = [
-        {"role": "system", "content": "You are an expert career development coach. Create specific, personalized learning roadmaps that directly map resume gaps to job requirements."},
+        {
+            "role": "system",
+            "content": "You are an expert career coach creating practical, non-generic weekly plans tied to candidate gaps and JD requirements.",
+        },
         {"role": "user", "content": prompt},
     ]
 
     try:
-        response = await call_oxlo_chat(messages, temperature=0.7, max_tokens=4000)
+        response = await call_oxlo_chat(messages, temperature=0.6, max_tokens=4000)
         parsed = json.loads(response)
         return _normalize_payload(parsed)
     except Exception as e:
         print(f"Error generating roadmap from AI: {str(e)}")
-        fallback_payload = {
-            "duration_weeks": 12,
-            "daily_hours": 2,
-            "tasks": [],
-            "milestones": [],
-            "completion_criteria": "",
-        }
-        return _normalize_payload(fallback_payload)
+        return _normalize_payload({})
 
 async def generate_quiz_questions(topic: str, difficulty: str, count: int = 5) -> List[Dict]:
     """Generate quiz questions for a topic"""
