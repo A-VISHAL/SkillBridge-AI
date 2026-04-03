@@ -1,5 +1,12 @@
 import re
-import fitz  # PyMuPDF
+try:
+    import fitz  # PyMuPDF
+except ImportError:
+    fitz = None
+try:
+    from pypdf import PdfReader
+except ImportError:
+    PdfReader = None
 from docx import Document
 from typing import List, Optional
 from app.models.schemas import ParsedResume, Skill, Experience, Education, Project
@@ -61,14 +68,21 @@ def extract_section_lines(text: str, section_name: str) -> List[str]:
     return collected
 
 def extract_text_from_pdf(file_path: str) -> str:
-    """Extract text from PDF using PyMuPDF"""
+    """Extract text from PDF using PyMuPDF or pypdf fallback."""
     try:
-        doc = fitz.open(file_path)
-        text = ""
-        for page in doc:
-            text += page.get_text()
-        doc.close()
-        return text
+        if fitz is not None:
+            doc = fitz.open(file_path)
+            text = ""
+            for page in doc:
+                text += page.get_text()
+            doc.close()
+            return text
+
+        if PdfReader is not None:
+            reader = PdfReader(file_path)
+            return "\n".join((page.extract_text() or "") for page in reader.pages)
+
+        raise RuntimeError("PDF support is unavailable because no PDF parser is installed (PyMuPDF or pypdf)")
     except Exception as e:
         print(f"Error extracting PDF: {e}")
         return ""
@@ -320,8 +334,8 @@ def parse_resume(file_path: str) -> ParsedResume:
     else:
         text = extract_text_from_txt(file_path)
     
-    if not text:
-        return ParsedResume(raw_text="")
+    if not text or not text.strip():
+        raise ValueError("Could not extract readable text from the uploaded file")
     
     # Debug: Print extracted text sections
     print("=" * 50)

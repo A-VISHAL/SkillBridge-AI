@@ -70,8 +70,12 @@ async def root():
 async def upload_resume(file: UploadFile = File(...)):
     """Upload and parse resume"""
     try:
+        if not file or not file.filename:
+            raise HTTPException(400, "No file was uploaded")
+
         # Validate file type
-        if not file.filename.endswith(('.pdf', '.docx', '.txt')):
+        _, ext = os.path.splitext(file.filename.lower())
+        if ext not in ('.pdf', '.docx', '.txt'):
             raise HTTPException(400, "Only PDF, DOCX, and TXT files are supported")
         
         # Save file
@@ -96,7 +100,11 @@ async def upload_resume(file: UploadFile = File(...)):
             "resume": parsed_resume.dict(),
             "message": "Resume uploaded and parsed successfully"
         }
-        
+
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(400, str(e))
     except Exception as e:
         raise HTTPException(500, f"Error processing resume: {str(e)}")
 

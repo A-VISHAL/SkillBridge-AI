@@ -989,7 +989,14 @@ const ResumeAnalyzer = ({ onResumeParsed }) => {
         });
         
         if (!uploadResponse.ok) {
-          throw new Error('Upload failed');
+          let message = 'Upload failed';
+          try {
+            const errorData = await uploadResponse.json();
+            message = errorData?.detail || errorData?.message || message;
+          } catch {
+            // Keep the default error message when the response is not JSON.
+          }
+          throw new Error(message);
         }
         
         const uploadData = await uploadResponse.json();
@@ -1042,12 +1049,12 @@ const ResumeAnalyzer = ({ onResumeParsed }) => {
         setUploaded(true);
       } catch (error) {
         console.error('Error:', error);
-        // Fallback to demo data
+        // Keep analyzer visible but show a real error state.
         setAtsScore(0);
         setScoreBreakdown({ formatting_score: 0, keyword_match: 0, readability_score: 0 });
-        setIssues([{ type: "error", text: "Failed to analyze resume. Please try again." }]);
+        setIssues([{ type: "error", text: error?.message || "Failed to analyze resume. Please try again." }]);
         setSuggestions(["Ensure resume is in PDF or DOCX format"]);
-        setUploaded(true);
+        setUploaded(false);
       } finally {
         setLoading(false);
       }
