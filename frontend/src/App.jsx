@@ -474,9 +474,21 @@ const ProjectExperiencePanel = ({ isDarkMode }) => {
                     </>
                   )}
                   {stackIndex === 0 && (
-                    <span style={{ display: "inline-flex", marginTop: 14, padding: "6px 10px", borderRadius: 999, background: isDarkMode ? "#8ea0ff" : "var(--gray-900)", color: isDarkMode ? "#0b0f19" : "var(--white)", fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>
-                      Reveal next
-                    </span>
+                    <>
+                      <span style={{ display: "inline-flex", marginTop: 24, padding: "12px 24px", borderRadius: 999, background: isDarkMode ? "#8ea0ff" : "var(--gray-900)", color: isDarkMode ? "#0b0f19" : "var(--white)", fontSize: 13, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", boxShadow: "0 4px 12px rgba(0,0,0,0.15)", cursor: "pointer", transition: "all 0.2s ease" }}>
+                        Reveal next
+                      </span>
+                      <div style={{ marginTop: 20, paddingTop: 16, borderTop: isDarkMode ? "1px solid rgba(124,143,255,0.15)" : "1px solid rgba(0,0,0,0.06)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div style={{ fontSize: 11, color: isDarkMode ? "#97a6d4" : "var(--gray-400)", fontWeight: 600, letterSpacing: "0.05em" }}>
+                          {activeDeck + 1} of {tracks.length}
+                        </div>
+                        <div style={{ display: "flex", gap: 4 }}>
+                          {tracks.map((_, idx) => (
+                            <div key={idx} style={{ width: 6, height: 6, borderRadius: "50%", background: idx === activeDeck ? (isDarkMode ? "#8ea0ff" : "var(--gray-900)") : (isDarkMode ? "rgba(143,161,255,0.25)" : "rgba(0,0,0,0.15)"), transition: "all 0.3s ease" }} />
+                          ))}
+                        </div>
+                      </div>
+                    </>
                   )}
                 </motion.button>
               );
