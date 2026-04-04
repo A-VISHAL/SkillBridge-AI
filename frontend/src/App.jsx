@@ -164,7 +164,7 @@ const Badge = ({ children, variant = "default", style = {} }) => {
   );
 };
 
-const Btn = ({ children, variant = "primary", onClick, style = {}, icon }) => {
+const Btn = ({ children, variant = "primary", onClick, style = {}, icon, accentColor }) => {
   const [hovered, setHovered] = useState(false);
   const base = {
     display: "inline-flex", alignItems: "center", justifyContent: "center",
@@ -175,9 +175,11 @@ const Btn = ({ children, variant = "primary", onClick, style = {}, icon }) => {
   };
   const variants = {
     primary: {
-      background: hovered ? "var(--gray-900)" : "var(--black)",
+      background: hovered ? (accentColor || "var(--gray-900)") : (accentColor || "var(--black)"),
       color: "var(--white)",
-      boxShadow: hovered ? "0 6px 20px rgba(0,0,0,0.22)" : "0 2px 8px rgba(0,0,0,0.12)",
+      boxShadow: hovered
+        ? (accentColor ? "0 8px 24px rgba(59,91,255,0.38)" : "0 6px 20px rgba(0,0,0,0.22)")
+        : (accentColor ? "0 4px 16px rgba(59,91,255,0.24)" : "0 2px 8px rgba(0,0,0,0.12)"),
       transform: hovered ? "translateY(-1px)" : "none",
     },
     secondary: {
@@ -603,7 +605,12 @@ const ProjectExperiencePanel = () => {
 const LandingPage = ({ onEnterApp }) => {
   const [scrolled, setScrolled] = useState(false);
   const [visible, setVisible] = useState({});
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [heroLoading, setHeroLoading] = useState(true);
+  const [scrollY, setScrollY] = useState(0);
+  const [liveTick, setLiveTick] = useState(0);
   const sectionsRef = useRef({});
+  const brandAccent = "#3b5bff";
 
   const scrollToSection = (sectionId) => {
     if (typeof window === "undefined") return;
@@ -615,8 +622,12 @@ const LandingPage = ({ onEnterApp }) => {
   };
 
   useEffect(() => {
-    const handleScroll = () => setScrolled(window.scrollY > 40);
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 40);
+      setScrollY(window.scrollY);
+    };
     window.addEventListener("scroll", handleScroll);
+    handleScroll();
 
     // Intersection observer for reveal
     const obs = new IntersectionObserver((entries) => {
@@ -626,7 +637,20 @@ const LandingPage = ({ onEnterApp }) => {
     }, { threshold: 0.15 });
 
     document.querySelectorAll("[data-key]").forEach(el => obs.observe(el));
-    return () => window.removeEventListener("scroll", handleScroll);
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      obs.disconnect();
+    };
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setHeroLoading(false), 1100);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    const ticker = window.setInterval(() => setLiveTick((p) => (p + 1) % 96), 160);
+    return () => window.clearInterval(ticker);
   }, []);
 
   const features = [
@@ -663,9 +687,30 @@ const LandingPage = ({ onEnterApp }) => {
   }));
 
   return (
-    <div className="mesh-bg" style={{ minHeight: "100vh", position: "relative", overflow: "hidden" }}>
+    <div
+      className="mesh-bg"
+      style={{
+        minHeight: "100vh",
+        position: "relative",
+        overflow: "hidden",
+        background: isDarkMode
+          ? "radial-gradient(ellipse at top left, rgba(55,72,150,0.24), transparent 40%), #0b0f19"
+          : undefined,
+        color: isDarkMode ? "#f4f6fb" : undefined,
+      }}
+    >
       {/* Animated Background Particles */}
-      <div style={{ position: "fixed", inset: 0, overflow: "hidden", pointerEvents: "none", zIndex: 0 }}>
+      <div
+        style={{
+          position: "fixed",
+          inset: 0,
+          overflow: "hidden",
+          pointerEvents: "none",
+          zIndex: 0,
+          transform: `translateY(${scrollY * -0.08}px)`,
+          transition: "transform 0.08s linear",
+        }}
+      >
         {particles.map(p => (
           <div
             key={p.id}
@@ -676,9 +721,11 @@ const LandingPage = ({ onEnterApp }) => {
               width: p.size,
               height: p.size,
               borderRadius: "50%",
-              background: "rgba(180, 180, 180, 0.25)",
+              background: isDarkMode ? "rgba(143, 161, 255, 0.25)" : "rgba(180, 180, 180, 0.25)",
               animation: `${p.animation} ${p.duration}s ease-in-out ${p.delay}s infinite`,
-              boxShadow: `0 0 ${p.size * 2}px rgba(180, 180, 180, 0.15)`,
+              boxShadow: isDarkMode
+                ? `0 0 ${p.size * 2}px rgba(116, 138, 255, 0.22)`
+                : `0 0 ${p.size * 2}px rgba(180, 180, 180, 0.15)`,
               filter: "blur(0.5px)"
             }}
           />
@@ -692,7 +739,9 @@ const LandingPage = ({ onEnterApp }) => {
           width: 320,
           height: 320,
           borderRadius: "50%",
-          background: "radial-gradient(circle, rgba(200, 200, 200, 0.12), transparent 70%)",
+          background: isDarkMode
+            ? "radial-gradient(circle, rgba(80, 104, 255, 0.22), transparent 70%)"
+            : "radial-gradient(circle, rgba(200, 200, 200, 0.12), transparent 70%)",
           animation: "floatSlow 22s ease-in-out infinite",
           filter: "blur(50px)"
         }}/>
@@ -703,7 +752,9 @@ const LandingPage = ({ onEnterApp }) => {
           width: 380,
           height: 380,
           borderRadius: "50%",
-          background: "radial-gradient(circle, rgba(190, 190, 190, 0.1), transparent 70%)",
+          background: isDarkMode
+            ? "radial-gradient(circle, rgba(91, 114, 255, 0.2), transparent 70%)"
+            : "radial-gradient(circle, rgba(190, 190, 190, 0.1), transparent 70%)",
           animation: "floatSlow 26s ease-in-out infinite 4s",
           filter: "blur(55px)"
         }}/>
@@ -714,7 +765,9 @@ const LandingPage = ({ onEnterApp }) => {
           width: 300,
           height: 300,
           borderRadius: "50%",
-          background: "radial-gradient(circle, rgba(185, 185, 185, 0.08), transparent 70%)",
+          background: isDarkMode
+            ? "radial-gradient(circle, rgba(109, 127, 255, 0.16), transparent 70%)"
+            : "radial-gradient(circle, rgba(185, 185, 185, 0.08), transparent 70%)",
           animation: "floatSlow 24s ease-in-out infinite 8s",
           filter: "blur(52px)"
         }}/>
@@ -725,15 +778,16 @@ const LandingPage = ({ onEnterApp }) => {
         position: "fixed", top: 0, left: 0, right: 0, zIndex: 100,
         padding: scrolled ? "12px 48px" : "20px 48px",
         transition: "all var(--transition)",
-        borderBottom: scrolled ? "1px solid var(--gray-150)" : "1px solid transparent",
+        borderBottom: scrolled ? (isDarkMode ? "1px solid rgba(133,149,255,0.22)" : "1px solid var(--gray-150)") : "1px solid transparent",
         boxShadow: scrolled ? "var(--shadow-sm)" : "none",
+        background: isDarkMode ? "rgba(8, 12, 22, 0.72)" : undefined,
       }}>
         <div style={{ maxWidth: 1100, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-            <div style={{ width: 32, height: 32, borderRadius: 10, background: "var(--gray-900)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <div style={{ width: 32, height: 32, borderRadius: 10, background: isDarkMode ? "#101827" : "var(--gray-900)", display: "flex", alignItems: "center", justifyContent: "center", border: isDarkMode ? "1px solid rgba(115,136,255,0.24)" : "none" }}>
               <Icon name="logo" size={16} color="white"/>
             </div>
-            <span style={{ fontWeight: 700, fontSize: 15.5, letterSpacing: "-0.03em", color: "var(--gray-900)" }}>SkillBridge AI</span>
+            <span style={{ fontWeight: 700, fontSize: 15.5, letterSpacing: "-0.03em", color: isDarkMode ? "#edf1ff" : "var(--gray-900)" }}>SkillBridge AI</span>
           </div>
 
           <div style={{ display: "flex", gap: 32, alignItems: "center" }}>
@@ -749,9 +803,9 @@ const LandingPage = ({ onEnterApp }) => {
                   e.preventDefault();
                   scrollToSection(item.id);
                 }}
-                style={{ fontSize: 14, color: "var(--gray-500)", textDecoration: "none", fontWeight: 500, letterSpacing: "-0.01em", transition: "color 0.15s" }}
-                onMouseEnter={e => e.target.style.color = "var(--gray-900)"}
-                onMouseLeave={e => e.target.style.color = "var(--gray-500)"}
+                style={{ fontSize: 14, color: isDarkMode ? "#b8c3ec" : "var(--gray-500)", textDecoration: "none", fontWeight: 500, letterSpacing: "-0.01em", transition: "color 0.15s" }}
+                onMouseEnter={e => e.target.style.color = isDarkMode ? "#eef2ff" : "var(--gray-900)"}
+                onMouseLeave={e => e.target.style.color = isDarkMode ? "#b8c3ec" : "var(--gray-500)"}
               >
                 {item.label}
               </a>
@@ -759,7 +813,20 @@ const LandingPage = ({ onEnterApp }) => {
           </div>
 
           <div style={{ display: "flex", gap: 10 }}>
-            <Btn variant="primary" onClick={onEnterApp} style={{ padding: "8px 18px", fontSize: 13.5 }}>Get started</Btn>
+            <Btn
+              variant="secondary"
+              onClick={() => setIsDarkMode((p) => !p)}
+              style={{
+                padding: "8px 14px",
+                fontSize: 12,
+                borderColor: isDarkMode ? "rgba(123,140,255,0.34)" : "var(--gray-200)",
+                background: isDarkMode ? "#101827" : "var(--white)",
+                color: isDarkMode ? "#e7edff" : "var(--gray-800)",
+              }}
+            >
+              {isDarkMode ? "Light mode" : "Dark mode"}
+            </Btn>
+            <Btn variant="primary" accentColor={brandAccent} onClick={onEnterApp} style={{ padding: "8px 18px", fontSize: 13.5 }}>Get started</Btn>
           </div>
         </div>
       </nav>
@@ -779,19 +846,29 @@ const LandingPage = ({ onEnterApp }) => {
         }}
       >
         <div className="fade-up" style={{ animationDelay: "0.1s", opacity: 0, animationFillMode: "forwards", marginBottom: 22 }}>
-          <Badge variant="neutral" style={{ fontSize: 12.5, padding: "8px 14px" }}>Resume intelligence + job alignment + adaptive prep</Badge>
+          <Badge variant="neutral" style={{ fontSize: 11.5, padding: "8px 14px", fontFamily: "'JetBrains Mono', 'DM Mono', monospace", letterSpacing: "0.08em", textTransform: "uppercase", background: isDarkMode ? "#101827" : undefined, borderColor: isDarkMode ? "rgba(126,145,255,0.4)" : undefined }}>
+            Project Focus: Resume + JD + Adaptive Prep
+          </Badge>
         </div>
         <h1 className="fade-up" style={{
           fontSize: "clamp(52px, 8.8vw, 96px)", fontWeight: 800,
           lineHeight: 0.98, letterSpacing: "-0.05em",
-          color: "var(--gray-900)", marginBottom: 20,
+          color: "transparent",
+          marginBottom: 20,
+          backgroundImage: isDarkMode
+            ? "linear-gradient(180deg, #f8faff 0%, #d7dff9 58%, #aeb8d9 100%)"
+            : "linear-gradient(180deg, #0e1015 0%, #292e39 54%, #838995 100%)",
+          WebkitBackgroundClip: "text",
+          backgroundClip: "text",
           animationDelay: "0.2s", opacity: 0, animationFillMode: "forwards",
         }}>
           Build A Career<br/>
-          <span style={{ color: "var(--gray-400)" }}>That Actually Fits</span>
+          <span style={{ color: "transparent", backgroundImage: isDarkMode ? "linear-gradient(180deg, #f5f7ff 0%, #8ea0ff 100%)" : "linear-gradient(180deg, #30333a 0%, #111218 100%)", WebkitBackgroundClip: "text", backgroundClip: "text" }}>
+            That Actually <span style={{ color: isDarkMode ? "#7d93ff" : "#111318", background: "none", WebkitBackgroundClip: "initial", backgroundClip: "initial" }}>Fits</span>
+          </span>
         </h1>
         <p className="fade-up" style={{
-          fontSize: "clamp(18px, 2.2vw, 24px)", color: "var(--gray-600)", lineHeight: 1.55,
+          fontSize: "clamp(18px, 2.2vw, 24px)", color: isDarkMode ? "#c4cee9" : "var(--gray-600)", lineHeight: 1.55,
           maxWidth: 860, margin: "0 auto 34px",
           fontWeight: 500, letterSpacing: "-0.015em",
           animationDelay: "0.3s", opacity: 0, animationFillMode: "forwards",
@@ -799,43 +876,126 @@ const LandingPage = ({ onEnterApp }) => {
           SkillBridge turns your resume and target role into a focused execution plan: diagnose gaps, map to real JDs, practice with feedback, and track measurable hiring readiness.
         </p>
         <div className="fade-up" style={{ display: "flex", gap: 12, justifyContent: "center", animationDelay: "0.4s", opacity: 0, animationFillMode: "forwards" }}>
-          <Btn variant="primary" onClick={onEnterApp} style={{ padding: "13px 30px", fontSize: 15 }}>
+          <Btn variant="primary" accentColor={brandAccent} onClick={onEnterApp} style={{ padding: "13px 30px", fontSize: 15 }}>
             Get started free
           </Btn>
-          <Btn variant="secondary" style={{ padding: "13px 30px", fontSize: 15 }} icon={<Icon name="play" size={14}/>}>
+          <Btn variant="secondary" style={{ padding: "13px 30px", fontSize: 15, borderColor: isDarkMode ? "rgba(128,145,255,0.28)" : undefined, background: isDarkMode ? "#121b2b" : undefined, color: isDarkMode ? "#e6ecff" : undefined }} icon={<Icon name="play" size={14}/> }>
             See demo
           </Btn>
         </div>
 
-        <div className="fade-up" style={{
-          marginTop: 30,
-          width: "min(980px, 100%)",
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-          gap: 12,
-          animationDelay: "0.48s",
-          opacity: 0,
-          animationFillMode: "forwards",
-        }}>
-          {[
-            { label: "Resume Deep-Scan", detail: "Skill extraction + gap detection" },
-            { label: "JD Match Engine", detail: "Role alignment with clear score logic" },
-            { label: "Adaptive Learning Loop", detail: "Roadmap, quiz, and interview in one flow" },
-            { label: "Progress Visibility", detail: "Weekly milestones and readiness tracking" },
-          ].map((item) => (
+        <div
+          className="fade-up"
+          style={{
+            marginTop: 28,
+            width: "min(980px, 100%)",
+            display: "grid",
+            gridTemplateColumns: "1.35fr 1fr 1fr",
+            gridTemplateRows: "auto auto",
+            gap: 12,
+            animationDelay: "0.48s",
+            opacity: 0,
+            animationFillMode: "forwards",
+            position: "relative",
+            transform: `translateY(${scrollY * -0.03}px)`,
+            transition: "transform 0.08s linear",
+          }}
+        >
+          <div style={{
+            position: "absolute",
+            right: -18,
+            top: -12,
+            zIndex: 3,
+            padding: "8px 12px",
+            borderRadius: 999,
+            border: "1px solid rgba(90, 120, 255, 0.35)",
+            background: isDarkMode ? "rgba(16,24,40,0.84)" : "rgba(255,255,255,0.88)",
+            backdropFilter: "blur(10px)",
+            fontSize: 11,
+            fontWeight: 700,
+            color: isDarkMode ? "#b6c6ff" : "#2c46d6",
+            boxShadow: "0 10px 28px rgba(56,91,255,0.22)",
+          }}>
+            ATS Score: {Math.min(98, 84 + liveTick)}
+          </div>
+
+          <div style={{
+            gridRow: "1 / span 2",
+            borderRadius: 18,
+            border: isDarkMode ? "1px solid rgba(124,143,255,0.24)" : "1px solid rgba(160,160,160,0.2)",
+            background: isDarkMode ? "rgba(18,26,42,0.62)" : "rgba(255,255,255,0.58)",
+            backdropFilter: "blur(10px)",
+            padding: 16,
+            textAlign: "left",
+            boxShadow: "0 32px 80px rgba(0,0,0,0.06), 0 10px 36px rgba(0,0,0,0.04), 0 2px 12px rgba(0,0,0,0.03)",
+          }}>
+            <div style={{ fontSize: 12, letterSpacing: "0.08em", textTransform: "uppercase", color: isDarkMode ? "#97a6d4" : "var(--gray-500)", fontFamily: "'JetBrains Mono', 'DM Mono', monospace", marginBottom: 10 }}>Hero Feature</div>
+            <div style={{ fontSize: 20, fontWeight: 760, color: isDarkMode ? "#f3f6ff" : "var(--gray-900)", marginBottom: 8 }}>Resume Deep-Scan</div>
+            <div style={{ fontSize: 13.5, lineHeight: 1.6, color: isDarkMode ? "#bec9e8" : "var(--gray-600)", marginBottom: 14 }}>
+              Intelligent extraction of skills, impact, and role-fit signals from your resume with line-level recommendations.
+            </div>
+            {heroLoading ? (
+              <div style={{ display: "grid", gap: 10 }}>
+                {[0, 1, 2].map((i) => (
+                  <div key={i} style={{ height: 12, borderRadius: 8, background: "linear-gradient(90deg, rgba(180,180,180,0.22) 25%, rgba(240,240,240,0.62) 50%, rgba(180,180,180,0.22) 75%)", backgroundSize: "400px 100%", animation: "shimmer 1.2s linear infinite" }} />
+                ))}
+              </div>
+            ) : (
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                  <span style={{ fontSize: 12, color: isDarkMode ? "#9eb2e8" : "var(--gray-500)" }}>Extraction Progress</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: isDarkMode ? "#dee6ff" : "var(--gray-800)" }}>{Math.min(100, 24 + liveTick)}%</span>
+                </div>
+                <div style={{ height: 9, borderRadius: 999, background: isDarkMode ? "rgba(146,161,219,0.2)" : "var(--gray-150)", overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: `${Math.min(100, 24 + liveTick)}%`, background: `linear-gradient(90deg, ${brandAccent}, #7294ff)`, transition: "width 0.16s linear" }} />
+                </div>
+                <div style={{ marginTop: 12, fontSize: 12, color: isDarkMode ? "#adbbe1" : "var(--gray-500)" }}>
+                  Parsed: Skills, Projects, Experience, Keywords
+                </div>
+              </div>
+            )}
+          </div>
+
+          {["JD Match Engine", "Adaptive Learning Loop", "Progress Visibility"].map((title, idx) => (
             <div
-              key={item.label}
+              key={title}
               style={{
+                borderRadius: 16,
+                border: isDarkMode ? "1px solid rgba(124,143,255,0.2)" : "1px solid rgba(170,170,170,0.22)",
+                background: isDarkMode ? "rgba(18,26,42,0.58)" : "rgba(255,255,255,0.56)",
+                backdropFilter: "blur(10px)",
+                padding: 14,
                 textAlign: "left",
-                padding: "12px 14px",
-                borderRadius: 14,
-                border: "1px solid var(--gray-150)",
-                background: "rgba(255,255,255,0.68)",
-                backdropFilter: "blur(8px)",
+                boxShadow: "0 24px 54px rgba(0,0,0,0.05), 0 8px 20px rgba(0,0,0,0.03), 0 2px 8px rgba(0,0,0,0.02)",
               }}
             >
-              <div style={{ fontSize: 13, fontWeight: 700, color: "var(--gray-800)", marginBottom: 4 }}>{item.label}</div>
-              <div style={{ fontSize: 12, color: "var(--gray-500)", lineHeight: 1.5 }}>{item.detail}</div>
+              <div style={{ fontSize: 14, fontWeight: 720, color: isDarkMode ? "#f0f4ff" : "var(--gray-900)", marginBottom: 6 }}>{title}</div>
+              {heroLoading ? (
+                <div style={{ height: 10, borderRadius: 8, background: "linear-gradient(90deg, rgba(180,180,180,0.22) 25%, rgba(240,240,240,0.62) 50%, rgba(180,180,180,0.22) 75%)", backgroundSize: "400px 100%", animation: "shimmer 1.2s linear infinite" }} />
+              ) : (
+                <>
+                  {idx === 0 && (
+                    <div>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: isDarkMode ? "#aab9df" : "var(--gray-600)", marginBottom: 6 }}>
+                        <span>Role match score</span><strong style={{ color: isDarkMode ? "#eaf0ff" : "var(--gray-900)" }}>{Math.min(95, 42 + liveTick)}%</strong>
+                      </div>
+                      <div style={{ height: 8, borderRadius: 999, background: isDarkMode ? "rgba(146,161,219,0.2)" : "var(--gray-150)", overflow: "hidden" }}>
+                        <div style={{ height: "100%", width: `${Math.min(95, 42 + liveTick)}%`, background: `linear-gradient(90deg, ${brandAccent}, #7f9bff)`, transition: "width 0.16s linear" }} />
+                      </div>
+                    </div>
+                  )}
+                  {idx === 1 && (
+                    <div style={{ fontSize: 12.5, color: isDarkMode ? "#b3c0e5" : "var(--gray-600)", lineHeight: 1.6 }}>
+                      Next task: System design fundamentals, timed quiz, and mock interview round.
+                    </div>
+                  )}
+                  {idx === 2 && (
+                    <div style={{ fontSize: 12.5, color: isDarkMode ? "#b3c0e5" : "var(--gray-600)", lineHeight: 1.6 }}>
+                      Hiring readiness increased from 61% to {Math.min(89, 68 + Math.floor(liveTick / 3))}% this week.
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           ))}
         </div>
