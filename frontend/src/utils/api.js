@@ -47,11 +47,13 @@ export const generateRoadmap = async (resumeId, jobDescription, dailyHours = 2) 
   return response.data;
 };
 
-export const generateQuiz = async (topic, difficulty = 'Medium', count = 5) => {
+export const generateQuiz = async (topic, difficulty = 'Adaptive', count = 10, resumeId = null, jobDescription = '') => {
   const formData = new FormData();
   formData.append('topic', topic);
   formData.append('difficulty', difficulty);
   formData.append('count', count);
+  if (resumeId) formData.append('resume_id', resumeId);
+  if (jobDescription) formData.append('job_description', jobDescription);
   const response = await api.post('/api/quiz/generate', formData);
   return response.data;
 };

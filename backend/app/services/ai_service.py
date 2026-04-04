@@ -1,3 +1,4 @@
+import asyncio
 import httpx
 import json
 import re
@@ -460,27 +461,43 @@ async def call_model_chat(
     }
 
     last_response = None
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(timeout=90.0) as client:
         for headers in header_variants:
-            try:
-                response = await client.post(endpoint, headers=headers, json=payload)
-            except Exception as e:
-                raise AIServiceError("network", f"AI API request failed: {str(e)}") from e
+            for attempt in range(2):
+                try:
+                    response = await client.post(endpoint, headers=headers, json=payload)
+                except Exception as e:
+                    raise AIServiceError("network", f"AI API request failed: {str(e)}") from e
 
-            if response.status_code == 200:
-                last_response = response
+                if response.status_code == 200:
+                    last_response = response
+                    break
+
+                # Retry auth format on auth failures only.
+                if response.status_code in (401, 403):
+                    last_response = response
+                    break
+
+                if response.status_code in (429, 502, 503, 504) and attempt == 0:
+                    wait_seconds = 5
+                    if response.status_code == 429:
+                        try:
+                            payload_json = response.json()
+                            retry_after = int(payload_json.get("retry_after", 5))
+                            wait_seconds = max(1, min(20, retry_after))
+                        except Exception:
+                            wait_seconds = 5
+                    await asyncio.sleep(wait_seconds)
+                    continue
+
+                if response.status_code == 429:
+                    raise AIServiceError("rate_limit", f"AI API rate limit exceeded: {response.text[:220]}")
+
+                code = "http_error"
+                raise AIServiceError(code, f"AI API request failed: status={response.status_code}, body={response.text[:220]}")
+
+            if last_response and last_response.status_code == 200:
                 break
-
-            # Retry auth format on auth failures only.
-            if response.status_code in (401, 403):
-                last_response = response
-                continue
-
-            if response.status_code == 429:
-                raise AIServiceError("rate_limit", f"AI API rate limit exceeded: {response.text[:220]}")
-
-            code = "http_error"
-            raise AIServiceError(code, f"AI API request failed: status={response.status_code}, body={response.text[:220]}")
 
     if not last_response or last_response.status_code != 200:
         body = last_response.text[:220] if last_response is not None else "No response body"
@@ -538,6 +555,21 @@ async def call_roadmap_chat(
         endpoint=settings.ROADMAP_CHAT_ENDPOINT,
         api_key=settings.ROADMAP_API_KEY,
         model=settings.ROADMAP_MODEL,
+        temperature=temperature,
+        max_tokens=max_tokens,
+    )
+
+
+async def call_quiz_chat(
+    messages: List[Dict[str, str]],
+    temperature: float = 0.7,
+    max_tokens: int = 2000,
+) -> str:
+    return await call_model_chat(
+        messages=messages,
+        endpoint=settings.QUIZ_CHAT_ENDPOINT,
+        api_key=settings.QUIZ_API_KEY,
+        model=settings.QUIZ_MODEL,
         temperature=temperature,
         max_tokens=max_tokens,
     )
@@ -1112,7 +1144,9 @@ async def generate_quiz_questions(
 
     domain_key = "coding_dsa" if domain.lower().startswith("coding") else "development"
     difficulty_key = difficulty.strip().lower()
+    adaptive_mode = difficulty_key in {"medium", "adaptive"}
     difficulty_key = {"medium": "hard"}.get(difficulty_key, difficulty_key)
+    difficulty_value = {"easy": "Easy", "hard": "Hard", "advanced": "Advanced"}.get(difficulty_key, "Hard")
     domain_prompt = "Data Structures, Algorithms, problem-solving, complexity" if domain_key == "coding_dsa" else "Web/app development, APIs, architecture, tooling"
     normalized_count = max(10, int(count or 10))
 
@@ -1132,85 +1166,6 @@ async def generate_quiz_questions(
             "explanation": explanation,
         }
 
-    fallback_banks: Dict[str, Dict[str, List[Dict[str, Any]]]] = {
-        "coding_dsa": {
-            "easy": [
-                _question_item("coding-easy-1", "Arrays", "What is an array?", ["A collection of same-type elements", "A type of loop", "A sorting method", "A database index"], 0, "An array stores elements contiguously and usually of the same type.", "Easy"),
-                _question_item("coding-easy-2", "Complexity", "What is the time complexity of accessing an element in an array by index?", ["O(1)", "O(log n)", "O(n)", "O(n log n)"], 0, "Direct index access in an array is constant time.", "Easy"),
-                _question_item("coding-easy-3", "Stacks", "What is a stack?", ["FIFO structure", "LIFO structure", "Tree traversal method", "Hashing technique"], 1, "Stacks follow Last In, First Out (LIFO).", "Easy"),
-                _question_item("coding-easy-4", "Queues", "What is FIFO?", ["First In, First Out", "Fast Input Fast Output", "First In, Fast Out", "Function Input Function Output"], 0, "FIFO means the earliest element added is removed first.", "Easy"),
-                _question_item("coding-easy-5", "Programming", "What is a variable?", ["A stored value that can change", "A fixed function", "A compiler error", "A package manager"], 0, "Variables store values that can be updated during execution.", "Easy"),
-                _question_item("coding-easy-6", "Operators", "What is the difference between == and = in most programming languages?", ["No difference", "== compares, = assigns", "= compares, == assigns", "Both mean addition"], 1, "Assignment uses = while equality comparison uses ==.", "Easy"),
-                _question_item("coding-easy-7", "Loops", "What is a loop?", ["A conditional statement", "A repetition structure", "A database query", "A memory allocator"], 1, "Loops repeat code while a condition remains true or for a fixed range.", "Easy"),
-                _question_item("coding-easy-8", "Functions", "What is a function?", ["A reusable block of code", "A variable type", "A network request", "A CSS rule"], 0, "Functions package logic into reusable units.", "Easy"),
-                _question_item("coding-easy-9", "Stacks", "What is the difference between stack and queue?", ["Stack is FIFO, queue is LIFO", "Stack is LIFO, queue is FIFO", "Both are the same", "Neither stores data"], 1, "Stacks remove the most recent item first, queues remove the oldest.", "Easy"),
-                _question_item("coding-easy-10", "Searching", "What is the output of: print(2 + 3 * 4)?", ["20", "14", "24", "9"], 1, "Multiplication happens before addition, so 3 * 4 = 12 and 2 + 12 = 14.", "Easy"),
-            ],
-            "hard": [
-                _question_item("coding-hard-1", "Binary Search", "What is the time complexity of binary search on a sorted array?", ["O(1)", "O(log n)", "O(n)", "O(n log n)"], 1, "Binary search halves the search space each step.", "Hard"),
-                _question_item("coding-hard-2", "Recursion", "What is recursion?", ["Calling a function from another file", "A function calling itself", "A database join", "A styling method"], 1, "Recursion solves a problem by reducing it to smaller versions of itself.", "Hard"),
-                _question_item("coding-hard-3", "Linked Lists", "What is a linked list?", ["A contiguous memory array", "Nodes connected by pointers", "A balanced tree", "A hash table"], 1, "A linked list stores nodes connected by references.", "Hard"),
-                _question_item("coding-hard-4", "Hash Tables", "What is a hash table mainly used for?", ["Sorting data", "Fast key-value lookup", "Rendering UI", "Encrypting files"], 1, "Hash tables provide fast average-case lookups by key.", "Hard"),
-                _question_item("coding-hard-5", "Algorithms", "What is the time complexity of a nested loop over n items?", ["O(n)", "O(log n)", "O(n^2)", "O(n^3)"], 2, "Two nested loops over the same range usually produce quadratic time.", "Hard"),
-                _question_item("coding-hard-6", "Trees", "Difference between BFS and DFS?", ["BFS uses a stack; DFS uses a queue", "BFS explores level by level; DFS explores deeply first", "They are identical", "DFS is only for graphs"], 1, "BFS explores all nodes at a depth before going deeper.", "Hard"),
-                _question_item("coding-hard-7", "Strings", "Reverse a string without using built-in functions tests which concept most directly?", ["Recursion or two-pointer logic", "Database normalization", "Network routing", "CSS specificity"], 0, "This is usually solved with iteration or recursion and index control.", "Hard"),
-                _question_item("coding-hard-8", "Linked Lists", "What is the time complexity of detecting a cycle in a linked list with Floyd's algorithm?", ["O(1)", "O(log n)", "O(n)", "O(n^2)"], 2, "The slow and fast pointers traverse at most linear time.", "Hard"),
-                _question_item("coding-hard-9", "Dynamic Programming", "What is memoization?", ["Sorting inputs before recursion", "Caching repeated subproblem results", "Encrypting recursive calls", "Using a queue for recursion"], 1, "Memoization stores computed results to avoid recomputation.", "Hard"),
-                _question_item("coding-hard-10", "Sorting", "Which algorithm is typically O(n log n) in average case?", ["Bubble sort", "Insertion sort", "Merge sort", "Linear search"], 2, "Merge sort is a classic O(n log n) divide-and-conquer algorithm.", "Hard"),
-            ],
-            "advanced": [
-                _question_item("coding-advanced-1", "LRU Cache", "How is an LRU cache commonly implemented for O(1) operations?", ["Stack + queue", "Hash map + doubly linked list", "Binary tree + array", "Set + recursion"], 1, "A hash map gives direct access and a doubly linked list tracks recency.", "Advanced"),
-                _question_item("coding-advanced-2", "Graphs", "Which algorithm finds the shortest path from a single source with non-negative weights?", ["DFS", "Dijkstra's algorithm", "Kruskal's algorithm", "Topological sort"], 1, "Dijkstra's algorithm is used for weighted shortest paths without negative weights.", "Advanced"),
-                _question_item("coding-advanced-3", "Tries", "What is a trie primarily useful for?", ["Range sums", "Prefix matching", "Cycle detection", "Load balancing"], 1, "Tries are optimized for prefix-based search and autocomplete.", "Advanced"),
-                _question_item("coding-advanced-4", "Graphs", "What does topological sorting apply to?", ["Undirected cyclic graphs only", "Directed acyclic graphs", "Binary heaps", "Hash tables"], 1, "Topological ordering exists for DAGs.", "Advanced"),
-                _question_item("coding-advanced-5", "Data Structures", "What is a segment tree used for?", ["String formatting", "Range queries and updates", "User authentication", "Network routing"], 1, "Segment trees support efficient range query/update operations.", "Advanced"),
-                _question_item("coding-advanced-6", "Data Structures", "What is a Fenwick tree mainly used for?", ["Prefix sums with updates", "Image rendering", "CSS layout", "Linked list traversal"], 0, "Fenwick trees support prefix sum queries and updates efficiently.", "Advanced"),
-                _question_item("coding-advanced-7", "Concurrency", "How do you describe a deadlock in concurrent systems?", ["Memory leak", "Two or more tasks waiting on each other indefinitely", "A faster thread", "A cache miss"], 1, "Deadlock occurs when waiting dependencies form a cycle.", "Advanced"),
-                _question_item("coding-advanced-8", "Optimization", "What is the key idea behind dynamic programming?", ["Randomization", "Overlapping subproblems and optimal substructure", "Using only recursion", "Ignoring state"], 1, "DP solves and reuses overlapping subproblems.", "Advanced"),
-                _question_item("coding-advanced-9", "Graphs", "Which traversal is best associated with finding the shortest unweighted path?", ["BFS", "DFS", "Postorder traversal", "Heap sort"], 0, "BFS discovers shortest paths in unweighted graphs.", "Advanced"),
-                _question_item("coding-advanced-10", "Linked Lists", "What is the main challenge in implementing a linked list compared to an array?", ["Random access", "Pointer management", "Sorting speed", "Constant-time length"], 1, "Linked lists require explicit pointer/reference management.", "Advanced"),
-            ],
-        },
-        "development": {
-            "easy": [
-                _question_item("dev-easy-1", "Frontend vs Backend", "What is the difference between frontend and backend development?", ["Frontend is server code; backend is styling", "Frontend is user-facing; backend handles server-side logic", "They are identical", "Backend only means HTML"], 1, "Frontend focuses on what users see, while backend powers data, logic, and APIs.", "Easy"),
-                _question_item("dev-easy-2", "HTML", "What does HTML stand for?", ["Hyper Text Markup Language", "High Transfer Machine Language", "Home Tool Markup Language", "Hyperlink and Text Management Language"], 0, "HTML is the standard markup language for web pages.", "Easy"),
-                _question_item("dev-easy-3", "CSS", "What is the purpose of CSS?", ["To store data", "To style and layout web pages", "To create databases", "To run server scripts"], 1, "CSS controls visual presentation and layout.", "Easy"),
-                _question_item("dev-easy-4", "APIs", "What is a REST API?", ["A database engine", "An HTTP-based API style", "A CSS framework", "A programming language"], 1, "REST APIs expose resources over HTTP using standard methods.", "Easy"),
-                _question_item("dev-easy-5", "Version Control", "What is version control? Name one tool.", ["Tracking code changes; Git", "Designing web pages; Figma", "Compiling code; Node", "Styling pages; Tailwind"], 0, "Version control tracks changes over time and Git is a common tool.", "Easy"),
-                _question_item("dev-easy-6", "Browser", "What does the DOM represent?", ["Database Object Model", "Document Object Model", "Data Output Module", "Dynamic Order Map"], 1, "The DOM is the browser's tree representation of HTML.", "Easy"),
-                _question_item("dev-easy-7", "Networking", "What is the purpose of HTTP status code 404?", ["Success", "Resource created", "Resource not found", "Server error"], 2, "404 means the requested resource could not be found.", "Easy"),
-                _question_item("dev-easy-8", "JavaScript", "What is JavaScript mainly used for in web development?", ["Database backups", "Interactivity and behavior", "Image compression", "Hardware drivers"], 1, "JavaScript adds interactivity and dynamic behavior to pages.", "Easy"),
-                _question_item("dev-easy-9", "Deployment", "Why is environment configuration important?", ["It changes fonts", "It separates local, staging, and production settings", "It replaces Git", "It removes the need for APIs"], 1, "Different environments need different secrets and settings.", "Easy"),
-                _question_item("dev-easy-10", "Authentication", "What is authentication?", ["Checking who a user is", "Checking what a user can do", "Styling a login page", "Compressing a file"], 0, "Authentication verifies identity.", "Easy"),
-            ],
-            "hard": [
-                _question_item("dev-hard-1", "HTTP", "What is the difference between GET and POST requests?", ["GET sends data in body; POST sends in URL", "GET retrieves data; POST submits data", "They are identical", "POST is only for CSS"], 1, "GET is used to fetch data and POST is used to submit data.", "Hard"),
-                _question_item("dev-hard-2", "Middleware", "What is middleware?", ["A database index", "Software that processes requests between layers", "A UI component", "A CSS selector"], 1, "Middleware runs between request and response handling.", "Hard"),
-                _question_item("dev-hard-3", "Security", "What is authentication vs authorization?", ["Authentication is permissions; authorization is identity", "Authentication verifies identity; authorization checks access", "They are the same", "Authorization replaces login"], 1, "Authentication confirms who you are; authorization determines what you can do.", "Hard"),
-                _question_item("dev-hard-4", "Data", "What is JSON?", ["A styling language", "A lightweight data format", "A database engine", "A browser API"], 1, "JSON is commonly used for structured data exchange.", "Hard"),
-                _question_item("dev-hard-5", "Architecture", "What is MVC architecture?", ["Model-View-Controller", "Module-View-Cache", "Main-Value-Control", "Markup-Variable-Component"], 0, "MVC separates data, presentation, and control logic.", "Hard"),
-                _question_item("dev-hard-6", "Databases", "Explain database indexing in one line.", ["It duplicates all data", "It speeds up lookups at storage and write-cost tradeoffs", "It removes tables", "It encrypts requests"], 1, "Indexes improve read performance by avoiding full table scans.", "Hard"),
-                _question_item("dev-hard-7", "Scalability", "What is load balancing?", ["Storing passwords", "Distributing traffic across multiple servers", "Compressing responses", "Caching DNS only"], 1, "Load balancers spread requests across healthy instances.", "Hard"),
-                _question_item("dev-hard-8", "DevOps", "Why is CORS important?", ["It compresses assets", "It controls cross-origin browser requests", "It encrypts databases", "It manages Docker images"], 1, "CORS protects browsers by controlling cross-origin access.", "Hard"),
-                _question_item("dev-hard-9", "Backend", "What is the purpose of caching in web applications?", ["Make every request slower", "Reduce repeated computation and latency", "Replace authentication", "Remove database tables"], 1, "Caching stores reusable results to improve speed.", "Hard"),
-                _question_item("dev-hard-10", "API Design", "What does idempotency mean for an API operation?", ["Each call creates a different result", "Repeated calls produce the same effect", "The API is offline", "It only supports GET"], 1, "Idempotent operations can be repeated without changing the final state.", "Hard"),
-            ],
-            "advanced": [
-                _question_item("dev-advanced-1", "System Design", "Design a URL shortener like bit.ly. What is the main scaling concern?", ["UI animation", "Unique code generation and redirect throughput", "Color themes", "Local storage only"], 1, "Shorteners need compact IDs, fast lookup, and high redirect availability.", "Advanced"),
-                _question_item("dev-advanced-2", "System Design", "How would you design a scalable chat system?", ["Use a single file server", "Use real-time messaging, fanout, and message persistence", "Avoid databases", "Send only emails"], 1, "Chat systems need low-latency delivery, storage, and presence handling.", "Advanced"),
-                _question_item("dev-advanced-3", "Distributed Systems", "Explain the CAP theorem.", ["Cache, API, Performance", "Consistency, Availability, Partition tolerance", "Control, Auth, Proxy", "Code, Analyze, Push"], 1, "A distributed system can only fully guarantee two of the three under partition.", "Advanced"),
-                _question_item("dev-advanced-4", "Concurrency", "How do you handle race conditions?", ["Ignore them", "Use synchronization or atomic operations", "Remove HTTP", "Use more CSS"], 1, "Concurrency controls prevent conflicting updates.", "Advanced"),
-                _question_item("dev-advanced-5", "Reliability", "What is a rate limiter used for?", ["Increase image size", "Control request volume and protect services", "Create database tables", "Generate HTML"], 1, "Rate limiters prevent abuse and stabilize traffic.", "Advanced"),
-                _question_item("dev-advanced-6", "Architecture", "What is the role of an API gateway?", ["Render CSS", "Route, secure, and observe backend services", "Store logs only", "Replace DNS"], 1, "API gateways centralize routing, auth, and policies.", "Advanced"),
-                _question_item("dev-advanced-7", "Messaging", "When would you choose WebSockets over normal HTTP polling?", ["For one-time static pages", "For persistent bi-directional communication", "Only for file uploads", "Only for database queries"], 1, "WebSockets are suited for real-time bidirectional updates.", "Advanced"),
-                _question_item("dev-advanced-8", "Data", "What is sharding in databases?", ["Merging tables", "Horizontal partitioning of data", "Encrypting columns", "Index compression"], 1, "Sharding splits data across multiple machines.", "Advanced"),
-                _question_item("dev-advanced-9", "Performance", "What is the tradeoff when using denormalization?", ["Less redundancy but slower reads", "More redundancy but faster reads", "No database needed", "No schema changes"], 1, "Denormalization often improves read speed at the cost of duplication.", "Advanced"),
-                _question_item("dev-advanced-10", "Reliability", "How do retries relate to idempotency?", ["Retries are safe only when operations are idempotent", "Retries always fail", "Idempotency removes the need for retries", "They are unrelated"], 0, "Safe retries depend on the operation not changing state unexpectedly.", "Advanced"),
-            ],
-        },
-    }
-
     def _normalize_ai_question(item: Dict[str, Any], index: int) -> Optional[Dict[str, Any]]:
         if not isinstance(item, dict):
             return None
@@ -1222,13 +1177,23 @@ async def generate_quiz_questions(
 
         cleaned_options: List[str] = []
         correct_answer = ""
+        flagged_correct = 0
         for option in options:
             if isinstance(option, dict):
                 option_text = str(option.get("text", "")).strip()
                 if option_text:
                     cleaned_options.append(option_text)
-                    if option.get("is_correct") and not correct_answer:
-                        correct_answer = option_text
+                    if option.get("is_correct"):
+                        flagged_correct += 1
+                        if not correct_answer:
+                            correct_answer = option_text
+
+        # Require exactly one correct option and unique options.
+        if flagged_correct != 1:
+            return None
+
+        if len(set(opt.lower() for opt in cleaned_options)) < 4:
+            return None
 
         if len(cleaned_options) < 4:
             return None
@@ -1240,27 +1205,26 @@ async def generate_quiz_questions(
             correct_answer = cleaned_options[0]
 
         correct_index = cleaned_options.index(correct_answer)
+        model_difficulty = str(item.get("difficulty", "")).strip().title()
+        if adaptive_mode:
+            if index < max(1, normalized_count // 3):
+                model_difficulty = "Easy"
+            elif index < max(2, (2 * normalized_count) // 3):
+                model_difficulty = "Hard"
+            else:
+                model_difficulty = "Advanced"
+        elif model_difficulty not in {"Easy", "Hard", "Advanced"}:
+            model_difficulty = difficulty_value
+
         return _question_item(
-            str(item.get("id", f"ai-{index + 1}")),
+            str(item.get("id", f"quiz-{difficulty_key}-{index + 1}")),
             str(item.get("topic", topic or domain)).strip() or (topic or domain),
             question_text,
             cleaned_options[:4],
             correct_index,
             str(item.get("explanation", "Review the underlying concept and compare each option." )).strip(),
-            str(item.get("difficulty", difficulty)).strip() or difficulty,
+            model_difficulty,
         )
-
-    def _build_fallback_questions() -> List[Dict[str, Any]]:
-        pool = fallback_banks.get(domain_key, fallback_banks["development"])
-        selected = pool.get(difficulty_key, pool["hard"])
-        questions_out: List[Dict[str, Any]] = []
-        for index, item in enumerate(selected[:normalized_count]):
-            question = dict(item)
-            question["id"] = f"{domain_key}-{difficulty_key}-{index + 1}"
-            question["topic"] = topic or question.get("topic", domain)
-            question["difficulty"] = difficulty.title() if difficulty else question.get("difficulty", "Hard")
-            questions_out.append(question)
-        return questions_out
 
     def _dedupe_questions(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         unique_items: List[Dict[str, Any]] = []
@@ -1273,13 +1237,11 @@ async def generate_quiz_questions(
             unique_items.append(item)
         return unique_items
 
-    # Deterministic question bank is the primary source so section + difficulty
-    # selections always produce distinct quiz sets.
-    fallback_questions = _build_fallback_questions()
-
-    # Keep the AI prompt as an optional enrichment path only if the bank is too small.
-    if len(fallback_questions) >= normalized_count:
-        return fallback_questions[:normalized_count]
+    difficulty_instruction = (
+        "Use progression order: first Easy, then Hard, then Advanced across the quiz."
+        if adaptive_mode
+        else f"All questions must be {difficulty_value}."
+    )
 
     prompt = f"""Generate exactly {normalized_count} {difficulty} quiz questions for domain: {domain}.
 
@@ -1298,9 +1260,11 @@ Roadmap context (followed/planned):
 Rules:
 1) Questions must be practical and aligned to resume gaps + JD requirements.
 2) Return MCQ only, 4 options each, one correct answer.
-3) Difficulty must match: {difficulty}.
-4) Avoid repetition.
+3) Difficulty policy: {difficulty_instruction}
+4) Avoid repetition at all costs.
 5) Keep question text crisp and interview-relevant.
+6) Questions must be different for different resume/JD/roadmap inputs.
+7) Mark exactly one option as correct and keep correct_answer consistent with that option.
 
 Return ONLY JSON array. For each object use keys:
 - id
@@ -1313,14 +1277,29 @@ Return ONLY JSON array. For each object use keys:
 - explanation
 """
 
+    compact_prompt = f"""Create {normalized_count} unique MCQ questions in STRICT JSON array.
+
+Context:
+- Domain: {domain}
+- Difficulty policy: {difficulty_instruction}
+- Resume: {resume_text[:500]}
+- JD: {jd_text[:500]}
+- Roadmap: {chr(10).join(roadmap_snippets[:6]) if roadmap_snippets else 'No roadmap'}
+
+Each question object must include:
+id, topic, difficulty, question_type, question, options(4 with exactly one is_correct=true), correct_answer, explanation.
+No repeated questions.
+No generic boilerplate.
+Return JSON array only."""
+
     messages = [
         {"role": "system", "content": "You are an expert technical interviewer creating highly relevant adaptive quizzes."},
         {"role": "user", "content": prompt},
     ]
 
     try:
-        response = await call_oxlo_chat(messages, temperature=0.6, max_tokens=3500)
-        parsed = json.loads(response)
+        response = await call_quiz_chat(messages, temperature=0.7, max_tokens=2200)
+        parsed = json.loads(_extract_json_block(response))
         if isinstance(parsed, list):
             normalized_questions: List[Dict[str, Any]] = []
             for index, item in enumerate(parsed):
@@ -1331,10 +1310,27 @@ Return ONLY JSON array. For each object use keys:
             normalized_questions = _dedupe_questions(normalized_questions)
             if len(normalized_questions) >= normalized_count:
                 return normalized_questions[:normalized_count]
-    except Exception:
-        pass
+    except Exception as first_error:
+        try:
+            retry_messages = [
+                {"role": "system", "content": "You are an expert technical interviewer creating highly relevant adaptive quizzes."},
+                {"role": "user", "content": compact_prompt},
+            ]
+            retry_response = await call_quiz_chat(retry_messages, temperature=0.6, max_tokens=1400)
+            retry_parsed = json.loads(_extract_json_block(retry_response))
+            if isinstance(retry_parsed, list):
+                normalized_questions = []
+                for index, item in enumerate(retry_parsed):
+                    normalized = _normalize_ai_question(item, index)
+                    if normalized:
+                        normalized_questions.append(normalized)
+                normalized_questions = _dedupe_questions(normalized_questions)
+                if len(normalized_questions) >= normalized_count:
+                    return normalized_questions[:normalized_count]
+        except Exception as retry_error:
+            raise AIServiceError("quiz_generation", f"Quiz generation failed: {str(first_error)} | Retry failed: {str(retry_error)}") from retry_error
 
-    return fallback_questions[:normalized_count]
+    raise AIServiceError("quiz_generation", "Quiz generation returned insufficient unique validated questions from model")
 
 
 async def evaluate_quiz_answer(question: str, correct_answer: str, user_answer: str) -> Dict:
@@ -1747,10 +1743,40 @@ def _extract_json_block(text: str) -> str:
         cleaned = cleaned[:-3]
     cleaned = cleaned.strip()
 
-    start = cleaned.find("{")
-    end = cleaned.rfind("}")
-    if start != -1 and end != -1 and end > start:
-        return cleaned[start:end + 1]
+    # Extract the first balanced JSON payload (array or object).
+    starts = [i for i in [cleaned.find("{"), cleaned.find("[")] if i != -1]
+    if starts:
+        start = min(starts)
+        opening = cleaned[start]
+        closing = "}" if opening == "{" else "]"
+        depth = 0
+        in_string = False
+        escaped = False
+
+        for i in range(start, len(cleaned)):
+            ch = cleaned[i]
+            if in_string:
+                if escaped:
+                    escaped = False
+                    continue
+                if ch == "\\":
+                    escaped = True
+                    continue
+                if ch == '"':
+                    in_string = False
+                continue
+
+            if ch == '"':
+                in_string = True
+                continue
+            if ch == opening:
+                depth += 1
+                continue
+            if ch == closing:
+                depth -= 1
+                if depth == 0:
+                    return cleaned[start:i + 1]
+
     return cleaned
 
 

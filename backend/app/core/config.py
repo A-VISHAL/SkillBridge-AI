@@ -76,6 +76,18 @@ class Settings:
     )
     ROADMAP_MODEL: str = _get_env("ROADMAP_MODEL", "OXLO_ROADMAP_MODEL", default="gpt-oss-20b")
 
+    # Quiz-specific model routing
+    QUIZ_API_KEY: str = _normalize_api_key(
+        _get_env("QUIZ_API_KEY", "OXLO_QUIZ_API_KEY", "OXLO_API_KEY", "OXLO_API_TOKEN")
+    )
+    QUIZ_CHAT_ENDPOINT: str = _get_env(
+        "QUIZ_CHAT_ENDPOINT",
+        "OXLO_QUIZ_CHAT_ENDPOINT",
+        "OXLO_CHAT_ENDPOINT",
+        default="https://api.oxlo.ai/v1/chat/completions",
+    )
+    QUIZ_MODEL: str = _get_env("QUIZ_MODEL", "OXLO_QUIZ_MODEL", default="deepseek-coder-33b")
+
     # Fallback policy: only allow fallback for explicit provider rate limits
     ENABLE_RATE_LIMIT_FALLBACK: bool = _get_env_bool("ENABLE_RATE_LIMIT_FALLBACK", default=True)
 

@@ -75,9 +75,11 @@ const Icon = ({ name, size = 18, color = "currentColor" }) => {
   );
 };
 
-export default function Quiz({ resumeId }) {
+export default function Quiz({ resumeId, jobDescription }) {
   const [topic, setTopic] = useState('Python')
   const [questions, setQuestions] = useState(null)
+  const [generationSource, setGenerationSource] = useState(null)
+  const [generationWarning, setGenerationWarning] = useState('')
   const [loading, setLoading] = useState(false)
   const [selected, setSelected] = useState(null)
   const [showExpl, setShowExpl] = useState(false)
@@ -89,9 +91,13 @@ export default function Quiz({ resumeId }) {
 
   const handleGenerate = async () => {
     setLoading(true)
+    setGenerationSource(null)
+    setGenerationWarning('')
     try {
-      const result = await generateQuiz(topic, 'Medium', 5)
+      const result = await generateQuiz(topic, 'Adaptive', 10, resumeId, jobDescription || '')
       setQuestions(result.questions)
+      setGenerationSource(result.generation_source || null)
+      setGenerationWarning(result.generation_warning || '')
       setCurrentQuestion(0)
       setScore(0)
       setAnswers([])
@@ -166,8 +172,18 @@ export default function Quiz({ resumeId }) {
       <div style={{ marginBottom: 24 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
           <h2 style={{ fontSize: 20, fontWeight: 700, color: "var(--gray-900)", letterSpacing: "-0.04em" }}>Adaptive Quiz</h2>
-          {questions && !quizCompleted && <Badge>Question {currentQuestion + 1} / {questions.length}</Badge>}
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {generationSource && (
+              <Badge>
+                Source: {generationSource === 'model' ? 'Live API model' : 'Fallback quiz'}
+              </Badge>
+            )}
+            {questions && !quizCompleted && <Badge>Question {currentQuestion + 1} / {questions.length}</Badge>}
+          </div>
         </div>
+        {generationWarning && (
+          <p style={{ margin: "4px 0 8px", fontSize: 12, color: "#b45309" }}>{generationWarning}</p>
+        )}
         {questions && !quizCompleted && (
           <div style={{ height: 4, background: "var(--gray-100)", borderRadius: 99 }}>
             <div style={{ height: "100%", borderRadius: 99, width: `${((currentQuestion + 1) / questions.length) * 100}%`, background: "var(--gray-700)", transition: "width 0.4s ease" }}/>

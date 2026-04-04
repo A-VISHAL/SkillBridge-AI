@@ -2647,8 +2647,37 @@ const Quiz = ({ resumeId, resumeData, jobDescription, onQuizComplete }) => {
                 <div style={{ fontSize: 13.5, fontWeight: 650, color: "var(--gray-900)", marginBottom: 6 }}>{item.title}</div>
                 <div style={{ fontSize: 12.5, color: "var(--gray-600)", lineHeight: 1.55, marginBottom: 8 }}>{item.what_to_study}</div>
                 {Array.isArray(item.resources) && item.resources.length > 0 && (
-                  <div style={{ fontSize: 11.5, color: "var(--gray-500)", lineHeight: 1.5 }}>
-                    {item.resources.slice(0, 3).join(" • ")}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    {item.resources.slice(0, 3).map((resource, rIndex) => {
+                      const resourceLabel = typeof resource === "string" ? resource : (resource?.label || resource?.url || `Resource ${rIndex + 1}`);
+                      const resourceUrl = typeof resource === "string" ? "" : (resource?.url || "");
+
+                      if (!resourceUrl) {
+                        return (
+                          <div key={rIndex} style={{ fontSize: 11.5, color: "var(--gray-500)", lineHeight: 1.5 }}>
+                            {resourceLabel}
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <a
+                          key={rIndex}
+                          href={resourceUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{
+                            fontSize: 12,
+                            fontWeight: 600,
+                            color: "#1d4ed8",
+                            textDecoration: "none",
+                            lineHeight: 1.5,
+                          }}
+                        >
+                          {resourceLabel}
+                        </a>
+                      );
+                    })}
                   </div>
                 )}
               </div>

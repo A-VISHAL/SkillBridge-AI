@@ -5,6 +5,7 @@ import json
 import os
 import uuid
 from datetime import datetime
+from urllib.parse import quote_plus
 
 from app.core.config import settings
 from app.models.schemas import *
@@ -80,6 +81,85 @@ def _build_roadmap_context_from_match(match_data: dict) -> List[dict]:
         })
 
     return tasks
+
+
+def _to_clickable_resource(resource: str, topic: str = "") -> Optional[dict]:
+    value = str(resource or "").strip()
+    if not value:
+        return None
+
+    lowered = value.lower()
+    if lowered.startswith("http://") or lowered.startswith("https://"):
+        return {"label": value, "url": value}
+
+    query = value
+    if topic and topic.lower() not in lowered:
+        query = f"{topic} {value}".strip()
+
+    return {
+        "label": value,
+        "url": f"https://www.google.com/search?q={quote_plus(query)}",
+    }
+
+
+def _build_quiz_study_materials(questions_data: List[dict], roadmap_context: List[dict]) -> List[dict]:
+    """Create right-panel study materials tied to generated quiz topics."""
+    topic_order: List[str] = []
+    for item in questions_data or []:
+        if not isinstance(item, dict):
+            continue
+        topic = str(item.get("topic", "")).strip()
+        if topic and topic.lower() not in {t.lower() for t in topic_order}:
+            topic_order.append(topic)
+
+    materials: List[dict] = []
+    for idx, topic in enumerate(topic_order[:8], start=1):
+        topic_l = topic.lower()
+        matched_task = None
+        for task in roadmap_context or []:
+            skill = str(task.get("skill", "")).strip().lower()
+            if skill and (skill in topic_l or topic_l in skill):
+                matched_task = task
+                break
+
+        if matched_task:
+            raw_resources = matched_task.get("resources", [])
+            what_to_study = str(matched_task.get("task", f"Practice {topic} with one interview-focused exercise.")).strip()
+        else:
+            raw_resources = [
+                f"{topic} official documentation",
+                f"{topic} interview questions",
+                f"{topic} hands-on tutorial",
+            ]
+            what_to_study = f"Review core {topic} concepts, then solve one practical implementation problem."
+
+        clickable_resources: List[dict] = []
+        for raw in raw_resources[:3]:
+            resource = _to_clickable_resource(str(raw), topic)
+            if resource:
+                clickable_resources.append(resource)
+
+        materials.append({
+            "week": idx,
+            "title": topic,
+            "what_to_study": what_to_study,
+            "resources": clickable_resources,
+        })
+
+    if materials:
+        return materials
+
+    # Fallback if model omitted topic labels.
+    return [{
+        "week": 1,
+        "title": "Core Revision",
+        "what_to_study": "Review key quiz areas and retry weak questions.",
+        "resources": [
+            _to_clickable_resource("technical interview preparation"),
+            _to_clickable_resource("problem solving patterns"),
+            _to_clickable_resource("coding practice roadmap"),
+        ],
+    }]
 
 # ============ Health & Status ============
 
@@ -496,25 +576,7 @@ async def generate_quiz(
         
         questions = [QuizQuestion(**q) for q in questions_data]
 
-        study_materials = []
-        if roadmap_context:
-            by_week = {}
-            for task in roadmap_context:
-                week = int(task.get("week", 0) or 0)
-                if week <= 0:
-                    continue
-                if week not in by_week:
-                    by_week[week] = []
-                by_week[week].append(task)
-
-            for week in sorted(by_week.keys())[:12]:
-                task = by_week[week][0]
-                study_materials.append({
-                    "week": week,
-                    "title": task.get("skill", f"Week {week} Focus"),
-                    "what_to_study": task.get("task", "Review roadmap task"),
-                    "resources": task.get("resources", [])[:3],
-                })
+        study_materials = _build_quiz_study_materials(questions_data, roadmap_context)
 
         rules = [
             "Read every question carefully before selecting an answer.",
@@ -527,6 +589,7 @@ async def generate_quiz(
         return {
             "domain": domain,
             "difficulty": difficulty,
+            "generation_source": "model",
             "passing_percentage": 80,
             "rules": rules,
             "study_materials": study_materials,
