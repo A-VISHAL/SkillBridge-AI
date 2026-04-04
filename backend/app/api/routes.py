@@ -261,10 +261,7 @@ async def match_jd(
 ):
     """Match resume to job description with focus areas"""
     try:
-        if resume_id not in resume_store:
-            raise HTTPException(404, "Resume not found")
-        
-        resume = resume_store[resume_id]
+        resume = _get_resume_or_404(resume_id)
         
         # Match with AI
         match_data = await ai_service.match_resume_to_jd(
@@ -323,10 +320,7 @@ async def analyze_skill_gap(
 ):
     """Analyze skill gaps"""
     try:
-        if resume_id not in resume_store:
-            raise HTTPException(404, "Resume not found")
-        
-        resume = resume_store[resume_id]
+        resume = _get_resume_or_404(resume_id)
         match_data = await ai_service.match_resume_to_jd(
             resume.raw_text,
             job_description,

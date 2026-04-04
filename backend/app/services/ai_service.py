@@ -273,6 +273,114 @@ def _infer_required_skills(jd_text: str, target_role: str) -> List[str]:
     return ROLE_DEFAULT_SKILLS["software engineer"]
 
 
+def _build_jd_match_fallback(
+    resume_text: str,
+    jd_text: str,
+    resume_data: Optional[Dict[str, Any]],
+    reason: str,
+) -> Dict[str, Any]:
+    required_skills = _infer_required_skills(jd_text, "software engineer")
+    resume_skill_set = set(_extract_skills(resume_text))
+
+    if isinstance(resume_data, dict):
+        for skill in resume_data.get("skills", []):
+            if isinstance(skill, dict) and skill.get("name"):
+                resume_skill_set.add(str(skill.get("name")).strip())
+
+    matched_skills = [skill for skill in required_skills if skill in resume_skill_set]
+    missing_skills = [skill for skill in required_skills if skill not in resume_skill_set]
+
+    resume_lower = (resume_text or "").lower()
+    jd_lower = (jd_text or "").lower()
+    keyword_hits = sum(1 for skill in required_skills if skill.lower() in jd_lower and skill.lower() in resume_lower)
+    keyword_ratio = keyword_hits / max(1, len(required_skills))
+
+    skills_ratio = len(matched_skills) / max(1, len(required_skills))
+    experience_score = min(20.0, _extract_candidate_years(resume_text, resume_data) * 4.0)
+    education_score = _education_score(resume_data, jd_text)
+    project_score = _project_relevance_score(required_skills, resume_text, resume_data)
+    quality_score = _resume_quality_score(resume_text)
+
+    match_percentage = round(
+        min(
+            100.0,
+            max(
+                18.0,
+                (skills_ratio * 42.0)
+                + (keyword_ratio * 18.0)
+                + experience_score
+                + education_score
+                + project_score
+                + quality_score,
+            ),
+        ),
+        1,
+    )
+
+    focus_candidates = missing_skills[:5]
+    if len(focus_candidates) < 5:
+        for skill in required_skills:
+            if skill not in focus_candidates:
+                focus_candidates.append(skill)
+            if len(focus_candidates) >= 5:
+                break
+
+    focus_areas = []
+    priority_map = ["HIGH", "HIGH", "MEDIUM", "MEDIUM", "LOW"]
+    study_map = ["2-3 days", "3-5 days", "1 week", "1 week", "1-2 weeks"]
+    for index, skill in enumerate(focus_candidates[:5]):
+        focus_areas.append({
+            "skill": skill,
+            "priority": priority_map[index],
+            "weight": float(max(8, 30 - index * 4)),
+            "reason": (
+                f"{skill} is not strongly represented in your extracted resume data and is important in the JD."
+                if skill in missing_skills
+                else f"{skill} appears in the JD and should be reinforced with stronger evidence."
+            ),
+            "study_time": study_map[index],
+        })
+
+    suggestions = [
+        f"Add stronger evidence for {focus_areas[0]['skill']} in your summary, skills, and project bullets.",
+        "Mirror the JD wording naturally in your experience and project descriptions.",
+        "Add one project bullet with measurable impact, scale, or performance improvements.",
+        "Convert weak areas into explicit accomplishments with metrics, tools, and outcomes.",
+    ]
+
+    strengths = []
+    if matched_skills:
+        strengths.append(f"Resume already demonstrates {', '.join(matched_skills[:3])}")
+    if education_score >= 7:
+        strengths.append("Education background aligns reasonably with the target role")
+    if experience_score >= 10:
+        strengths.append("Experience depth is relevant for the role")
+
+    weaknesses = []
+    if missing_skills:
+        weaknesses.append(f"Missing or weak coverage for {', '.join(missing_skills[:4])}")
+    if project_score < 9:
+        weaknesses.append("Projects need stronger alignment with JD requirements")
+    if quality_score < 6:
+        weaknesses.append("Resume structure can be improved for ATS readability")
+
+    hire_probability = "High" if match_percentage >= 80 else "Medium" if match_percentage >= 60 else "Low"
+
+    return {
+        "match_percentage": match_percentage,
+        "hire_probability": hire_probability,
+        "matched_skills": matched_skills,
+        "missing_skills": missing_skills,
+        "focus_areas": focus_areas,
+        "interview_topics": [skill for skill in focus_candidates[:4]] + ["Projects", "System Design"],
+        "strengths": strengths or ["Resume data parsed successfully"],
+        "weaknesses": weaknesses or ["Live JD model temporarily unavailable"],
+        "suggestions": suggestions,
+        "source": "jd_structured_fallback",
+        "warning": reason,
+    }
+
+
 class AIServiceError(Exception):
     def __init__(self, code: str, message: str):
         super().__init__(message)
@@ -656,31 +764,7 @@ Return JSON with keys: match_percentage, hire_probability, matched_skills, missi
             should_fallback = True
         if not should_fallback:
             raise
-        # Fallback for provider-unavailable cases (rate limit/auth/network/etc.).
-        return {
-            "match_percentage": 62,
-            "hire_probability": "Medium",
-            "matched_skills": ["Communication", "Problem Solving"],
-            "missing_skills": ["Role-specific keywords from JD"],
-            "focus_areas": [
-                {
-                    "skill": "JD keyword alignment",
-                    "priority": "HIGH",
-                    "weight": 35,
-                    "reason": "JD model rate limit reached, showing temporary fallback analysis.",
-                    "study_time": "2-3 days",
-                }
-            ],
-            "interview_topics": ["Core fundamentals", "Project deep-dive"],
-            "strengths": ["Resume data parsed successfully"],
-            "weaknesses": ["Live JD model temporarily unavailable"],
-            "suggestions": [
-                "Prioritize high-weight JD keywords in resume summary and skills section",
-                "Add one project that directly demonstrates missing core requirements",
-            ],
-            "source": "jd_model_unavailable_fallback",
-            "warning": str(e),
-        }
+        return _build_jd_match_fallback(resume_text, jd_text, resume_data, str(e))
 
     try:
         parsed = json.loads(_extract_json_block(response))

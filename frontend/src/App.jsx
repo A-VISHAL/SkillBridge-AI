@@ -2101,7 +2101,12 @@ const JDMatcher = ({ resumeId, onJobMatched }) => {
       }
     } catch (e) {
       console.error(e);
-      setError("Could not analyze JD match with real data. Please check API key/config and try again.");
+      const message = e?.message || "";
+      if (message.includes("Resume not found")) {
+        setError("Resume not found. Upload your resume again, then retry JD matching.");
+      } else {
+        setError(message || "Could not analyze JD match with real data. Please try again.");
+      }
       setMatchResult(null);
     } finally {
       setLoading(false);
