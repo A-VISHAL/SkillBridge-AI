@@ -539,8 +539,366 @@ export function AdminDashboard({ onLogout }) {
             )}
 
             {active === 'summary' && (
-              <motion.div key="summary" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+              <motion.div key="summary" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
                 <SectionShell title="Executive Summary" subtitle="Comprehensive overview of student performance, eligibility, and placement readiness.">
+                  
+                  {/* Key Performance Indicators */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
+                    <motion.div 
+                      whileHover={{ y: -4 }}
+                      style={{ 
+                        ...metricStyle, 
+                        padding: 28,
+                        background: 'linear-gradient(135deg, rgba(34,197,94,0.15) 0%, rgba(34,197,94,0.05) 100%)',
+                        borderColor: 'rgba(34,197,94,0.3)',
+                        position: 'relative',
+                        overflow: 'hidden'
+                      }}
+                    >
+                      <div style={{ position: 'absolute', top: -20, right: -20, width: 100, height: 100, borderRadius: '50%', background: 'radial-gradient(circle, rgba(34,197,94,0.2), transparent)', filter: 'blur(30px)' }} />
+                      <div style={{ position: 'relative', zIndex: 1 }}>
+                        <div style={{ fontSize: 11, color: '#86efac', marginBottom: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Placement Ready</div>
+                        <div style={{ fontSize: 48, fontWeight: 900, color: '#22c55e', lineHeight: 1, marginBottom: 8 }}>
+                          {placementReadiness}%
+                        </div>
+                        <div style={{ fontSize: 13, color: '#b4c3d9', fontWeight: 500 }}>
+                          {eligibilityBreakdown.totalEligible} of {totalStudents} students eligible
+                        </div>
+                      </div>
+                    </motion.div>
+
+                    <motion.div 
+                      whileHover={{ y: -4 }}
+                      style={{ 
+                        ...metricStyle, 
+                        padding: 28,
+                        background: 'linear-gradient(135deg, rgba(56,189,248,0.15) 0%, rgba(56,189,248,0.05) 100%)',
+                        borderColor: 'rgba(56,189,248,0.3)',
+                        position: 'relative',
+                        overflow: 'hidden'
+                      }}
+                    >
+                      <div style={{ position: 'absolute', top: -20, right: -20, width: 100, height: 100, borderRadius: '50%', background: 'radial-gradient(circle, rgba(56,189,248,0.2), transparent)', filter: 'blur(30px)' }} />
+                      <div style={{ position: 'relative', zIndex: 1 }}>
+                        <div style={{ fontSize: 11, color: '#7dd3fc', marginBottom: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Avg ATS Score</div>
+                        <div style={{ fontSize: 48, fontWeight: 900, color: '#38bdf8', lineHeight: 1, marginBottom: 8 }}>
+                          {Math.round(averageAts)}
+                        </div>
+                        <div style={{ fontSize: 13, color: '#b4c3d9', fontWeight: 500 }}>
+                          Top score: {totalStudents ? Math.max(...students.map(s => Number(s.ats_score || 0))) : 0}
+                        </div>
+                      </div>
+                    </motion.div>
+
+                    <motion.div 
+                      whileHover={{ y: -4 }}
+                      style={{ 
+                        ...metricStyle, 
+                        padding: 28,
+                        background: 'linear-gradient(135deg, rgba(139,92,246,0.15) 0%, rgba(139,92,246,0.05) 100%)',
+                        borderColor: 'rgba(139,92,246,0.3)',
+                        position: 'relative',
+                        overflow: 'hidden'
+                      }}
+                    >
+                      <div style={{ position: 'absolute', top: -20, right: -20, width: 100, height: 100, borderRadius: '50%', background: 'radial-gradient(circle, rgba(139,92,246,0.2), transparent)', filter: 'blur(30px)' }} />
+                      <div style={{ position: 'relative', zIndex: 1 }}>
+                        <div style={{ fontSize: 11, color: '#c4b5fd', marginBottom: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Avg CGPA</div>
+                        <div style={{ fontSize: 48, fontWeight: 900, color: '#8b5cf6', lineHeight: 1, marginBottom: 8 }}>
+                          {totalStudents ? (students.reduce((sum, s) => sum + Number(s.cgpa || 0), 0) / totalStudents).toFixed(2) : '0.00'}
+                        </div>
+                        <div style={{ fontSize: 13, color: '#b4c3d9', fontWeight: 500 }}>
+                          Across all students
+                        </div>
+                      </div>
+                    </motion.div>
+
+                    <motion.div 
+                      whileHover={{ y: -4 }}
+                      style={{ 
+                        ...metricStyle, 
+                        padding: 28,
+                        background: 'linear-gradient(135deg, rgba(245,158,11,0.15) 0%, rgba(245,158,11,0.05) 100%)',
+                        borderColor: 'rgba(245,158,11,0.3)',
+                        position: 'relative',
+                        overflow: 'hidden'
+                      }}
+                    >
+                      <div style={{ position: 'absolute', top: -20, right: -20, width: 100, height: 100, borderRadius: '50%', background: 'radial-gradient(circle, rgba(245,158,11,0.2), transparent)', filter: 'blur(30px)' }} />
+                      <div style={{ position: 'relative', zIndex: 1 }}>
+                        <div style={{ fontSize: 11, color: '#fcd34d', marginBottom: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Job Openings</div>
+                        <div style={{ fontSize: 48, fontWeight: 900, color: '#f59e0b', lineHeight: 1, marginBottom: 8 }}>
+                          {activeJobs}
+                        </div>
+                        <div style={{ fontSize: 13, color: '#b4c3d9', fontWeight: 500 }}>
+                          Active opportunities
+                        </div>
+                      </div>
+                    </motion.div>
+                  </div>
+
+                  {/* Insights Grid */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: 20 }}>
+                    {/* Student Overview */}
+                    <div style={{ ...metricStyle, padding: 24, borderLeft: '4px solid #6b93d6' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+                        <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(107,147,214,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>
+                          📊
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 15, fontWeight: 700, color: '#e8eef7' }}>Student Overview</div>
+                          <div style={{ fontSize: 12, color: '#8a9bb5' }}>Current cohort statistics</div>
+                        </div>
+                      </div>
+                      <div style={{ fontSize: 14, color: '#b4c3d9', lineHeight: 1.7 }}>
+                        Tracking <span style={{ color: '#e8eef7', fontWeight: 600 }}>{totalStudents}</span> students with an average ATS score of <span style={{ color: '#e8eef7', fontWeight: 600 }}>{Math.round(averageAts)}</span> and CGPA of <span style={{ color: '#e8eef7', fontWeight: 600 }}>{totalStudents ? (students.reduce((sum, s) => sum + Number(s.cgpa || 0), 0) / totalStudents).toFixed(2) : '0.00'}</span>.
+                      </div>
+                    </div>
+
+                    {/* Eligibility Status */}
+                    <div style={{ ...metricStyle, padding: 24, borderLeft: '4px solid #22c55e' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+                        <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(34,197,94,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>
+                          ✓
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 15, fontWeight: 700, color: '#e8eef7' }}>Eligibility Status</div>
+                          <div style={{ fontSize: 12, color: '#8a9bb5' }}>Placement criteria breakdown</div>
+                        </div>
+                      </div>
+                      <div style={{ fontSize: 14, color: '#b4c3d9', lineHeight: 1.7 }}>
+                        <span style={{ color: '#22c55e', fontWeight: 600 }}>{eligibilityBreakdown.totalEligible}</span> students ({Math.round((eligibilityBreakdown.totalEligible / totalStudents) * 100)}%) meet all criteria. 
+                        CGPA: <span style={{ color: '#e8eef7', fontWeight: 600 }}>{eligibilityBreakdown.cgpaCount}</span>, 
+                        ATS: <span style={{ color: '#e8eef7', fontWeight: 600 }}>{eligibilityBreakdown.atsCount}</span>, 
+                        Skills: <span style={{ color: '#e8eef7', fontWeight: 600 }}>{eligibilityBreakdown.skillsCount}</span>.
+                      </div>
+                    </div>
+
+                    {/* Skills Analysis */}
+                    <div style={{ ...metricStyle, padding: 24, borderLeft: '4px solid #8b5cf6' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+                        <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(139,92,246,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>
+                          🎯
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 15, fontWeight: 700, color: '#e8eef7' }}>Skills Analysis</div>
+                          <div style={{ fontSize: 12, color: '#8a9bb5' }}>Top competencies</div>
+                        </div>
+                      </div>
+                      <div style={{ fontSize: 14, color: '#b4c3d9', lineHeight: 1.7 }}>
+                        {(() => {
+                          const skillCount = {};
+                          students.forEach(student => {
+                            (student.skills || []).forEach(skill => {
+                              const skillName = typeof skill === 'string' ? skill : skill.name;
+                              skillCount[skillName] = (skillCount[skillName] || 0) + 1;
+                            });
+                          });
+                          const topSkills = Object.entries(skillCount).sort((a, b) => b[1] - a[1]).slice(0, 3);
+                          return topSkills.length > 0 
+                            ? `Most common: ${topSkills.map(([skill, count]) => `<span style="color: #e8eef7; font-weight: 600">${skill}</span> (${count})`).join(', ')}.`
+                            : 'No skill data available.';
+                        })().split('<span').map((part, i) => i === 0 ? part : <span key={i} dangerouslySetInnerHTML={{ __html: '<span' + part }} />)}
+                      </div>
+                    </div>
+
+                    {/* Recommendations */}
+                    <div style={{ ...metricStyle, padding: 24, borderLeft: '4px solid #38bdf8' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+                        <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(56,189,248,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>
+                          💡
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 15, fontWeight: 700, color: '#e8eef7' }}>Recommendations</div>
+                          <div style={{ fontSize: 12, color: '#8a9bb5' }}>Action items</div>
+                        </div>
+                      </div>
+                      <div style={{ fontSize: 14, color: '#b4c3d9', lineHeight: 1.7 }}>
+                        {placementReadiness >= 70 && 'Strong placement readiness! Continue monitoring student progress.'}
+                        {placementReadiness < 70 && placementReadiness >= 50 && 'Consider targeted training programs to boost eligibility rates.'}
+                        {placementReadiness < 50 && 'Focus on upskilling and resume workshops to improve placement readiness.'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Analytics Charts */}
+                  <div>
+                    <div style={{ marginBottom: 20 }}>
+                      <h3 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: '#e8eef7', letterSpacing: '-0.02em' }}>Performance Analytics</h3>
+                      <p style={{ margin: '8px 0 0 0', fontSize: 14, color: '#8a9bb5' }}>Visual breakdown of key metrics and distributions</p>
+                    </div>
+                    
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(450px, 1fr))', gap: 20 }}>
+                      {/* Eligibility Breakdown */}
+                      <div style={{ ...metricStyle, padding: 28 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                          <div>
+                            <div style={{ fontSize: 16, fontWeight: 700, color: '#e8eef7' }}>Eligibility Breakdown</div>
+                            <div style={{ fontSize: 12, color: '#8a9bb5', marginTop: 4 }}>Student qualification status</div>
+                          </div>
+                        </div>
+                        <ResponsiveContainer width="100%" height={280}>
+                          <PieChart>
+                            <Pie
+                              data={[
+                                { name: 'Eligible', value: eligibilityBreakdown.totalEligible, fill: '#22c55e' },
+                                { name: 'Not Eligible', value: eligibilityBreakdown.notEligible, fill: '#ef4444' }
+                              ]}
+                              cx="50%"
+                              cy="50%"
+                              innerRadius={70}
+                              outerRadius={100}
+                              paddingAngle={5}
+                              dataKey="value"
+                            >
+                            </Pie>
+                            <Tooltip 
+                              contentStyle={{ 
+                                background: '#1e2a3a', 
+                                border: '1px solid rgba(91,127,196,0.3)', 
+                                borderRadius: 12, 
+                                color: '#e8eef7',
+                                boxShadow: '0 8px 24px rgba(0,0,0,0.3)'
+                              }} 
+                            />
+                          </PieChart>
+                        </ResponsiveContainer>
+                        <div style={{ display: 'flex', justifyContent: 'center', gap: 24, marginTop: 16 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#22c55e' }} />
+                            <span style={{ fontSize: 13, color: '#b4c3d9', fontWeight: 500 }}>Eligible ({eligibilityBreakdown.totalEligible})</span>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#ef4444' }} />
+                            <span style={{ fontSize: 13, color: '#b4c3d9', fontWeight: 500 }}>Not Eligible ({eligibilityBreakdown.notEligible})</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* ATS Distribution */}
+                      <div style={{ ...metricStyle, padding: 28 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                          <div>
+                            <div style={{ fontSize: 16, fontWeight: 700, color: '#e8eef7' }}>ATS Score Distribution</div>
+                            <div style={{ fontSize: 12, color: '#8a9bb5', marginTop: 4 }}>Resume screening performance</div>
+                          </div>
+                        </div>
+                        <ResponsiveContainer width="100%" height={280}>
+                          <BarChart data={chartData}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(91,127,196,0.15)" vertical={false} />
+                            <XAxis 
+                              dataKey="name" 
+                              stroke="#8a9bb5" 
+                              style={{ fontSize: 12 }}
+                              tickLine={false}
+                              axisLine={{ stroke: 'rgba(91,127,196,0.2)' }}
+                            />
+                            <YAxis 
+                              stroke="#8a9bb5" 
+                              style={{ fontSize: 12 }}
+                              tickLine={false}
+                              axisLine={{ stroke: 'rgba(91,127,196,0.2)' }}
+                            />
+                            <Tooltip 
+                              contentStyle={{ 
+                                background: '#1e2a3a', 
+                                border: '1px solid rgba(91,127,196,0.3)', 
+                                borderRadius: 12, 
+                                color: '#e8eef7',
+                                boxShadow: '0 8px 24px rgba(0,0,0,0.3)'
+                              }} 
+                            />
+                            <Bar dataKey="value" radius={[8, 8, 0, 0]}>
+                              {chartData.map((entry, index) => <Cell key={entry.name} fill={colors[index % colors.length]} />)}
+                            </Bar>
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+
+                      {/* CGPA Distribution */}
+                      <div style={{ ...metricStyle, padding: 28 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                          <div>
+                            <div style={{ fontSize: 16, fontWeight: 700, color: '#e8eef7' }}>CGPA Distribution</div>
+                            <div style={{ fontSize: 12, color: '#8a9bb5', marginTop: 4 }}>Academic performance spread</div>
+                          </div>
+                        </div>
+                        <ResponsiveContainer width="100%" height={280}>
+                          <BarChart data={[
+                            { range: '4-5', count: students.filter(s => !isNaN(Number(s.cgpa)) && Number(s.cgpa) >= 4 && Number(s.cgpa) < 5).length },
+                            { range: '5-6', count: students.filter(s => !isNaN(Number(s.cgpa)) && Number(s.cgpa) >= 5 && Number(s.cgpa) < 6).length },
+                            { range: '6-7', count: students.filter(s => !isNaN(Number(s.cgpa)) && Number(s.cgpa) >= 6 && Number(s.cgpa) < 7).length },
+                            { range: '7-8', count: students.filter(s => !isNaN(Number(s.cgpa)) && Number(s.cgpa) >= 7 && Number(s.cgpa) < 8).length },
+                            { range: '8-9', count: students.filter(s => !isNaN(Number(s.cgpa)) && Number(s.cgpa) >= 8 && Number(s.cgpa) < 9).length },
+                            { range: '9-10', count: students.filter(s => !isNaN(Number(s.cgpa)) && Number(s.cgpa) >= 9).length },
+                          ]}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(91,127,196,0.15)" vertical={false} />
+                            <XAxis 
+                              dataKey="range" 
+                              stroke="#8a9bb5" 
+                              style={{ fontSize: 12 }}
+                              tickLine={false}
+                              axisLine={{ stroke: 'rgba(91,127,196,0.2)' }}
+                            />
+                            <YAxis 
+                              stroke="#8a9bb5" 
+                              style={{ fontSize: 12 }}
+                              tickLine={false}
+                              axisLine={{ stroke: 'rgba(91,127,196,0.2)' }}
+                            />
+                            <Tooltip 
+                              contentStyle={{ 
+                                background: '#1e2a3a', 
+                                border: '1px solid rgba(91,127,196,0.3)', 
+                                borderRadius: 12, 
+                                color: '#e8eef7',
+                                boxShadow: '0 8px 24px rgba(0,0,0,0.3)'
+                              }} 
+                            />
+                            <Bar dataKey="count" radius={[8, 8, 0, 0]} fill="#38bdf8" />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+
+                      {/* Skills Gap */}
+                      <div style={{ ...metricStyle, padding: 28 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                          <div>
+                            <div style={{ fontSize: 16, fontWeight: 700, color: '#e8eef7' }}>Skills Gap Analysis</div>
+                            <div style={{ fontSize: 12, color: '#8a9bb5', marginTop: 4 }}>Students lacking required skills</div>
+                          </div>
+                        </div>
+                        <ResponsiveContainer width="100%" height={280}>
+                          <BarChart data={skillGaps}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(91,127,196,0.15)" vertical={false} />
+                            <XAxis 
+                              dataKey="skill" 
+                              stroke="#8a9bb5" 
+                              style={{ fontSize: 12 }}
+                              tickLine={false}
+                              axisLine={{ stroke: 'rgba(91,127,196,0.2)' }}
+                            />
+                            <YAxis 
+                              stroke="#8a9bb5" 
+                              style={{ fontSize: 12 }}
+                              tickLine={false}
+                              axisLine={{ stroke: 'rgba(91,127,196,0.2)' }}
+                            />
+                            <Tooltip 
+                              contentStyle={{ 
+                                background: '#1e2a3a', 
+                                border: '1px solid rgba(91,127,196,0.3)', 
+                                borderRadius: 12, 
+                                color: '#e8eef7',
+                                boxShadow: '0 8px 24px rgba(0,0,0,0.3)'
+                              }} 
+                            />
+                            <Bar dataKey="students" radius={[8, 8, 0, 0]} fill="#8b5cf6" />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+                  </div>
                   
                   {/* Summary Text Insights */}
                   <div style={{ ...metricStyle, padding: 28 }}>
