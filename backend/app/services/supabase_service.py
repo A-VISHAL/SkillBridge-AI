@@ -47,6 +47,27 @@ class SupabaseService:
         except Exception as exc:
             return False, str(exc)
 
+    def get_resume(self, resume_id: str) -> Tuple[bool, Optional[Dict[str, Any]], str]:
+        if not self._client:
+            return False, None, "Supabase is not configured"
+
+        try:
+            response = (
+                self._client
+                .table("resumes")
+                .select("id, parsed_data, raw_text")
+                .eq("id", resume_id)
+                .limit(1)
+                .execute()
+            )
+            rows = getattr(response, "data", None) or []
+            if not rows:
+                return False, None, "Resume not found"
+            row = rows[0]
+            return True, row, ""
+        except Exception as exc:
+            return False, None, str(exc)
+
     def save_resume(
         self,
         resume_id: str,

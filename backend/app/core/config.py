@@ -20,18 +20,52 @@ def _normalize_api_key(value: str) -> str:
         key = key[7:].strip()
     return key
 
+
+def _get_env_bool(*names: str, default: bool = False) -> bool:
+    raw = _get_env(*names, default="")
+    if not raw:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
 class Settings:
     PROJECT_NAME: str = "SkillBridge AI API"
     VERSION: str = "1.0.0"
     DESCRIPTION: str = "Agentic Career Operating System - HackHazards '26"
     
-    # Oxlo API
+    # Backward-compatible Oxlo API settings (legacy)
     OXLO_API_KEY: str = _normalize_api_key(
         _get_env("OXLO_API_KEY", "OXLO_API_TOKEN", "OPENAI_API_KEY", "ANTHROPIC_API_KEY")
     )
     OXLO_CHAT_ENDPOINT: str = _get_env("OXLO_CHAT_ENDPOINT", default="https://api.oxlo.ai/v1/chat/completions")
     OXLO_MODEL: str = _get_env("OXLO_MODEL", default="deepseek r1 8b")
     OXLO_EMBEDDINGS_ENDPOINT: str = os.getenv("OXLO_EMBEDDINGS_ENDPOINT", "https://api.oxlo.ai/v1/embeddings")
+
+    # ATS-specific model routing
+    ATS_API_KEY: str = _normalize_api_key(
+        _get_env("ATS_API_KEY", "OXLO_ATS_API_KEY", "OXLO_API_KEY", "OXLO_API_TOKEN")
+    )
+    ATS_CHAT_ENDPOINT: str = _get_env(
+        "ATS_CHAT_ENDPOINT",
+        "OXLO_ATS_CHAT_ENDPOINT",
+        "OXLO_CHAT_ENDPOINT",
+        default="https://api.oxlo.ai/v1/chat/completions",
+    )
+    ATS_MODEL: str = _get_env("ATS_MODEL", "OXLO_ATS_MODEL", default="deepseek-r1-8b")
+
+    # JD-specific model routing
+    JD_API_KEY: str = _normalize_api_key(
+        _get_env("JD_API_KEY", "OXLO_JD_API_KEY", "OXLO_API_KEY", "OXLO_API_TOKEN")
+    )
+    JD_CHAT_ENDPOINT: str = _get_env(
+        "JD_CHAT_ENDPOINT",
+        "OXLO_JD_CHAT_ENDPOINT",
+        "OXLO_CHAT_ENDPOINT",
+        default="https://api.oxlo.ai/v1/chat/completions",
+    )
+    JD_MODEL: str = _get_env("JD_MODEL", "OXLO_JD_MODEL", default="deepseek-v3.2")
+
+    # Fallback policy: only allow fallback for explicit provider rate limits
+    ENABLE_RATE_LIMIT_FALLBACK: bool = _get_env_bool("ENABLE_RATE_LIMIT_FALLBACK", default=True)
 
     # Supabase
     SUPABASE_URL: str = os.getenv("SUPABASE_URL", "")

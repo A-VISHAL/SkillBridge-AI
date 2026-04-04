@@ -33,10 +33,15 @@ async def startup_event():
     print(f"📚 API Documentation: http://localhost:8000/docs")
     print(f"🔧 Upload directory: {settings.UPLOAD_DIR}")
     
-    if settings.OXLO_API_KEY:
-        print("✅ Oxlo API configured")
+    if settings.ATS_API_KEY:
+        print(f"✅ ATS model route configured ({settings.ATS_MODEL})")
     else:
-        print("⚠️  Oxlo API not configured - using demo mode")
+        print("⚠️  ATS model route not configured")
+
+    if settings.JD_API_KEY:
+        print(f"✅ JD model route configured ({settings.JD_MODEL})")
+    else:
+        print("⚠️  JD model route not configured")
     
     if settings.ADZUNA_APP_ID and settings.ADZUNA_APP_KEY:
         print("✅ Adzuna API configured")

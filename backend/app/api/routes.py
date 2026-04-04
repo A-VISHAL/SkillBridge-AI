@@ -18,40 +18,64 @@ resume_store = {}
 progress_store = {}
 interview_sessions = {}
 
+
+def _get_resume_or_404(resume_id: str) -> ParsedResume:
+    """Resolve resume from in-memory store, sample fallback, or Supabase cache."""
+    if resume_id in resume_store:
+        return resume_store[resume_id]
+
+    if resume_id == "sample_demo":
+        sample = parser.get_sample_resume()
+        resume_store[resume_id] = sample
+        return sample
+
+    if supabase_service.enabled:
+        ok, row, err = supabase_service.get_resume(resume_id)
+        if ok and row:
+            parsed_data = row.get("parsed_data") or {}
+            if isinstance(parsed_data, dict):
+                parsed_data = dict(parsed_data)
+                if not parsed_data.get("raw_text"):
+                    parsed_data["raw_text"] = row.get("raw_text", "")
+                try:
+                    resume = ParsedResume(**parsed_data)
+                    resume_store[resume_id] = resume
+                    return resume
+                except Exception as parse_error:
+                    raise HTTPException(500, f"Resume data is corrupted: {str(parse_error)}")
+
+        if err and err != "Resume not found":
+            raise HTTPException(500, f"Failed to load resume from storage: {err}")
+
+    raise HTTPException(404, "Resume not found. Please upload your resume again.")
+
 # ============ Health & Status ============
 
 @router.get("/api/test-ai")
-async def test_ai_connection():
-    """Test AI API connection"""
-    from app.core.config import settings
-    import httpx
-    
-    if not settings.OXLO_API_KEY:
-        return {"error": "No API key configured"}
-    
+async def test_ai_connection(task: str = "ats"):
+    """Test AI API connection for ATS or JD model route."""
+    normalized_task = (task or "ats").strip().lower()
+    messages = [{"role": "user", "content": "Say 'API is working!'"}]
+
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(
-                settings.OXLO_CHAT_ENDPOINT,
-                headers={
-                    "Authorization": f"Bearer {settings.OXLO_API_KEY}",
-                    "x-api-key": settings.OXLO_API_KEY,
-                    "anthropic-version": "2023-06-01",
-                    "Content-Type": "application/json"
-                },
-                json={
-                    "model": "claude-3-5-sonnet-20241022",
-                    "messages": [{"role": "user", "content": "Say 'API is working!'"}],
-                    "max_tokens": 50
-                }
-            )
-            
+        if normalized_task == "jd":
+            response_text = await ai_service.call_jd_chat(messages, temperature=0.0, max_tokens=60)
             return {
-                "status": response.status_code,
-                "response": response.json() if response.status_code == 200 else response.text
+                "task": "jd",
+                "endpoint": settings.JD_CHAT_ENDPOINT,
+                "model": settings.JD_MODEL,
+                "response": response_text,
             }
+
+        response_text = await ai_service.call_ats_chat(messages, temperature=0.0, max_tokens=60)
+        return {
+            "task": "ats",
+            "endpoint": settings.ATS_CHAT_ENDPOINT,
+            "model": settings.ATS_MODEL,
+            "response": response_text,
+        }
     except Exception as e:
-        return {"error": str(e)}
+        return {"task": normalized_task, "error": str(e)}
 
 @router.get("/health")
 async def health_check():
@@ -144,10 +168,7 @@ async def analyze_resume(
 ):
     """Analyze resume for comprehensive ATS score and insights"""
     try:
-        if resume_id not in resume_store:
-            raise HTTPException(404, "Resume not found")
-        
-        resume = resume_store[resume_id]
+        resume = _get_resume_or_404(resume_id)
         
         # Get comprehensive ATS analysis
         ats_result = await ai_service.calculate_ats_score(
@@ -189,15 +210,20 @@ async def analyze_resume(
             strong_points=ats_result.get("analysis", {}).get("strengths", [])
         )
         
-        # Get bullet improvements
-        improvements_data = await ai_service.improve_resume_bullets(
-            [exp.dict() for exp in resume.experiences],
-            job_description or target_role
-        )
-        
-        bullet_improvements = [
-            BulletImprovement(**imp) for imp in improvements_data[:5]
-        ]
+        # Get bullet improvements.
+        # This should not fail the full ATS analysis response.
+        bullet_improvements: List[BulletImprovement] = []
+        bullet_improvement_error = None
+        try:
+            improvements_data = await ai_service.improve_resume_bullets(
+                [exp.dict() for exp in resume.experiences],
+                job_description or target_role
+            )
+            bullet_improvements = [
+                BulletImprovement(**imp) for imp in improvements_data[:5]
+            ]
+        except Exception as e:
+            bullet_improvement_error = str(e)
         
         result = ResumeAnalysisResult(
             ats_analysis=ats_analysis,
@@ -210,9 +236,19 @@ async def analyze_resume(
         # Add the detailed ATS result to response
         response = result.dict()
         response["detailed_ats_analysis"] = ats_result
+        response["analysis_source"] = {
+            "ats_scoring": ats_result.get("source", "unknown"),
+            "bullet_improvements": "model" if not bullet_improvement_error else "unavailable",
+        }
+        if ats_result.get("fallback_reason"):
+            response["ats_model_warning"] = ats_result.get("fallback_reason")
+        if bullet_improvement_error:
+            response["bullet_improvement_warning"] = bullet_improvement_error
         
         return response
-        
+
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(500, f"Error analyzing resume: {str(e)}")
 
@@ -231,7 +267,11 @@ async def match_jd(
         resume = resume_store[resume_id]
         
         # Match with AI
-        match_data = await ai_service.match_resume_to_jd(resume.raw_text, job_description)
+        match_data = await ai_service.match_resume_to_jd(
+            resume.raw_text,
+            job_description,
+            resume.dict(),
+        )
         
         # Convert to structured format
         focus_areas = [
@@ -246,7 +286,8 @@ async def match_jd(
             focus_areas=focus_areas,
             interview_topics=match_data.get("interview_topics", []),
             strengths=match_data.get("strengths", []),
-            weaknesses=match_data.get("weaknesses", [])
+            weaknesses=match_data.get("weaknesses", []),
+            suggestions=match_data.get("suggestions", []),
         )
 
         # Persist JD + match details to Supabase (best-effort)
@@ -286,7 +327,11 @@ async def analyze_skill_gap(
             raise HTTPException(404, "Resume not found")
         
         resume = resume_store[resume_id]
-        match_data = await ai_service.match_resume_to_jd(resume.raw_text, job_description)
+        match_data = await ai_service.match_resume_to_jd(
+            resume.raw_text,
+            job_description,
+            resume.dict(),
+        )
         
         missing_skills = match_data.get("missing_skills", [])
         
@@ -738,10 +783,7 @@ async def search_jobs(
 ):
     """Search for matching jobs"""
     try:
-        if resume_id not in resume_store:
-            raise HTTPException(404, "Resume not found")
-        
-        resume = resume_store[resume_id]
+        resume = _get_resume_or_404(resume_id)
         
         preferences = {
             "role": role,
@@ -752,7 +794,9 @@ async def search_jobs(
         jobs = await job_service.find_matching_jobs(resume, preferences)
         
         return {"jobs": [job.dict() for job in jobs]}
-        
+
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(500, f"Error searching jobs: {str(e)}")
 

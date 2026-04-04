@@ -53,21 +53,22 @@ Return ONLY the JSON, no other text."""
     try:
         print("=" * 60)
         print("AI PARSER - Starting")
-        print(f"API Endpoint: {settings.OXLO_CHAT_ENDPOINT}")
-        print(f"API Key (first 10 chars): {settings.OXLO_API_KEY[:10]}...")
+        print(f"API Endpoint: {settings.ATS_CHAT_ENDPOINT}")
+        print(f"API Key (first 10 chars): {settings.ATS_API_KEY[:10]}...")
+        print(f"Model: {settings.ATS_MODEL}")
         print(f"Resume text length: {len(resume_text)} chars")
         print("=" * 60)
         
         async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.post(
-                settings.OXLO_CHAT_ENDPOINT,
+                settings.ATS_CHAT_ENDPOINT,
                 headers={
-                    "x-api-key": settings.OXLO_API_KEY,
-                    "anthropic-version": "2023-06-01",
+                    "Authorization": f"Bearer {settings.ATS_API_KEY}",
+                    "x-api-key": settings.ATS_API_KEY,
                     "Content-Type": "application/json"
                 },
                 json={
-                    "model": "claude-3-5-sonnet-20241022",
+                    "model": settings.ATS_MODEL,
                     "messages": [
                         {
                             "role": "user",

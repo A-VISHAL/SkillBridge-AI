@@ -272,109 +272,169 @@ def _infer_required_skills(jd_text: str, target_role: str) -> List[str]:
             return defaults
     return ROLE_DEFAULT_SKILLS["software engineer"]
 
-async def call_oxlo_chat(
+
+class AIServiceError(Exception):
+    def __init__(self, code: str, message: str):
+        super().__init__(message)
+        self.code = code
+
+def _extract_text_from_response_payload(data: Dict[str, Any]) -> Optional[str]:
+    # OpenAI/Oxlo style: {"choices": [{"message": {"content": "..."}}]}
+    choices = data.get("choices")
+    if isinstance(choices, list) and choices:
+        message = choices[0].get("message", {}) if isinstance(choices[0], dict) else {}
+        content = message.get("content", "") if isinstance(message, dict) else ""
+        if isinstance(content, str) and content.strip():
+            return content.strip()
+
+    # Anthropic style: {"content": [{"type": "text", "text": "..."}]}
+    if "content" in data and isinstance(data["content"], list):
+        for block in data["content"]:
+            if isinstance(block, dict) and block.get("type") == "text":
+                text = block.get("text", "").strip()
+                if text:
+                    return text
+
+    if isinstance(data.get("text"), str) and data.get("text").strip():
+        return data.get("text").strip()
+
+    return None
+
+
+async def call_model_chat(
     messages: List[Dict[str, str]],
+    endpoint: str,
+    api_key: str,
+    model: str,
     temperature: float = 0.7,
-    max_tokens: int = 2000
+    max_tokens: int = 2000,
 ) -> str:
-    """Call Oxlo Chat API"""
-    
-    if not settings.OXLO_API_KEY:
-        raise ValueError("OXLO_API_KEY is not configured")
-    
-    endpoint = settings.OXLO_CHAT_ENDPOINT.lower()
-    api_key = settings.OXLO_API_KEY.strip()
+    """Call a chat model endpoint with explicit credentials and model routing."""
+
+    if not api_key:
+        raise AIServiceError("config", "API key is not configured")
+
+    if not endpoint:
+        raise AIServiceError("config", "Chat endpoint is not configured")
+
+    if not model:
+        raise AIServiceError("config", "Model name is not configured")
+
+    api_key = api_key.strip()
     if api_key.lower().startswith("bearer "):
         api_key = api_key[7:].strip()
 
-    # Auto-correct common misconfiguration: Oxlo key with Anthropic endpoint.
-    # Anthropic keys usually start with "sk-ant-"; if not, fallback to Oxlo completions endpoint.
-    actual_endpoint = settings.OXLO_CHAT_ENDPOINT
-    if "anthropic.com" in endpoint and not api_key.startswith("sk-ant-"):
-        actual_endpoint = "https://api.oxlo.ai/v1/chat/completions"
-        endpoint = actual_endpoint.lower()
-
-    def _extract_text(data: Dict[str, Any]) -> Optional[str]:
-        # Anthropic style: {"content": [{"type": "text", "text": "..."}]}
-        if "content" in data and isinstance(data["content"], list):
-            for block in data["content"]:
-                if isinstance(block, dict) and block.get("type") == "text":
-                    text = block.get("text", "").strip()
-                    if text:
-                        return text
-
-        # OpenAI/Oxlo style: {"choices": [{"message": {"content": "..."}}]}
-        choices = data.get("choices")
-        if isinstance(choices, list) and choices:
-            message = choices[0].get("message", {}) if isinstance(choices[0], dict) else {}
-            content = message.get("content", "") if isinstance(message, dict) else ""
-            if isinstance(content, str) and content.strip():
-                return content.strip()
-
-        # Some providers return direct "text"
-        if isinstance(data.get("text"), str) and data.get("text").strip():
-            return data.get("text").strip()
-
-        return None
-
-    # Build both payload styles and try endpoint-compatible flow first, then fallback.
-    anthropic_system = "\n".join([m.get("content", "") for m in messages if m.get("role") == "system"]).strip()
-    anthropic_messages = [m for m in messages if m.get("role") in ("user", "assistant")]
-    if not anthropic_messages:
-        anthropic_messages = [{"role": "user", "content": "Hello"}]
-
-    anthropic_headers = {
-        "Authorization": f"Bearer {api_key}",
-        "x-api-key": api_key,
-        "anthropic-version": "2023-06-01",
-        "Content-Type": "application/json",
-    }
-    anthropic_payload: Dict[str, Any] = {
-        "model": "claude-3-5-sonnet-20241022",
-        "messages": anthropic_messages,
-        "temperature": temperature,
-        "max_tokens": max_tokens,
-    }
-    if anthropic_system:
-        anthropic_payload["system"] = anthropic_system
-
-    openai_headers = {
-        "Authorization": f"Bearer {api_key}",
-        "x-api-key": api_key,
-        "Content-Type": "application/json",
-    }
-    openai_payload = {
-        "model": settings.OXLO_MODEL,
+    # Oxlo-style gateways can reject Authorization header format.
+    # Use API-key style headers first and avoid raw Authorization formats.
+    header_variants = [
+        {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        {
+            "x-api-key": api_key,
+            "Content-Type": "application/json",
+        },
+        {
+            "api-key": api_key,
+            "Content-Type": "application/json",
+        },
+        {
+            "X-API-Key": api_key,
+            "Content-Type": "application/json",
+        },
+    ]
+    payload = {
+        "model": model,
         "messages": messages,
         "temperature": temperature,
         "max_tokens": max_tokens,
     }
 
-    attempts = []
-    if "anthropic" in endpoint:
-        attempts = [(anthropic_headers, anthropic_payload), (openai_headers, openai_payload)]
-    else:
-        attempts = [(openai_headers, openai_payload), (anthropic_headers, anthropic_payload)]
-
-    last_error = ""
+    last_response = None
     async with httpx.AsyncClient(timeout=30.0) as client:
-        for headers, payload in attempts:
+        for headers in header_variants:
             try:
-                response = await client.post(actual_endpoint, headers=headers, json=payload)
-                if response.status_code != 200:
-                    last_error = f"status={response.status_code}, body={response.text[:220]}"
-                    continue
-
-                data = response.json()
-                text = _extract_text(data)
-                if text:
-                    return text
-
-                last_error = f"No textual content in response payload keys={list(data.keys())}"
+                response = await client.post(endpoint, headers=headers, json=payload)
             except Exception as e:
-                last_error = str(e)
+                raise AIServiceError("network", f"AI API request failed: {str(e)}") from e
 
-    raise ValueError(f"AI API request failed: {last_error}")
+            if response.status_code == 200:
+                last_response = response
+                break
+
+            # Retry auth format on auth failures only.
+            if response.status_code in (401, 403):
+                last_response = response
+                continue
+
+            if response.status_code == 429:
+                raise AIServiceError("rate_limit", f"AI API rate limit exceeded: {response.text[:220]}")
+
+            code = "http_error"
+            raise AIServiceError(code, f"AI API request failed: status={response.status_code}, body={response.text[:220]}")
+
+    if not last_response or last_response.status_code != 200:
+        body = last_response.text[:220] if last_response is not None else "No response body"
+        raise AIServiceError("auth", f"AI API request failed: status=401, body={body}")
+
+    try:
+        data = last_response.json()
+    except Exception as e:
+        raise AIServiceError("parse", f"Invalid JSON response from AI API: {str(e)}") from e
+
+    text = _extract_text_from_response_payload(data)
+    if text:
+        return text
+
+    raise AIServiceError("parse", f"No textual content in response payload keys={list(data.keys())}")
+
+
+async def call_ats_chat(
+    messages: List[Dict[str, str]],
+    temperature: float = 0.7,
+    max_tokens: int = 2000,
+) -> str:
+    return await call_model_chat(
+        messages=messages,
+        endpoint=settings.ATS_CHAT_ENDPOINT,
+        api_key=settings.ATS_API_KEY,
+        model=settings.ATS_MODEL,
+        temperature=temperature,
+        max_tokens=max_tokens,
+    )
+
+
+async def call_jd_chat(
+    messages: List[Dict[str, str]],
+    temperature: float = 0.7,
+    max_tokens: int = 2000,
+) -> str:
+    return await call_model_chat(
+        messages=messages,
+        endpoint=settings.JD_CHAT_ENDPOINT,
+        api_key=settings.JD_API_KEY,
+        model=settings.JD_MODEL,
+        temperature=temperature,
+        max_tokens=max_tokens,
+    )
+
+
+def _allow_rate_limit_fallback(error: Exception) -> bool:
+    return (
+        settings.ENABLE_RATE_LIMIT_FALLBACK
+        and isinstance(error, AIServiceError)
+        and error.code == "rate_limit"
+    )
+
+
+async def call_oxlo_chat(
+    messages: List[Dict[str, str]],
+    temperature: float = 0.7,
+    max_tokens: int = 2000,
+) -> str:
+    """Backward-compatible alias; defaults to ATS model routing."""
+    return await call_ats_chat(messages=messages, temperature=temperature, max_tokens=max_tokens)
 
 def _get_fallback_response(messages: List[Dict[str, str]]) -> str:
     """Fallback response when API is not available"""
@@ -417,7 +477,7 @@ Return response in JSON format with keys: ats_score, problems, missing_keywords,
         {"role": "user", "content": prompt}
     ]
     
-    response = await call_oxlo_chat(messages, temperature=0.3)
+    response = await call_ats_chat(messages, temperature=0.3)
     
     try:
         return json.loads(response)
@@ -459,13 +519,15 @@ Return as JSON array with keys: original, improved, reason, impact_score"""
     ]
     
     try:
-        response = await call_oxlo_chat(messages, temperature=0.5)
-    except Exception:
+        response = await call_ats_chat(messages, temperature=0.5)
+    except Exception as e:
+        if not _allow_rate_limit_fallback(e):
+            raise
         return [
             {
                 "original": bullets[0] if bullets else "Worked on projects",
                 "improved": "Built and shipped production features with measurable impact on users and performance.",
-                "reason": "Fallback suggestion generated because AI service authentication failed.",
+                "reason": "Fallback suggestion generated because ATS model rate limit was reached.",
                 "impact_score": 7,
             }
         ]
@@ -482,10 +544,81 @@ Return as JSON array with keys: original, improved, reason, impact_score"""
             }
         ]
 
-async def match_resume_to_jd(resume_text: str, jd_text: str) -> Dict[str, Any]:
+def _build_resume_context_for_jd(resume_text: str, resume_data: Optional[Dict[str, Any]], max_chars: int = 2600) -> str:
+    parts: List[str] = []
+
+    if isinstance(resume_data, dict):
+        skills = [
+            str(skill.get("name", "")).strip()
+            for skill in resume_data.get("skills", [])
+            if isinstance(skill, dict) and str(skill.get("name", "")).strip()
+        ]
+        experiences = [
+            {
+                "title": str(exp.get("title", "")).strip(),
+                "company": str(exp.get("company", "")).strip(),
+                "duration": str(exp.get("duration", "")).strip(),
+            }
+            for exp in resume_data.get("experiences", [])
+            if isinstance(exp, dict)
+        ]
+        projects = [
+            str(project.get("name", "")).strip()
+            for project in resume_data.get("projects", [])
+            if isinstance(project, dict) and str(project.get("name", "")).strip()
+        ]
+        education = [
+            str(edu.get("degree", "")).strip()
+            for edu in resume_data.get("education", [])
+            if isinstance(edu, dict) and str(edu.get("degree", "")).strip()
+        ]
+
+        if skills:
+            parts.append(f"Skills: {', '.join(skills[:20])}")
+        if experiences:
+            exp_summary = "; ".join(
+                f"{item['title']} at {item['company']} ({item['duration']})".strip()
+                for item in experiences[:8]
+                if item.get("title") or item.get("company")
+            )
+            if exp_summary:
+                parts.append(f"Experience: {exp_summary}")
+        if projects:
+            parts.append(f"Projects: {', '.join(projects[:10])}")
+        if education:
+            parts.append(f"Education: {', '.join(education[:5])}")
+
+    raw = (resume_text or "").strip()
+    if raw:
+        parts.append(f"Raw resume excerpt: {raw[:max_chars]}")
+
+    combined = "\n".join(part for part in parts if part).strip()
+    return combined[:max_chars] if combined else raw[:max_chars]
+
+
+def _normalize_model_jd_payload(raw: Dict[str, Any]) -> Dict[str, Any]:
+    if not isinstance(raw, dict):
+        raise ValueError("JD model response must be a JSON object")
+
+    return {
+        "match_percentage": max(0, min(100, float(raw.get("match_percentage", 0)))),
+        "hire_probability": str(raw.get("hire_probability", "Medium")),
+        "matched_skills": raw.get("matched_skills", []) or [],
+        "missing_skills": raw.get("missing_skills", []) or [],
+        "focus_areas": raw.get("focus_areas", []) or [],
+        "interview_topics": raw.get("interview_topics", []) or [],
+        "strengths": raw.get("strengths", []) or [],
+        "weaknesses": raw.get("weaknesses", []) or [],
+        "suggestions": raw.get("suggestions", []) or [],
+    }
+
+
+async def match_resume_to_jd(resume_text: str, jd_text: str, resume_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Match resume to job description with focus areas"""
-    
-    prompt = f"""Analyze this resume against the job description and provide:
+
+    resume_context = _build_resume_context_for_jd(resume_text, resume_data, max_chars=2600)
+
+    prompt = f"""Analyze this resume against the job description and provide STRICT JSON:
 
 1. Match percentage (0-100)
 2. Hire probability (High/Medium/Low)
@@ -500,14 +633,15 @@ async def match_resume_to_jd(resume_text: str, jd_text: str) -> Dict[str, Any]:
 6. Interview topics
 7. Strengths
 8. Weaknesses
+9. Suggestions (top actionable recommendations to improve fit)
 
 Resume:
-{resume_text[:1000]}
+{resume_context}
 
 Job Description:
-{jd_text[:1000]}
+{jd_text[:1800]}
 
-Return as JSON with keys: match_percentage, hire_probability, matched_skills, missing_skills, focus_areas, interview_topics, strengths, weaknesses"""
+Return JSON with keys: match_percentage, hire_probability, matched_skills, missing_skills, focus_areas, interview_topics, strengths, weaknesses, suggestions"""
     
     messages = [
         {"role": "system", "content": "You are an expert technical recruiter and career coach."},
@@ -515,9 +649,14 @@ Return as JSON with keys: match_percentage, hire_probability, matched_skills, mi
     ]
     
     try:
-        response = await call_oxlo_chat(messages, temperature=0.3, max_tokens=3000)
-    except Exception:
-        # Graceful fallback so UI can continue even when external AI auth fails.
+        response = await call_jd_chat(messages, temperature=0.2, max_tokens=2600)
+    except Exception as e:
+        should_fallback = _allow_rate_limit_fallback(e)
+        if isinstance(e, AIServiceError) and e.code in {"auth", "config", "network", "http_error", "parse"}:
+            should_fallback = True
+        if not should_fallback:
+            raise
+        # Fallback for provider-unavailable cases (rate limit/auth/network/etc.).
         return {
             "match_percentage": 62,
             "hire_probability": "Medium",
@@ -528,26 +667,24 @@ Return as JSON with keys: match_percentage, hire_probability, matched_skills, mi
                     "skill": "JD keyword alignment",
                     "priority": "HIGH",
                     "weight": 35,
-                    "reason": "AI service unavailable, unable to score exact technical overlap.",
+                    "reason": "JD model rate limit reached, showing temporary fallback analysis.",
                     "study_time": "2-3 days",
                 }
             ],
             "interview_topics": ["Core fundamentals", "Project deep-dive"],
             "strengths": ["Resume data parsed successfully"],
-            "weaknesses": ["Live AI matching unavailable due to API authentication"],
+            "weaknesses": ["Live JD model temporarily unavailable"],
+            "suggestions": [
+                "Prioritize high-weight JD keywords in resume summary and skills section",
+                "Add one project that directly demonstrates missing core requirements",
+            ],
+            "source": "jd_model_unavailable_fallback",
+            "warning": str(e),
         }
-    
-    try:
-        cleaned = response.strip()
-        if cleaned.startswith("```json"):
-            cleaned = cleaned[7:]
-        if cleaned.startswith("```"):
-            cleaned = cleaned[3:]
-        if cleaned.endswith("```"):
-            cleaned = cleaned[:-3]
-        cleaned = cleaned.strip()
 
-        return json.loads(cleaned)
+    try:
+        parsed = json.loads(_extract_json_block(response))
+        return _normalize_model_jd_payload(parsed)
     except Exception as e:
         raise ValueError(f"Failed to parse AI JD match response: {str(e)}")
 
@@ -1241,7 +1378,7 @@ async def evaluate_interview_answer(question: str, answer: str, expected_keyword
     }
 
 
-async def calculate_ats_score(
+def _calculate_ats_score_rule_based(
     resume_text: str,
     target_role: str = "",
     job_description: str = "",
@@ -1421,3 +1558,213 @@ async def calculate_ats_score(
             ],
         },
     }
+
+
+def _extract_json_block(text: str) -> str:
+    cleaned = (text or "").strip()
+    if cleaned.startswith("```json"):
+        cleaned = cleaned[7:]
+    if cleaned.startswith("```"):
+        cleaned = cleaned[3:]
+    if cleaned.endswith("```"):
+        cleaned = cleaned[:-3]
+    cleaned = cleaned.strip()
+
+    start = cleaned.find("{")
+    end = cleaned.rfind("}")
+    if start != -1 and end != -1 and end > start:
+        return cleaned[start:end + 1]
+    return cleaned
+
+
+def _normalize_model_ats_payload(raw: Dict[str, Any], fallback: Dict[str, Any]) -> Dict[str, Any]:
+    if not isinstance(raw, dict):
+        raise ValueError("ATS model response must be a JSON object")
+
+    merged = dict(fallback)
+    merged.update(raw)
+
+    ats_score = merged.get("ats_score", fallback.get("ats_score", 0))
+    try:
+        ats_score = int(round(float(ats_score)))
+    except Exception:
+        ats_score = int(fallback.get("ats_score", 0))
+    ats_score = max(0, min(100, ats_score))
+
+    score_breakdown = merged.get("score_breakdown", {})
+    if not isinstance(score_breakdown, dict):
+        score_breakdown = {}
+
+    merged_score_breakdown = dict(fallback.get("score_breakdown", {}))
+    merged_score_breakdown.update(score_breakdown)
+
+    suggestions = merged.get("suggestions", {})
+    if not isinstance(suggestions, dict):
+        suggestions = {}
+
+    merged_suggestions = dict(fallback.get("suggestions", {}))
+    merged_suggestions.update(suggestions)
+
+    analysis = merged.get("analysis", {})
+    if not isinstance(analysis, dict):
+        analysis = {}
+
+    merged_analysis = dict(fallback.get("analysis", {}))
+    merged_analysis.update(analysis)
+
+    return {
+        "match_percentage": float(merged.get("match_percentage", ats_score)),
+        "skills_score": float(merged.get("skills_score", fallback.get("skills_score", 0))),
+        "experience_score": float(merged.get("experience_score", fallback.get("experience_score", 0))),
+        "education_score": float(merged.get("education_score", fallback.get("education_score", 0))),
+        "keyword_score": float(merged.get("keyword_score", fallback.get("keyword_score", 0))),
+        "project_score": float(merged.get("project_score", fallback.get("project_score", 0))),
+        "quality_score": float(merged.get("quality_score", fallback.get("quality_score", 0))),
+        "matched_skills": merged.get("matched_skills", fallback.get("matched_skills", [])) or [],
+        "missing_skills": merged.get("missing_skills", fallback.get("missing_skills", [])) or [],
+        "strengths": merged.get("strengths", fallback.get("strengths", [])) or [],
+        "weaknesses": merged.get("weaknesses", fallback.get("weaknesses", [])) or [],
+        "recommendations": merged.get("recommendations", fallback.get("recommendations", [])) or [],
+        "ats_score": ats_score,
+        "score_breakdown": merged_score_breakdown,
+        "matched_keywords": merged.get("matched_keywords", fallback.get("matched_keywords", [])) or [],
+        "missing_keywords": merged.get("missing_keywords", fallback.get("missing_keywords", [])) or [],
+        "analysis": merged_analysis,
+        "suggestions": merged_suggestions,
+        "final_verdict": str(merged.get("final_verdict", fallback.get("final_verdict", "Resume analysis complete"))),
+        "improvement_roadmap": merged.get("improvement_roadmap", fallback.get("improvement_roadmap", {})) or {},
+        "source": "model",
+    }
+
+
+def _build_resume_context_for_ats(
+    resume_text: str,
+    resume_data: Optional[Dict[str, Any]],
+    max_chars: int,
+) -> str:
+    parts: List[str] = []
+
+    if isinstance(resume_data, dict):
+        skills = [
+            str(skill.get("name", "")).strip()
+            for skill in resume_data.get("skills", [])
+            if isinstance(skill, dict) and str(skill.get("name", "")).strip()
+        ]
+        experiences = [
+            str(exp.get("title", "")).strip()
+            for exp in resume_data.get("experiences", [])
+            if isinstance(exp, dict) and str(exp.get("title", "")).strip()
+        ]
+        projects = [
+            str(project.get("name", "")).strip()
+            for project in resume_data.get("projects", [])
+            if isinstance(project, dict) and str(project.get("name", "")).strip()
+        ]
+        education = [
+            str(edu.get("degree", "")).strip()
+            for edu in resume_data.get("education", [])
+            if isinstance(edu, dict) and str(edu.get("degree", "")).strip()
+        ]
+
+        if skills:
+            parts.append(f"Skills: {', '.join(skills[:20])}")
+        if experiences:
+            parts.append(f"Experience titles: {', '.join(experiences[:10])}")
+        if projects:
+            parts.append(f"Projects: {', '.join(projects[:10])}")
+        if education:
+            parts.append(f"Education: {', '.join(education[:5])}")
+
+    raw = (resume_text or "").strip()
+    if raw:
+        parts.append(f"Resume raw excerpt: {raw[:max_chars]}")
+
+    combined = "\n".join(part for part in parts if part).strip()
+    if not combined:
+        combined = raw[:max_chars]
+
+    return combined[:max_chars]
+
+
+async def calculate_ats_score(
+    resume_text: str,
+    target_role: str = "",
+    job_description: str = "",
+    resume_data: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Model-first ATS scoring. Falls back to rule engine only on provider rate limits."""
+
+    fallback = _calculate_ats_score_rule_based(
+        resume_text=resume_text,
+        target_role=target_role,
+        job_description=job_description,
+        resume_data=resume_data,
+    )
+
+    resume_context = _build_resume_context_for_ats(
+        resume_text=resume_text,
+        resume_data=resume_data,
+        max_chars=3200,
+    )
+
+    prompt = (
+        "Analyze this resume for ATS compatibility and return STRICT JSON only.\\n"
+        "The JSON must include these keys:\\n"
+        "ats_score, score_breakdown, analysis, missing_keywords, matched_keywords, matched_skills, missing_skills, suggestions, final_verdict\\n"
+        "where score_breakdown includes: keyword_match, skills_relevance, experience_alignment, education_fit, resume_structure, projects_quality, ats_compatibility.\\n"
+        "analysis includes: strengths (array), weaknesses (array), red_flags (array).\\n"
+        "suggestions includes: improve_keywords (array), add_projects (array), enhance_experience (array), formatting_fixes (array).\\n"
+        f"Target role: {target_role or 'Software Engineer'}\\n"
+        f"Job description: {(job_description or '')[:1500]}\\n"
+        f"Resume text: {resume_context}"
+    )
+
+    messages = [
+        {
+            "role": "system",
+            "content": "You are an expert ATS evaluator. Return only valid JSON with no markdown.",
+        },
+        {"role": "user", "content": prompt},
+    ]
+
+    try:
+        response_text = await call_ats_chat(messages, temperature=0.2, max_tokens=2200)
+        payload = json.loads(_extract_json_block(response_text))
+        return _normalize_model_ats_payload(payload, fallback)
+    except Exception as first_error:
+        # Retry once with an even shorter context for model gateways that reject large/noisy payloads.
+        try:
+            short_context = _build_resume_context_for_ats(
+                resume_text=resume_text,
+                resume_data=resume_data,
+                max_chars=1400,
+            )
+            retry_prompt = (
+                "Return STRICT JSON only with keys: ats_score, score_breakdown, analysis, missing_keywords, matched_keywords, matched_skills, missing_skills, suggestions, final_verdict.\n"
+                f"Target role: {target_role or 'Software Engineer'}\n"
+                f"Job description: {(job_description or '')[:900]}\n"
+                f"Resume text: {short_context}"
+            )
+            retry_messages = [
+                {
+                    "role": "system",
+                    "content": "You are an ATS evaluator. Return only valid JSON and no markdown.",
+                },
+                {"role": "user", "content": retry_prompt},
+            ]
+            retry_text = await call_ats_chat(retry_messages, temperature=0.1, max_tokens=1600)
+            retry_payload = json.loads(_extract_json_block(retry_text))
+            return _normalize_model_ats_payload(retry_payload, fallback)
+        except Exception:
+            e = first_error
+
+        should_fallback = _allow_rate_limit_fallback(e)
+        if isinstance(e, AIServiceError) and e.code in {"auth", "config", "network", "http_error", "parse"}:
+            should_fallback = True
+
+        if should_fallback:
+            fallback_with_reason = dict(fallback)
+            fallback_with_reason["source"] = "rule_engine_model_unavailable"
+            fallback_with_reason["fallback_reason"] = str(e)
+            return fallback_with_reason
+        raise

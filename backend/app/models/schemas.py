@@ -100,6 +100,7 @@ class JDMatchResult(BaseModel):
     interview_topics: List[str]
     strengths: List[str]
     weaknesses: List[str]
+    suggestions: List[str] = []
 
 # ============ Skill Gap & Roadmap Models ============
 

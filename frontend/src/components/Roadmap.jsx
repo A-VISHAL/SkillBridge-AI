@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 const Button = ({ children, active = false, onClick, disabled = false, style = {} }) => (
   <button
@@ -129,6 +129,11 @@ export default function Roadmap({ resumeId, jobDescription, onProgressChange }) 
   const [error, setError] = useState('');
   const [taskProgress, setTaskProgress] = useState({});
   const [showCongrats, setShowCongrats] = useState(false);
+  const onProgressChangeRef = useRef(onProgressChange);
+
+  useEffect(() => {
+    onProgressChangeRef.current = onProgressChange;
+  }, [onProgressChange]);
 
   const fetchRoadmap = async (weeks) => {
     if (!resumeId) {
@@ -217,7 +222,7 @@ export default function Roadmap({ resumeId, jobDescription, onProgressChange }) 
         milestones,
       });
       setTaskProgress({});
-      onProgressChange?.({
+      onProgressChangeRef.current?.({
         generated: true,
         durationWeeks: weeks,
         completedTasks: 0,
@@ -277,7 +282,7 @@ export default function Roadmap({ resumeId, jobDescription, onProgressChange }) 
 
   useEffect(() => {
     if (!roadmap) {
-      onProgressChange?.({
+      onProgressChangeRef.current?.({
         generated: false,
         durationWeeks,
         completedTasks: 0,
@@ -288,7 +293,7 @@ export default function Roadmap({ resumeId, jobDescription, onProgressChange }) 
       return;
     }
 
-    onProgressChange?.({
+    onProgressChangeRef.current?.({
       generated: true,
       durationWeeks,
       completedTasks,
@@ -296,7 +301,7 @@ export default function Roadmap({ resumeId, jobDescription, onProgressChange }) 
       overallProgress,
       updatedAt: new Date().toISOString(),
     });
-  }, [roadmap, durationWeeks, completedTasks, totalTasks, overallProgress, onProgressChange]);
+  }, [roadmap, durationWeeks, completedTasks, totalTasks, overallProgress]);
 
   const toggleTask = (task) => {
     const key = `${task.week}-${task._index}`;

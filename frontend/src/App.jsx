@@ -1564,6 +1564,55 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed }) => {
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef(null);
 
+  const uploadResumeFile = async (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const uploadResponse = await fetch('/api/resume/upload', {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!uploadResponse.ok) {
+      let message = 'Upload failed';
+      try {
+        const errorData = await uploadResponse.json();
+        message = errorData?.detail || errorData?.message || message;
+      } catch {
+        // Keep the default message when backend does not return JSON.
+      }
+      throw new Error(message);
+    }
+
+    return await uploadResponse.json();
+  };
+
+  const analyzeResumeById = async (resumeId) => {
+    const analyzeFormData = new FormData();
+    analyzeFormData.append('resume_id', resumeId);
+    analyzeFormData.append('target_role', 'Software Engineer');
+
+    const analyzeResponse = await fetch('/api/resume/analyze', {
+      method: 'POST',
+      body: analyzeFormData,
+    });
+
+    if (!analyzeResponse.ok) {
+      let message = 'Analysis failed';
+      try {
+        const errorData = await analyzeResponse.json();
+        message = errorData?.detail || errorData?.message || message;
+      } catch {
+        // Keep the default message when backend does not return JSON.
+      }
+      const err = new Error(message);
+      err.status = analyzeResponse.status;
+      throw err;
+    }
+
+    return await analyzeResponse.json();
+  };
+
   const handleFileSelect = async (file) => {
     if (file) {
       setLoading(true);
@@ -1573,46 +1622,29 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed }) => {
       
       try {
         // Upload resume
-        const formData = new FormData();
-        formData.append('file', file);
-        
-        const uploadResponse = await fetch('/api/resume/upload', {
-          method: 'POST',
-          body: formData,
-        });
-        
-        if (!uploadResponse.ok) {
-          let message = 'Upload failed';
-          try {
-            const errorData = await uploadResponse.json();
-            message = errorData?.detail || errorData?.message || message;
-          } catch {
-            // Keep the default error message when the response is not JSON.
-          }
-          throw new Error(message);
-        }
-        
-        const uploadData = await uploadResponse.json();
+        let uploadData = await uploadResumeFile(file);
         const resumeId = uploadData.resume_id;
         setResumeId(resumeId);
         setResumeData(uploadData.resume); // Store parsed resume data
         onResumeParsed?.(resumeId, uploadData.resume);
-        
-        // Analyze resume
-        const analyzeFormData = new FormData();
-        analyzeFormData.append('resume_id', resumeId);
-        analyzeFormData.append('target_role', 'Software Engineer');
-        
-        const analyzeResponse = await fetch('/api/resume/analyze', {
-          method: 'POST',
-          body: analyzeFormData,
-        });
-        
-        if (!analyzeResponse.ok) {
-          throw new Error('Analysis failed');
+
+        // Analyze resume. If backend memory was reset between upload and analyze,
+        // retry once by re-uploading the same file to obtain a fresh resume_id.
+        let analyzeData;
+        try {
+          analyzeData = await analyzeResumeById(resumeId);
+        } catch (analysisError) {
+          if (analysisError?.status === 404) {
+            uploadData = await uploadResumeFile(file);
+            const retriedResumeId = uploadData.resume_id;
+            setResumeId(retriedResumeId);
+            setResumeData(uploadData.resume);
+            onResumeParsed?.(retriedResumeId, uploadData.resume);
+            analyzeData = await analyzeResumeById(retriedResumeId);
+          } else {
+            throw analysisError;
+          }
         }
-        
-        const analyzeData = await analyzeResponse.json();
         
         // Update state with real data
         const nextAtsScore = analyzeData.ats_analysis?.score || 0;
@@ -1635,6 +1667,18 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed }) => {
           type: p.severity === 'high' ? 'error' : p.severity === 'medium' ? 'warning' : 'info',
           text: p.issue
         }));
+        if (analyzeData.ats_model_warning) {
+          problemIssues.push({
+            type: 'warning',
+            text: `ATS model unavailable: ${analyzeData.ats_model_warning}`,
+          });
+        }
+        if (analyzeData.bullet_improvement_warning) {
+          problemIssues.push({
+            type: 'warning',
+            text: `Bullet improvement model unavailable: ${analyzeData.bullet_improvement_warning}`,
+          });
+        }
         setIssues(problemIssues);
         
         // Set suggestions
@@ -1727,6 +1771,18 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed }) => {
         type: p.severity === 'high' ? 'error' : p.severity === 'medium' ? 'warning' : 'info',
         text: p.issue
       }));
+      if (analyzeData.ats_model_warning) {
+        problemIssues.push({
+          type: 'warning',
+          text: `ATS model unavailable: ${analyzeData.ats_model_warning}`,
+        });
+      }
+      if (analyzeData.bullet_improvement_warning) {
+        problemIssues.push({
+          type: 'warning',
+          text: `Bullet improvement model unavailable: ${analyzeData.bullet_improvement_warning}`,
+        });
+      }
       setIssues(problemIssues);
       
       const allSuggestions = [];
@@ -2057,6 +2113,7 @@ const JDMatcher = ({ resumeId, onJobMatched }) => {
   const focusAreas = matchResult?.focus_areas || [];
   const strengths = matchResult?.strengths || [];
   const weaknesses = matchResult?.weaknesses || [];
+  const suggestions = matchResult?.suggestions || [];
   const overallMatch = Math.round(matchResult?.match_percentage || 0);
 
   return (
@@ -2160,6 +2217,17 @@ const JDMatcher = ({ resumeId, onJobMatched }) => {
                         <span key={i} style={{ fontSize: 12, color: "var(--gray-600)" }}>• {w}</span>
                       ))}
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {suggestions.length > 0 && (
+                <div style={{ marginTop: 16 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#1d4ed8", marginBottom: 8 }}>Suggestions</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    {suggestions.slice(0, 4).map((item, i) => (
+                      <span key={i} style={{ fontSize: 12, color: "var(--gray-600)" }}>• {item}</span>
+                    ))}
                   </div>
                 </div>
               )}
@@ -2784,6 +2852,11 @@ const JobFinder = ({ resumeId, resumeData, onJobsUpdated }) => {
   const [location, setLocation] = useState("India");
   const [activeChip, setActiveChip] = useState("all");
   const [savedJobs, setSavedJobs] = useState({});
+  const onJobsUpdatedRef = useRef(onJobsUpdated);
+
+  useEffect(() => {
+    onJobsUpdatedRef.current = onJobsUpdated;
+  }, [onJobsUpdated]);
 
   const deriveRoleFromResume = (data) => {
     if (data?.experiences?.length > 0) {
@@ -2831,7 +2904,14 @@ const JobFinder = ({ resumeId, resumeData, onJobsUpdated }) => {
       });
 
       if (!response.ok) {
-        throw new Error("Failed to fetch jobs");
+        let message = "Failed to fetch jobs";
+        try {
+          const errorData = await response.json();
+          message = errorData?.detail || errorData?.message || message;
+        } catch {
+          // Keep default if backend response is not JSON.
+        }
+        throw new Error(message);
       }
 
       const data = await response.json();
@@ -2872,13 +2952,13 @@ const JobFinder = ({ resumeId, resumeData, onJobsUpdated }) => {
   };
 
   useEffect(() => {
-    onJobsUpdated?.({
+    onJobsUpdatedRef.current?.({
       total: jobs.length,
       filtered: filteredJobs.length,
       saved: Object.values(savedJobs).filter(Boolean).length,
       updatedAt: new Date().toISOString(),
     });
-  }, [jobs, filteredJobs.length, savedJobs, onJobsUpdated]);
+  }, [jobs, filteredJobs.length, savedJobs]);
 
   const quickChips = [
     { id: "all", label: "All jobs" },
