@@ -854,11 +854,14 @@ async def generate_roadmap(
             return 14
         return 16
 
-    def _build_week_tasks(week: int, primary: str, secondary: str, tertiary: str) -> List[Dict[str, Any]]:
+    def _build_week_tasks(week: int, primary: str, secondary: str, tertiary: str, focus_pool: List[str]) -> List[Dict[str, Any]]:
         phase = _week_phase(week)
         difficulty = _difficulty_for_week(week)
         hours = _hours_for_week(week)
-        focus = primary if week <= 4 else secondary if week <= 8 else tertiary
+        pool = [item for item in focus_pool if str(item).strip()]
+        if not pool:
+            pool = [primary, secondary, tertiary]
+        focus = pool[(week - 1) % len(pool)]
         jd_hint = ", ".join(_unique_items(skill_gaps)[:3]) or "JD core requirements"
 
         learn_task = {
@@ -934,7 +937,7 @@ async def generate_roadmap(
 
         for week in range(1, 13):
             if len(tasks_by_week[week]) < 3:
-                fallback_tasks = _build_week_tasks(week, primary, secondary, tertiary)
+                fallback_tasks = _build_week_tasks(week, primary, secondary, tertiary, skills)
                 existing_lower = {task["task"].lower() for task in tasks_by_week[week]}
                 for fallback in fallback_tasks:
                     if fallback["task"].lower() not in existing_lower:
@@ -1022,6 +1025,33 @@ Rules:
 6) Do not output generic tasks like "practice" without a specific artifact.
 7) Focus on generating practical tasks, not broad advice."""
 
+    compact_prompt = f"""Create a 12-week roadmap in STRICT JSON.
+
+Resume context:
+{resume_context[:1000]}
+
+JD summary:
+{jd_analysis_summary[:700] if jd_analysis_summary else 'Not provided'}
+
+Job description:
+{jd_text[:1100]}
+
+Missing skills:
+{', '.join(skill_gaps[:6])}
+
+Return JSON keys only:
+- duration_weeks
+- daily_hours
+- tasks (objects with week, task, skill, difficulty, estimated_hours, resources, priority, milestone)
+- milestones
+- completion_criteria
+
+Rules:
+1) Weeks 1..12 must exist.
+2) At least 3 unique tasks per week.
+3) No repeated task text.
+4) Each task must include a concrete deliverable tied to JD requirements."""
+
     messages = [
         {
             "role": "system",
@@ -1031,12 +1061,34 @@ Rules:
     ]
 
     try:
-        response = await call_roadmap_chat(messages, temperature=0.6, max_tokens=4200)
-        parsed = json.loads(response)
-        return _normalize_payload(parsed)
-    except Exception as e:
-        print(f"Error generating roadmap from AI: {str(e)}")
-        return _normalize_payload({})
+        # Primary model attempt.
+        response = await call_roadmap_chat(messages, temperature=0.6, max_tokens=2200)
+        parsed = json.loads(_extract_json_block(response))
+        normalized = _normalize_payload(parsed)
+        normalized["source"] = "model"
+        return normalized
+    except Exception as first_error:
+        # Retry once with a compact prompt and lower token budget.
+        try:
+            retry_messages = [
+                {
+                    "role": "system",
+                    "content": "You are an expert career coach creating practical, non-generic weekly plans tied to candidate gaps and JD requirements.",
+                },
+                {"role": "user", "content": compact_prompt},
+            ]
+            retry_response = await call_roadmap_chat(retry_messages, temperature=0.5, max_tokens=1200)
+            retry_parsed = json.loads(_extract_json_block(retry_response))
+            normalized = _normalize_payload(retry_parsed)
+            normalized["source"] = "model"
+            normalized["retry_used"] = True
+            return normalized
+        except Exception as retry_error:
+            print(f"Error generating roadmap from AI: {str(first_error)} | Retry failed: {str(retry_error)}")
+            normalized = _normalize_payload({})
+            normalized["source"] = "roadmap_fallback"
+            normalized["warning"] = str(retry_error)
+            return normalized
 
 async def generate_quiz_questions(
     topic: str,

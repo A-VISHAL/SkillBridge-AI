@@ -1586,6 +1586,7 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed }) => {
   const [issues, setIssues] = useState([]);
   const [suggestions, setSuggestions] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [loadingStage, setLoadingStage] = useState("");
   const fileInputRef = useRef(null);
 
   const uploadResumeFile = async (file) => {
@@ -1640,6 +1641,7 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed }) => {
   const handleFileSelect = async (file) => {
     if (file) {
       setLoading(true);
+      setLoadingStage("Uploading resume to SkillBridge...");
       const sizeInKB = Math.round(file.size / 1024);
       setFileName(file.name);
       setFileSize(`${sizeInKB} KB`);
@@ -1654,21 +1656,26 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed }) => {
 
         // Analyze resume. If backend memory was reset between upload and analyze,
         // retry once by re-uploading the same file to obtain a fresh resume_id.
+        setLoadingStage("Running ATS and project-fit analysis...");
         let analyzeData;
         try {
           analyzeData = await analyzeResumeById(resumeId);
         } catch (analysisError) {
           if (analysisError?.status === 404) {
+            setLoadingStage("Refreshing resume context and retrying analysis...");
             uploadData = await uploadResumeFile(file);
             const retriedResumeId = uploadData.resume_id;
             setResumeId(retriedResumeId);
             setResumeData(uploadData.resume);
             onResumeParsed?.(retriedResumeId, uploadData.resume);
+            setLoadingStage("Running ATS and project-fit analysis...");
             analyzeData = await analyzeResumeById(retriedResumeId);
           } else {
             throw analysisError;
           }
         }
+
+        setLoadingStage("Generating project-ready improvement suggestions...");
         
         // Update state with real data
         const nextAtsScore = analyzeData.ats_analysis?.score || 0;
@@ -1726,6 +1733,7 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed }) => {
         setUploaded(false);
       } finally {
         setLoading(false);
+        setLoadingStage("");
       }
     }
   };
@@ -1752,6 +1760,7 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed }) => {
 
   const handleSampleResume = async () => {
     setLoading(true);
+    setLoadingStage("Loading sample resume profile...");
     try {
       // Get sample resume
       const sampleResponse = await fetch('/api/resume/sample');
@@ -1767,13 +1776,26 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed }) => {
       const analyzeFormData = new FormData();
       analyzeFormData.append('resume_id', sampleData.resume_id);
       analyzeFormData.append('target_role', 'Software Engineer');
+      setLoadingStage("Running ATS and project-fit analysis...");
       
       const analyzeResponse = await fetch('/api/resume/analyze', {
         method: 'POST',
         body: analyzeFormData,
       });
+
+      if (!analyzeResponse.ok) {
+        let message = 'Analysis failed';
+        try {
+          const errorData = await analyzeResponse.json();
+          message = errorData?.detail || errorData?.message || message;
+        } catch {
+          // Keep default message when backend does not return JSON.
+        }
+        throw new Error(message);
+      }
       
       const analyzeData = await analyzeResponse.json();
+      setLoadingStage("Generating project-ready improvement suggestions...");
       
       // Update state with real data
       const nextAtsScore = analyzeData.ats_analysis?.score || 0;
@@ -1830,6 +1852,7 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed }) => {
       setUploaded(true);
     } finally {
       setLoading(false);
+      setLoadingStage("");
     }
   };
 
@@ -1864,6 +1887,11 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed }) => {
                 <div style={{ fontSize: 15, fontWeight: 600, color: "var(--gray-800)", marginBottom: 6 }}>
                   {loading ? "Processing resume..." : "Drop your resume here"}
                 </div>
+                {loading && (
+                  <div style={{ fontSize: 12.5, color: "var(--gray-500)", marginBottom: 8, fontWeight: 500 }}>
+                    {loadingStage || "SkillBridge is evaluating ATS quality, skills, and project evidence..."}
+                  </div>
+                )}
                 <div style={{ fontSize: 13, color: "var(--gray-400)", marginBottom: 20 }}>PDF, DOCX supported · Max 5MB</div>
                 <input
                   ref={fileInputRef}
@@ -2057,7 +2085,7 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed }) => {
         <Card style={{ padding: "28px 24px", textAlign: "center" }}>
           <div style={{ fontSize: 12, color: "var(--gray-400)", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 20 }}>ATS Score</div>
           <CircularProgress value={uploaded ? atsScore : 0} size={140} label="Score"/>
-          {loading && <div style={{ fontSize: 12, color: "var(--gray-500)", marginTop: 10 }}>Analyzing...</div>}
+          {loading && <div style={{ fontSize: 12, color: "var(--gray-500)", marginTop: 10 }}>{loadingStage || "Analyzing..."}</div>}
           <div style={{ marginTop: 24, display: "flex", flexDirection: "column", gap: 10 }}>
             {[
               { label: "Formatting", val: scoreBreakdown.formatting_score },
@@ -2085,6 +2113,7 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed }) => {
 const JDMatcher = ({ resumeId, onJobMatched }) => {
   const [jd, setJD] = useState("");
   const [loading, setLoading] = useState(false);
+  const [loadingStage, setLoadingStage] = useState("");
   const [error, setError] = useState("");
   const [matchResult, setMatchResult] = useState(null);
 
@@ -2101,6 +2130,7 @@ const JDMatcher = ({ resumeId, onJobMatched }) => {
     }
 
     setLoading(true);
+    setLoadingStage("SkillBridge is mapping your resume signals to JD requirements...");
     setError("");
     try {
       const formData = new FormData();
@@ -2134,6 +2164,7 @@ const JDMatcher = ({ resumeId, onJobMatched }) => {
       setMatchResult(null);
     } finally {
       setLoading(false);
+      setLoadingStage("");
     }
   };
 
@@ -2160,6 +2191,7 @@ const JDMatcher = ({ resumeId, onJobMatched }) => {
               value={jd}
               onChange={e => setJD(e.target.value)}
               placeholder="Paste the full job description here..."
+              disabled={loading}
               style={{
                 width: "100%", height: 200, border: "1px solid var(--gray-200)",
                 borderRadius: 10, padding: "12px 14px", fontSize: 13,
@@ -2168,7 +2200,7 @@ const JDMatcher = ({ resumeId, onJobMatched }) => {
                 lineHeight: 1.65,
               }}
             />
-            <Btn variant="primary" onClick={analyzeMatch} style={{ marginTop: 12, width: "100%", justifyContent: "center" }} icon={<Icon name="search" size={14}/>}> 
+            <Btn variant="primary" onClick={analyzeMatch} disabled={loading} style={{ marginTop: 12, width: "100%", justifyContent: "center" }} icon={<Icon name="search" size={14}/>}> 
               {loading ? "Analyzing..." : "Analyze match"}
             </Btn>
             {error && <div style={{ marginTop: 10, fontSize: 12.5, color: "#b91c1c", fontWeight: 600 }}>{error}</div>}
@@ -2264,7 +2296,7 @@ const JDMatcher = ({ resumeId, onJobMatched }) => {
           </div>
         )}
 
-        {!analyzed && (
+        {!analyzed && !loading && (
           <Card style={{ display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 14, padding: 40, minHeight: 300 }} hover={false}>
             <div style={{ width: 56, height: 56, borderRadius: 16, background: "var(--gray-100)", display: "flex", alignItems: "center", justifyContent: "center" }}>
               <Icon name="match" size={24} color="var(--gray-400)"/>
@@ -2272,6 +2304,18 @@ const JDMatcher = ({ resumeId, onJobMatched }) => {
             <div style={{ textAlign: "center" }}>
               <div style={{ fontSize: 14, fontWeight: 600, color: "var(--gray-700)", marginBottom: 6 }}>Awaiting analysis</div>
               <div style={{ fontSize: 13, color: "var(--gray-400)" }}>Paste a JD and click Analyze to see your match</div>
+            </div>
+          </Card>
+        )}
+
+        {!analyzed && loading && (
+          <Card style={{ display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 12, padding: 40, minHeight: 300 }} hover={false}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "var(--gray-800)" }}>Analyzing JD Match</div>
+            <div style={{ fontSize: 12.5, color: "var(--gray-500)", textAlign: "center", maxWidth: 320 }}>
+              {loadingStage || "SkillBridge is calculating match score, focus areas, and improvement suggestions."}
+            </div>
+            <div style={{ width: "80%", height: 6, borderRadius: 999, background: "var(--gray-100)", overflow: "hidden", marginTop: 4 }}>
+              <div style={{ width: "55%", height: "100%", borderRadius: 999, background: "var(--gray-700)", transition: "width 0.8s ease" }} />
             </div>
           </Card>
         )}

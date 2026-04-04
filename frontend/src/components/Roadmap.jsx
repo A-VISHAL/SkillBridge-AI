@@ -127,6 +127,8 @@ export default function Roadmap({ resumeId, jobDescription, onProgressChange }) 
   const [roadmap, setRoadmap] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [generationSource, setGenerationSource] = useState('');
+  const [generationWarning, setGenerationWarning] = useState('');
   const [taskProgress, setTaskProgress] = useState({});
   const [showCongrats, setShowCongrats] = useState(false);
   const onProgressChangeRef = useRef(onProgressChange);
@@ -147,6 +149,8 @@ export default function Roadmap({ resumeId, jobDescription, onProgressChange }) 
 
     setLoading(true);
     setError('');
+    setGenerationSource('');
+    setGenerationWarning('');
     setShowCongrats(false);
 
     try {
@@ -214,6 +218,11 @@ export default function Roadmap({ resumeId, jobDescription, onProgressChange }) 
       const milestones = Array.isArray(data.milestones) && data.milestones.length > 0
         ? data.milestones
         : normalizedTasks.filter((task) => task.milestone).map((task) => `Week ${task.week}: ${task.skill} milestone`);
+
+      const source = String(data.generation_source || '').trim();
+      const warning = String(data.generation_warning || '').trim();
+      setGenerationSource(source);
+      setGenerationWarning(warning);
 
       setRoadmap({
         ...data,
@@ -337,6 +346,16 @@ export default function Roadmap({ resumeId, jobDescription, onProgressChange }) 
         <p style={{ marginTop: 4, color: '#6b7280', fontSize: 13.5 }}>
           Your personalized learning path based on your resume and JD.
         </p>
+        {generationSource ? (
+          <div style={{ marginTop: 8, fontSize: 12.5, fontWeight: 600, color: generationSource === 'model' ? '#166534' : '#92400e' }}>
+            Source: {generationSource === 'model' ? 'Live API model' : 'Fallback plan'}
+          </div>
+        ) : null}
+        {generationWarning ? (
+          <div style={{ marginTop: 6, fontSize: 12, color: '#b45309', maxWidth: 860 }}>
+            Warning: {generationWarning}
+          </div>
+        ) : null}
       </div>
 
       {error ? (

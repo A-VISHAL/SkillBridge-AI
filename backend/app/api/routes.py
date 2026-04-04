@@ -90,6 +90,15 @@ async def test_ai_connection(task: str = "ats"):
     messages = [{"role": "user", "content": "Say 'API is working!'"}]
 
     try:
+        if normalized_task == "roadmap":
+            response_text = await ai_service.call_roadmap_chat(messages, temperature=0.0, max_tokens=60)
+            return {
+                "task": "roadmap",
+                "endpoint": settings.ROADMAP_CHAT_ENDPOINT,
+                "model": settings.ROADMAP_MODEL,
+                "response": response_text,
+            }
+
         if normalized_task == "jd":
             response_text = await ai_service.call_jd_chat(messages, temperature=0.0, max_tokens=60)
             return {
@@ -436,7 +445,11 @@ async def generate_roadmap(
                 if not roadmap_ok:
                     print(f"Warning: failed to persist roadmap: {roadmap_err}")
         
-        return roadmap.dict()
+        response_payload = roadmap.dict()
+        response_payload["generation_source"] = roadmap_data.get("source", "unknown")
+        if roadmap_data.get("warning"):
+            response_payload["generation_warning"] = roadmap_data.get("warning")
+        return response_payload
         
     except HTTPException:
         raise
