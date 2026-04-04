@@ -765,25 +765,38 @@ const LandingPage = ({ onEnterApp }) => {
       </nav>
 
       {/* Hero */}
-      <section style={{ paddingTop: 160, paddingBottom: 120, textAlign: "center", maxWidth: 1280, margin: "0 auto", padding: "160px 24px 120px" }}>
-        <div className="fade-up" style={{ animationDelay: "0.1s", opacity: 0, animationFillMode: "forwards", marginBottom: 24 }}>
+      <section
+        style={{
+          minHeight: "100vh",
+          textAlign: "center",
+          maxWidth: 1280,
+          margin: "0 auto",
+          padding: "160px 24px 72px",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <div className="fade-up" style={{ animationDelay: "0.1s", opacity: 0, animationFillMode: "forwards", marginBottom: 22 }}>
+          <Badge variant="neutral" style={{ fontSize: 12.5, padding: "8px 14px" }}>Resume intelligence + job alignment + adaptive prep</Badge>
         </div>
         <h1 className="fade-up" style={{
-          fontSize: "clamp(40px, 7vw, 72px)", fontWeight: 700,
-          lineHeight: 1.06, letterSpacing: "-0.04em",
-          color: "var(--gray-900)", marginBottom: 22,
+          fontSize: "clamp(52px, 8.8vw, 96px)", fontWeight: 800,
+          lineHeight: 0.98, letterSpacing: "-0.05em",
+          color: "var(--gray-900)", marginBottom: 20,
           animationDelay: "0.2s", opacity: 0, animationFillMode: "forwards",
         }}>
-          Your AI Career<br/>
-          <span style={{ color: "var(--gray-400)" }}>Operating System</span>
+          Build A Career<br/>
+          <span style={{ color: "var(--gray-400)" }}>That Actually Fits</span>
         </h1>
         <p className="fade-up" style={{
-          fontSize: 18, color: "var(--gray-500)", lineHeight: 1.65,
-          maxWidth: 520, margin: "0 auto 44px",
-          fontWeight: 400, letterSpacing: "-0.01em",
+          fontSize: "clamp(18px, 2.2vw, 24px)", color: "var(--gray-600)", lineHeight: 1.55,
+          maxWidth: 860, margin: "0 auto 34px",
+          fontWeight: 500, letterSpacing: "-0.015em",
           animationDelay: "0.3s", opacity: 0, animationFillMode: "forwards",
         }}>
-          Analyze, learn, practice, and get hired — powered by AI that understands every nuance of your career journey.
+          SkillBridge turns your resume and target role into a focused execution plan: diagnose gaps, map to real JDs, practice with feedback, and track measurable hiring readiness.
         </p>
         <div className="fade-up" style={{ display: "flex", gap: 12, justifyContent: "center", animationDelay: "0.4s", opacity: 0, animationFillMode: "forwards" }}>
           <Btn variant="primary" onClick={onEnterApp} style={{ padding: "13px 30px", fontSize: 15 }}>
@@ -794,6 +807,42 @@ const LandingPage = ({ onEnterApp }) => {
           </Btn>
         </div>
 
+        <div className="fade-up" style={{
+          marginTop: 30,
+          width: "min(980px, 100%)",
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+          gap: 12,
+          animationDelay: "0.48s",
+          opacity: 0,
+          animationFillMode: "forwards",
+        }}>
+          {[
+            { label: "Resume Deep-Scan", detail: "Skill extraction + gap detection" },
+            { label: "JD Match Engine", detail: "Role alignment with clear score logic" },
+            { label: "Adaptive Learning Loop", detail: "Roadmap, quiz, and interview in one flow" },
+            { label: "Progress Visibility", detail: "Weekly milestones and readiness tracking" },
+          ].map((item) => (
+            <div
+              key={item.label}
+              style={{
+                textAlign: "left",
+                padding: "12px 14px",
+                borderRadius: 14,
+                border: "1px solid var(--gray-150)",
+                background: "rgba(255,255,255,0.68)",
+                backdropFilter: "blur(8px)",
+              }}
+            >
+              <div style={{ fontSize: 13, fontWeight: 700, color: "var(--gray-800)", marginBottom: 4 }}>{item.label}</div>
+              <div style={{ fontSize: 12, color: "var(--gray-500)", lineHeight: 1.5 }}>{item.detail}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Journey section appears after first screen */}
+      <section style={{ maxWidth: 1280, margin: "0 auto", padding: "24px 24px 20px" }}>
         <ProjectExperiencePanel />
       </section>
 
