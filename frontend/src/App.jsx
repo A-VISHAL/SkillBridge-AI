@@ -213,7 +213,7 @@ const Btn = ({ children, variant = "primary", onClick, style = {}, icon, accentC
   );
 };
 
-const Card = ({ children, style = {}, hover = true, glass = false }) => {
+const Card = ({ children, style = {}, hover = true, glass = false, isDarkMode = false }) => {
   const [isHovered, setIsHovered] = useState(false);
 
   return (
@@ -222,8 +222,8 @@ const Card = ({ children, style = {}, hover = true, glass = false }) => {
       onMouseEnter={() => hover && setIsHovered(true)}
       onMouseLeave={() => hover && setIsHovered(false)}
       style={{
-        background: glass ? undefined : "var(--white)",
-        border: "1px solid var(--gray-150)",
+        background: glass ? undefined : (isDarkMode ? "#253447" : "var(--white)"),
+        border: isDarkMode ? "1px solid rgba(70,100,150,0.3)" : "1px solid var(--gray-150)",
         borderRadius: "var(--radius-lg)",
         boxShadow: isHovered && hover ? "0 20px 60px rgba(0,0,0,0.12), 0 4px 16px rgba(0,0,0,0.06)" : "var(--shadow-md)",
         padding: 24,
@@ -265,6 +265,8 @@ const Icon = ({ name, size = 18, color = "currentColor" }) => {
     x: <><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></>,
     user: <><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></>,
     settings: <><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></>,
+    sun: <><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></>,
+    moon: <><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></>,
   };
   return (
     <svg width={size} height={size} viewBox="0 0 24 24"
@@ -276,39 +278,39 @@ const Icon = ({ name, size = 18, color = "currentColor" }) => {
 };
 
 // ─── Circular Progress ───────────────────────────────────────────────────────
-const CircularProgress = ({ value, size = 120, label }) => {
+const CircularProgress = ({ value, size = 120, label, isDarkMode }) => {
   const r = (size - 16) / 2;
   const circ = 2 * Math.PI * r;
   const offset = circ - (value / 100) * circ;
   return (
     <div style={{ position: "relative", width: size, height: size, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
       <svg width={size} height={size} style={{ transform: "rotate(-90deg)", position: "absolute" }}>
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--gray-100)" strokeWidth="8"/>
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={isDarkMode ? "rgba(91,127,196,0.2)" : "var(--gray-100)"} strokeWidth="8"/>
         <circle cx={size / 2} cy={size / 2} r={r} fill="none"
-          stroke="var(--gray-800)" strokeWidth="8"
+          stroke={isDarkMode ? "#6b93d6" : "var(--gray-800)"} strokeWidth="8"
           strokeLinecap="round"
           strokeDasharray={circ} strokeDashoffset={offset}
           style={{ transition: "stroke-dashoffset 1.2s cubic-bezier(0.4,0,0.2,1)" }}/>
       </svg>
       <div style={{ textAlign: "center", zIndex: 1 }}>
-        <div style={{ fontSize: size * 0.22, fontWeight: 700, color: "var(--gray-900)", lineHeight: 1 }}>{value}</div>
-        {label && <div style={{ fontSize: 10, color: "var(--gray-400)", marginTop: 2, fontWeight: 500, letterSpacing: "0.05em", textTransform: "uppercase" }}>{label}</div>}
+        <div style={{ fontSize: size * 0.22, fontWeight: 700, color: isDarkMode ? "#e8eef7" : "var(--gray-900)", lineHeight: 1 }}>{value}</div>
+        {label && <div style={{ fontSize: 10, color: isDarkMode ? "#8a9bb5" : "var(--gray-400)", marginTop: 2, fontWeight: 500, letterSpacing: "0.05em", textTransform: "uppercase" }}>{label}</div>}
       </div>
     </div>
   );
 };
 
 // ─── Progress Bar ────────────────────────────────────────────────────────────
-const ProgressBar = ({ value, label, sublabel }) => (
+const ProgressBar = ({ value, label, sublabel, isDarkMode }) => (
   <div>
     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 7, alignItems: "baseline" }}>
-      <span style={{ fontSize: 13, fontWeight: 500, color: "var(--gray-700)" }}>{label}</span>
-      {sublabel && <span style={{ fontSize: 12, color: "var(--gray-400)", fontWeight: 500 }}>{sublabel}</span>}
+      <span style={{ fontSize: 13, fontWeight: 500, color: isDarkMode ? "#e8eef7" : "var(--gray-700)" }}>{label}</span>
+      {sublabel && <span style={{ fontSize: 12, color: isDarkMode ? "#8a9bb5" : "var(--gray-400)", fontWeight: 500 }}>{sublabel}</span>}
     </div>
-    <div style={{ height: 6, background: "var(--gray-100)", borderRadius: 99, overflow: "hidden" }}>
+    <div style={{ height: 6, background: isDarkMode ? "rgba(91,127,196,0.2)" : "var(--gray-100)", borderRadius: 99, overflow: "hidden" }}>
       <div style={{
         height: "100%", borderRadius: 99,
-        background: "linear-gradient(90deg, var(--gray-700), var(--gray-400))",
+        background: isDarkMode ? "linear-gradient(90deg, #6b93d6, #5b7fc4)" : "linear-gradient(90deg, var(--gray-700), var(--gray-400))",
         width: `${value}%`,
         transition: "width 1s cubic-bezier(0.4,0,0.2,1)",
       }}/>
@@ -1262,7 +1264,7 @@ const LandingPage = ({ onEnterApp }) => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 // ─── Sidebar ─────────────────────────────────────────────────────────────────
-const Sidebar = ({ active, setActive }) => {
+const Sidebar = ({ active, setActive, isDarkMode }) => {
   const nav = [
     { id: "dashboard", icon: "dashboard", label: "Overview" },
     { id: "resume", icon: "resume", label: "Resume" },
@@ -1276,21 +1278,21 @@ const Sidebar = ({ active, setActive }) => {
   return (
     <aside style={{
       width: 220, flexShrink: 0,
-      background: "var(--white)",
-      borderRight: "1px solid var(--gray-150)",
+      background: isDarkMode ? "#1e2a3a" : "var(--white)",
+      borderRight: isDarkMode ? "1px solid rgba(70,100,150,0.25)" : "1px solid var(--gray-150)",
       display: "flex", flexDirection: "column",
       padding: "24px 0",
       height: "100vh", position: "sticky", top: 0,
     }}>
       {/* Logo */}
-      <div style={{ padding: "0 20px 24px", borderBottom: "1px solid var(--gray-100)" }}>
+      <div style={{ padding: "0 20px 24px", borderBottom: isDarkMode ? "1px solid rgba(70,100,150,0.2)" : "1px solid var(--gray-100)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-          <div style={{ width: 30, height: 30, borderRadius: 9, background: "var(--gray-900)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ width: 30, height: 30, borderRadius: 9, background: isDarkMode ? "#5b7fc4" : "var(--gray-900)", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <Icon name="logo" size={14} color="white"/>
           </div>
           <div>
-            <div style={{ fontWeight: 700, fontSize: 13.5, color: "var(--gray-900)", letterSpacing: "-0.03em" }}>SkillBridge</div>
-            <div style={{ fontSize: 10, color: "var(--gray-400)", fontWeight: 500 }}>AI Career OS</div>
+            <div style={{ fontWeight: 700, fontSize: 13.5, color: isDarkMode ? "#e8eef7" : "var(--gray-900)", letterSpacing: "-0.03em" }}>SkillBridge</div>
+            <div style={{ fontSize: 10, color: isDarkMode ? "#8a9bb5" : "var(--gray-400)", fontWeight: 500 }}>AI Career OS</div>
           </div>
         </div>
       </div>
@@ -1305,15 +1307,15 @@ const Sidebar = ({ active, setActive }) => {
                 display: "flex", alignItems: "center", gap: 10,
                 padding: "10px 12px", borderRadius: 10,
                 border: "none", cursor: "pointer", width: "100%", textAlign: "left",
-                background: isActive ? "var(--gray-100)" : "transparent",
-                color: isActive ? "var(--gray-900)" : "var(--gray-500)",
+                background: isActive ? (isDarkMode ? "rgba(91,127,196,0.18)" : "var(--gray-100)") : "transparent",
+                color: isActive ? (isDarkMode ? "#e8eef7" : "var(--gray-900)") : (isDarkMode ? "#b4c3d9" : "var(--gray-500)"),
                 fontSize: 13.5, fontWeight: isActive ? 600 : 500,
                 transition: "all var(--transition)",
                 fontFamily: "inherit",
               }}
-              onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = "var(--gray-50)"; }}
+              onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = isDarkMode ? "rgba(91,127,196,0.1)" : "var(--gray-50)"; }}
               onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = "transparent"; }}>
-              <Icon name={item.icon} size={16} color={isActive ? "var(--gray-900)" : "var(--gray-400)"}/>
+              <Icon name={item.icon} size={16} color={isActive ? (isDarkMode ? "#6b93d6" : "var(--gray-900)") : (isDarkMode ? "#8a9bb5" : "var(--gray-400)")}/>
               {item.label}
             </button>
           );
@@ -1321,12 +1323,12 @@ const Sidebar = ({ active, setActive }) => {
       </nav>
 
       {/* User */}
-      <div style={{ padding: "16px 20px", borderTop: "1px solid var(--gray-100)" }}>
+      <div style={{ padding: "16px 20px", borderTop: isDarkMode ? "1px solid rgba(70,100,150,0.2)" : "1px solid var(--gray-100)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ width: 30, height: 30, borderRadius: "50%", background: "var(--gray-900)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: "var(--white)" }}>A</div>
+          <div style={{ width: 30, height: 30, borderRadius: "50%", background: isDarkMode ? "#5b7fc4" : "var(--gray-900)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: "var(--white)" }}>A</div>
           <div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: "var(--gray-800)" }}>Aryan Sharma</div>
-            <div style={{ fontSize: 11, color: "var(--gray-400)" }}>Pro plan</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: isDarkMode ? "#e8eef7" : "var(--gray-800)" }}>Aryan Sharma</div>
+            <div style={{ fontSize: 11, color: isDarkMode ? "#8a9bb5" : "var(--gray-400)" }}>Pro plan</div>
           </div>
         </div>
       </div>
@@ -1335,7 +1337,7 @@ const Sidebar = ({ active, setActive }) => {
 };
 
 // ─── Topbar ───────────────────────────────────────────────────────────────────
-const Topbar = ({ title, onLogout }) => {
+const Topbar = ({ title, onLogout, isDarkMode, setIsDarkMode }) => {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const profileRef = useRef(null);
 
@@ -1351,33 +1353,43 @@ const Topbar = ({ title, onLogout }) => {
 
   return (
     <header style={{
-      height: 60, borderBottom: "1px solid var(--gray-150)",
+      height: 60, borderBottom: isDarkMode ? "1px solid rgba(70,100,150,0.25)" : "1px solid var(--gray-150)",
       display: "flex", alignItems: "center", justifyContent: "space-between",
-      padding: "0 28px", background: "var(--white)", position: "sticky", top: 0, zIndex: 10,
+      padding: "0 28px", background: isDarkMode ? "#1e2a3a" : "var(--white)", position: "sticky", top: 0, zIndex: 10,
     }}>
-      <h1 style={{ fontSize: 16, fontWeight: 650, color: "var(--gray-900)", letterSpacing: "-0.025em" }}>{title}</h1>
+      <h1 style={{ fontSize: 16, fontWeight: 650, color: isDarkMode ? "#e8eef7" : "var(--gray-900)", letterSpacing: "-0.025em" }}>{title}</h1>
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <div style={{
           display: "flex", alignItems: "center", gap: 8,
-          background: "var(--gray-50)", border: "1px solid var(--gray-200)",
+          background: isDarkMode ? "#253447" : "var(--gray-50)", border: isDarkMode ? "1px solid rgba(70,100,150,0.3)" : "1px solid var(--gray-200)",
           borderRadius: 99, padding: "8px 14px", width: 200,
         }}>
-          <Icon name="search" size={14} color="var(--gray-400)"/>
+          <Icon name="search" size={14} color={isDarkMode ? "#8a9bb5" : "var(--gray-400)"}/>
           <input placeholder="Search anything..." style={{
-            border: "none", background: "transparent", fontSize: 13, color: "var(--gray-600)",
+            border: "none", background: "transparent", fontSize: 13, color: isDarkMode ? "#b4c3d9" : "var(--gray-600)",
             outline: "none", width: "100%", fontFamily: "inherit",
           }}/>
         </div>
+        <button
+          onClick={() => setIsDarkMode(!isDarkMode)}
+          style={{
+            width: 36, height: 36, borderRadius: "50%", background: isDarkMode ? "#253447" : "var(--gray-50)",
+            border: isDarkMode ? "1px solid rgba(70,100,150,0.3)" : "1px solid var(--gray-200)", display: "flex", alignItems: "center",
+            justifyContent: "center", cursor: "pointer", transition: "all 0.2s ease",
+          }}
+        >
+          <Icon name={isDarkMode ? "sun" : "moon"} size={15} color={isDarkMode ? "#6b93d6" : "var(--gray-500)"}/>
+        </button>
         <div style={{
-          width: 36, height: 36, borderRadius: "50%", background: "var(--gray-50)",
-          border: "1px solid var(--gray-200)", display: "flex", alignItems: "center",
+          width: 36, height: 36, borderRadius: "50%", background: isDarkMode ? "#253447" : "var(--gray-50)",
+          border: isDarkMode ? "1px solid rgba(70,100,150,0.3)" : "1px solid var(--gray-200)", display: "flex", alignItems: "center",
           justifyContent: "center", cursor: "pointer", position: "relative",
         }}>
-          <Icon name="bell" size={15} color="var(--gray-500)"/>
+          <Icon name="bell" size={15} color={isDarkMode ? "#6b93d6" : "var(--gray-500)"}/>
           <div style={{
             position: "absolute", top: 8, right: 8,
             width: 7, height: 7, borderRadius: "50%",
-            background: "var(--gray-700)", border: "1.5px solid var(--white)",
+            background: isDarkMode ? "#6b93d6" : "var(--gray-700)", border: isDarkMode ? "1.5px solid #1e2a3a" : "1.5px solid var(--white)",
           }}/>
         </div>
         <div ref={profileRef} style={{ position: "relative" }}>
@@ -1447,7 +1459,7 @@ const Topbar = ({ title, onLogout }) => {
 };
 
 // ─── Dashboard Overview ───────────────────────────────────────────────────────
-const DashboardOverview = ({ resumeContext, overviewMetrics }) => {
+const DashboardOverview = ({ resumeContext, overviewMetrics, isDarkMode }) => {
   const atsScore = Number(overviewMetrics.resume?.atsScore || 0);
   const jdMatch = Math.round(Number(resumeContext.matchResult?.match_percentage || 0));
   const quizScore = Number(overviewMetrics.quiz?.score || 0);
@@ -1518,49 +1530,49 @@ const DashboardOverview = ({ resumeContext, overviewMetrics }) => {
   return (
     <div style={{ padding: "28px", display: "flex", flexDirection: "column", gap: 24, animation: "fadeIn 0.4s ease" }}>
       <div>
-        <h2 style={{ fontSize: 22, fontWeight: 700, color: "var(--gray-900)", letterSpacing: "-0.04em", marginBottom: 4 }}>Good morning, Aryan ✦</h2>
-        <p style={{ fontSize: 13.5, color: "var(--gray-500)" }}>This view updates from your real resume, JD, roadmap, quiz, interview, and jobs activity.</p>
+        <h2 style={{ fontSize: 22, fontWeight: 700, color: isDarkMode ? "#e8eef7" : "var(--gray-900)", letterSpacing: "-0.04em", marginBottom: 4 }}>Good morning, Aryan ✦</h2>
+        <p style={{ fontSize: 13.5, color: isDarkMode ? "#b4c3d9" : "var(--gray-500)" }}>This view updates from your real resume, JD, roadmap, quiz, interview, and jobs activity.</p>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
         {stats.map(s => (
-          <Card key={s.label} style={{ padding: "20px 22px" }}>
+          <Card key={s.label} isDarkMode={isDarkMode} style={{ padding: "20px 22px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
-              <div style={{ width: 34, height: 34, borderRadius: 10, background: "var(--gray-100)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <Icon name={s.icon} size={16} color="var(--gray-600)"/>
+              <div style={{ width: 34, height: 34, borderRadius: 10, background: isDarkMode ? "rgba(91,127,196,0.15)" : "var(--gray-100)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Icon name={s.icon} size={16} color={isDarkMode ? "#6b93d6" : "var(--gray-600)"}/>
               </div>
-              <Badge>{s.trend}</Badge>
+              <Badge style={{ background: isDarkMode ? "rgba(91,127,196,0.15)" : undefined, color: isDarkMode ? "#8a9bb5" : undefined, borderColor: isDarkMode ? "rgba(91,127,196,0.3)" : undefined }}>{s.trend}</Badge>
             </div>
-            <div style={{ fontSize: 28, fontWeight: 700, color: "var(--gray-900)", letterSpacing: "-0.04em", lineHeight: 1 }}>
-              {s.value}<span style={{ fontSize: 13, color: "var(--gray-400)", fontWeight: 500, marginLeft: 3 }}>{s.unit}</span>
+            <div style={{ fontSize: 28, fontWeight: 700, color: isDarkMode ? "#e8eef7" : "var(--gray-900)", letterSpacing: "-0.04em", lineHeight: 1 }}>
+              {s.value}<span style={{ fontSize: 13, color: isDarkMode ? "#8a9bb5" : "var(--gray-400)", fontWeight: 500, marginLeft: 3 }}>{s.unit}</span>
             </div>
-            <div style={{ fontSize: 12, color: "var(--gray-400)", marginTop: 6, fontWeight: 500 }}>{s.label}</div>
+            <div style={{ fontSize: 12, color: isDarkMode ? "#8a9bb5" : "var(--gray-400)", marginTop: 6, fontWeight: 500 }}>{s.label}</div>
           </Card>
         ))}
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 18 }}>
-        <Card>
-          <div style={{ fontSize: 13.5, fontWeight: 650, color: "var(--gray-900)", marginBottom: 18, letterSpacing: "-0.02em" }}>Weekly Progress</div>
+        <Card isDarkMode={isDarkMode}>
+          <div style={{ fontSize: 13.5, fontWeight: 650, color: isDarkMode ? "#e8eef7" : "var(--gray-900)", marginBottom: 18, letterSpacing: "-0.02em" }}>Weekly Progress</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             {progressRows.map((row) => (
-              <ProgressBar key={row.label} value={Math.max(0, Math.min(100, row.value))} label={row.label} sublabel={row.sublabel}/>
+              <ProgressBar key={row.label} value={Math.max(0, Math.min(100, row.value))} label={row.label} sublabel={row.sublabel} isDarkMode={isDarkMode}/>
             ))}
           </div>
         </Card>
-        <Card>
-          <div style={{ fontSize: 13.5, fontWeight: 650, color: "var(--gray-900)", marginBottom: 18, letterSpacing: "-0.02em" }}>Today's Tasks</div>
+        <Card isDarkMode={isDarkMode}>
+          <div style={{ fontSize: 13.5, fontWeight: 650, color: isDarkMode ? "#e8eef7" : "var(--gray-900)", marginBottom: 18, letterSpacing: "-0.02em" }}>Today's Tasks</div>
           {tasks.map((t, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderBottom: i < tasks.length - 1 ? "1px solid var(--gray-100)" : "none" }}>
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderBottom: i < tasks.length - 1 ? (isDarkMode ? "1px solid rgba(70,100,150,0.2)" : "1px solid var(--gray-100)") : "none" }}>
               <div style={{
-                width: 18, height: 18, borderRadius: 5, border: `1.5px solid ${t.done ? "var(--gray-700)" : "var(--gray-250)"}`,
-                background: t.done ? "var(--gray-900)" : "transparent",
+                width: 18, height: 18, borderRadius: 5, border: `1.5px solid ${t.done ? (isDarkMode ? "#6b93d6" : "var(--gray-700)") : (isDarkMode ? "rgba(91,127,196,0.3)" : "var(--gray-250)")}`,
+                background: t.done ? (isDarkMode ? "#6b93d6" : "var(--gray-900)") : "transparent",
                 display: "flex", alignItems: "center", justifyContent: "center",
                 flexShrink: 0,
               }}>
                 {t.done && <Icon name="check" size={10} color="white"/>}
               </div>
-              <span style={{ fontSize: 13, color: t.done ? "var(--gray-400)" : "var(--gray-700)", textDecoration: t.done ? "line-through" : "none", fontWeight: 500 }}>{t.task}</span>
+              <span style={{ fontSize: 13, color: t.done ? (isDarkMode ? "#8a9bb5" : "var(--gray-400)") : (isDarkMode ? "#e8eef7" : "var(--gray-700)"), textDecoration: t.done ? "line-through" : "none", fontWeight: 500 }}>{t.task}</span>
             </div>
           ))}
         </Card>
@@ -1570,7 +1582,7 @@ const DashboardOverview = ({ resumeContext, overviewMetrics }) => {
 };
 
 // ─── Resume Analyzer ──────────────────────────────────────────────────────────
-const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed }) => {
+const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed, isDarkMode }) => {
   const [uploaded, setUploaded] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [fileName, setFileName] = useState("");
@@ -1859,8 +1871,8 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed }) => {
   return (
     <div style={{ padding: 28, display: "flex", flexDirection: "column", gap: 22, animation: "fadeIn 0.4s ease" }}>
       <div>
-        <h2 style={{ fontSize: 20, fontWeight: 700, color: "var(--gray-900)", letterSpacing: "-0.04em", marginBottom: 4 }}>Resume Analyzer</h2>
-        <p style={{ fontSize: 13.5, color: "var(--gray-500)" }}>Upload your resume for AI-powered ATS analysis and improvement suggestions.</p>
+        <h2 style={{ fontSize: 20, fontWeight: 700, color: isDarkMode ? "#e8eef7" : "var(--gray-900)", letterSpacing: "-0.04em", marginBottom: 4 }}>Resume Analyzer</h2>
+        <p style={{ fontSize: 13.5, color: isDarkMode ? "#b4c3d9" : "var(--gray-500)" }}>Upload your resume for AI-powered ATS analysis and improvement suggestions.</p>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 280px", gap: 18, alignItems: "start" }}>
@@ -1873,26 +1885,26 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed }) => {
                 onDragLeave={() => setDragging(false)}
                 onDrop={handleDrop}
                 style={{
-                  border: `2px dashed ${dragging ? "var(--gray-600)" : "var(--gray-200)"}`,
+                  border: `2px dashed ${dragging ? (isDarkMode ? "#6b93d6" : "var(--gray-600)") : (isDarkMode ? "rgba(91,127,196,0.4)" : "var(--gray-200)")}`,
                   borderRadius: "var(--radius-lg)", padding: "48px 32px",
                   textAlign: "center", cursor: loading ? "wait" : "pointer",
-                  background: dragging ? "var(--gray-50)" : "transparent",
+                  background: dragging ? (isDarkMode ? "rgba(91,127,196,0.1)" : "var(--gray-50)") : "transparent",
                   transition: "all var(--transition)",
                   opacity: loading ? 0.6 : 1,
                   pointerEvents: loading ? "none" : "auto",
                 }}>
-                <div style={{ width: 48, height: 48, borderRadius: 14, background: "var(--gray-100)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
-                  <Icon name="upload" size={22} color="var(--gray-500)"/>
+                <div style={{ width: 48, height: 48, borderRadius: 14, background: isDarkMode ? "rgba(91,127,196,0.15)" : "var(--gray-100)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+                  <Icon name="upload" size={22} color={isDarkMode ? "#6b93d6" : "var(--gray-500)"}/>
                 </div>
-                <div style={{ fontSize: 15, fontWeight: 600, color: "var(--gray-800)", marginBottom: 6 }}>
+                <div style={{ fontSize: 15, fontWeight: 600, color: isDarkMode ? "#e8eef7" : "var(--gray-800)", marginBottom: 6 }}>
                   {loading ? "Processing resume..." : "Drop your resume here"}
                 </div>
                 {loading && (
-                  <div style={{ fontSize: 12.5, color: "var(--gray-500)", marginBottom: 8, fontWeight: 500 }}>
+                  <div style={{ fontSize: 12.5, color: isDarkMode ? "#b4c3d9" : "var(--gray-500)", marginBottom: 8, fontWeight: 500 }}>
                     {loadingStage || "SkillBridge is evaluating ATS quality, skills, and project evidence..."}
                   </div>
                 )}
-                <div style={{ fontSize: 13, color: "var(--gray-400)", marginBottom: 20 }}>PDF, DOCX supported · Max 5MB</div>
+                <div style={{ fontSize: 13, color: isDarkMode ? "#8a9bb5" : "var(--gray-400)", marginBottom: 20 }}>PDF, DOCX supported · Max 5MB</div>
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -1901,25 +1913,25 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed }) => {
                   style={{ display: "none" }}
                 />
                 <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
-                  <Btn variant="secondary" onClick={handleBrowseClick} style={{ padding: "8px 20px", fontSize: 13 }}>Browse files</Btn>
-                  <Btn variant="ghost" onClick={handleSampleResume} style={{ padding: "8px 20px", fontSize: 13 }}>Use sample resume</Btn>
+                  <Btn variant="secondary" onClick={handleBrowseClick} style={{ padding: "8px 20px", fontSize: 13, background: isDarkMode ? "#253447" : undefined, color: isDarkMode ? "#e8eef7" : undefined, borderColor: isDarkMode ? "rgba(91,127,196,0.3)" : undefined }}>Browse files</Btn>
+                  <Btn variant="ghost" onClick={handleSampleResume} style={{ padding: "8px 20px", fontSize: 13, color: isDarkMode ? "#b4c3d9" : undefined }}>Use sample resume</Btn>
                 </div>
               </div>
             </div>
           ) : (
             <div>
-              <Card style={{ padding: "16px 20px" }}>
+              <Card isDarkMode={isDarkMode} style={{ padding: "16px 20px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                  <div style={{ width: 40, height: 40, borderRadius: 11, background: "var(--gray-100)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <Icon name="resume" size={18} color="var(--gray-600)"/>
+                  <div style={{ width: 40, height: 40, borderRadius: 11, background: isDarkMode ? "rgba(91,127,196,0.15)" : "var(--gray-100)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <Icon name="resume" size={18} color={isDarkMode ? "#6b93d6" : "var(--gray-600)"}/>
                   </div>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: "var(--gray-900)" }}>{fileName}</div>
-                    <div style={{ fontSize: 12, color: "var(--gray-400)" }}>Uploaded · {fileSize}</div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: isDarkMode ? "#e8eef7" : "var(--gray-900)" }}>{fileName}</div>
+                    <div style={{ fontSize: 12, color: isDarkMode ? "#8a9bb5" : "var(--gray-400)" }}>Uploaded · {fileSize}</div>
                   </div>
                   <Badge variant="success">Analyzed</Badge>
                   <button onClick={() => setUploaded(false)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
-                    <Icon name="x" size={16} color="var(--gray-400)"/>
+                    <Icon name="x" size={16} color={isDarkMode ? "#8a9bb5" : "var(--gray-400)"}/>
                   </button>
                 </div>
               </Card>
@@ -1927,23 +1939,23 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed }) => {
               {/* Extracted Information */}
               {resumeData && (
                 <div style={{ marginTop: 14 }}>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: "var(--gray-900)", marginBottom: 14 }}>Extracted Information</div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: isDarkMode ? "#e8eef7" : "var(--gray-900)", marginBottom: 14 }}>Extracted Information</div>
                   
                   {/* Personal Info Card */}
                   {(resumeData.name || resumeData.email || resumeData.phone) && (
-                    <Card style={{ marginBottom: 12, padding: 20 }}>
-                      {resumeData.name && <div style={{ fontSize: 17, fontWeight: 700, color: "var(--gray-900)", marginBottom: 12 }}>{resumeData.name}</div>}
+                    <Card isDarkMode={isDarkMode} style={{ marginBottom: 12, padding: 20 }}>
+                      {resumeData.name && <div style={{ fontSize: 17, fontWeight: 700, color: isDarkMode ? "#e8eef7" : "var(--gray-900)", marginBottom: 12 }}>{resumeData.name}</div>}
                       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                         {resumeData.email && (
                           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                             <span style={{ fontSize: 14 }}>📧</span>
-                            <span style={{ fontSize: 13, color: "var(--gray-600)" }}>{resumeData.email}</span>
+                            <span style={{ fontSize: 13, color: isDarkMode ? "#b4c3d9" : "var(--gray-600)" }}>{resumeData.email}</span>
                           </div>
                         )}
                         {resumeData.phone && (
                           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                             <span style={{ fontSize: 14 }}>📱</span>
-                            <span style={{ fontSize: 13, color: "var(--gray-600)" }}>{resumeData.phone}</span>
+                            <span style={{ fontSize: 13, color: isDarkMode ? "#b4c3d9" : "var(--gray-600)" }}>{resumeData.phone}</span>
                           </div>
                         )}
                       </div>
@@ -1952,15 +1964,15 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed }) => {
 
                   {/* Skills Card */}
                   {resumeData.skills && resumeData.skills.length > 0 && (
-                    <Card style={{ marginBottom: 12, padding: 20 }}>
-                      <div style={{ fontSize: 14, fontWeight: 650, color: "var(--gray-900)", marginBottom: 12 }}>Skills</div>
+                    <Card isDarkMode={isDarkMode} style={{ marginBottom: 12, padding: 20 }}>
+                      <div style={{ fontSize: 14, fontWeight: 650, color: isDarkMode ? "#e8eef7" : "var(--gray-900)", marginBottom: 12 }}>Skills</div>
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
                         {resumeData.skills.map((skill, i) => (
                           <span key={i} style={{
                             padding: "6px 12px", borderRadius: 8,
-                            background: "var(--gray-100)", fontSize: 12.5,
-                            color: "var(--gray-700)", fontWeight: 500,
-                            border: "1px solid var(--gray-200)",
+                            background: isDarkMode ? "rgba(91,127,196,0.15)" : "var(--gray-100)", fontSize: 12.5,
+                            color: isDarkMode ? "#b4c3d9" : "var(--gray-700)", fontWeight: 500,
+                            border: isDarkMode ? "1px solid rgba(91,127,196,0.3)" : "1px solid var(--gray-200)",
                           }}>{typeof skill === 'string' ? skill : skill.name}</span>
                         ))}
                       </div>
@@ -1969,22 +1981,22 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed }) => {
 
                   {/* Experience Card */}
                   {resumeData.experiences && resumeData.experiences.length > 0 && (
-                    <Card style={{ marginBottom: 12, padding: 20 }}>
-                      <div style={{ fontSize: 14, fontWeight: 650, color: "var(--gray-900)", marginBottom: 14 }}>Experience</div>
+                    <Card isDarkMode={isDarkMode} style={{ marginBottom: 12, padding: 20 }}>
+                      <div style={{ fontSize: 14, fontWeight: 650, color: isDarkMode ? "#e8eef7" : "var(--gray-900)", marginBottom: 14 }}>Experience</div>
                       {resumeData.experiences.map((exp, i) => (
                         <div key={i} style={{ 
                           marginBottom: i < resumeData.experiences.length - 1 ? 16 : 0,
                           paddingBottom: i < resumeData.experiences.length - 1 ? 16 : 0,
-                          borderBottom: i < resumeData.experiences.length - 1 ? "1px solid var(--gray-100)" : "none"
+                          borderBottom: i < resumeData.experiences.length - 1 ? (isDarkMode ? "1px solid rgba(70,100,150,0.2)" : "1px solid var(--gray-100)") : "none"
                         }}>
-                          {exp.title && <div style={{ fontSize: 14, fontWeight: 650, color: "var(--gray-900)", marginBottom: 4 }}>{exp.title}</div>}
+                          {exp.title && <div style={{ fontSize: 14, fontWeight: 650, color: isDarkMode ? "#e8eef7" : "var(--gray-900)", marginBottom: 4 }}>{exp.title}</div>}
                           {(exp.company || exp.duration) && (
-                            <div style={{ fontSize: 12.5, color: "var(--gray-500)", marginBottom: 6 }}>
+                            <div style={{ fontSize: 12.5, color: isDarkMode ? "#8a9bb5" : "var(--gray-500)", marginBottom: 6 }}>
                               {exp.company}{exp.company && exp.duration ? ' · ' : ''}{exp.duration}
                             </div>
                           )}
                           {exp.description && Array.isArray(exp.description) && exp.description.length > 0 && (
-                            <div style={{ fontSize: 12.5, color: "var(--gray-600)", lineHeight: 1.6 }}>
+                            <div style={{ fontSize: 12.5, color: isDarkMode ? "#b4c3d9" : "var(--gray-600)", lineHeight: 1.6 }}>
                               {exp.description.join('. ')}
                             </div>
                           )}
@@ -1995,21 +2007,21 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed }) => {
 
                   {/* Education Card */}
                   {resumeData.education && resumeData.education.length > 0 && (
-                    <Card style={{ marginBottom: 12, padding: 20 }}>
-                      <div style={{ fontSize: 14, fontWeight: 650, color: "var(--gray-900)", marginBottom: 14 }}>Education</div>
+                    <Card isDarkMode={isDarkMode} style={{ marginBottom: 12, padding: 20 }}>
+                      <div style={{ fontSize: 14, fontWeight: 650, color: isDarkMode ? "#e8eef7" : "var(--gray-900)", marginBottom: 14 }}>Education</div>
                       {resumeData.education.map((edu, i) => (
                         <div key={i} style={{ 
                           marginBottom: i < resumeData.education.length - 1 ? 14 : 0,
                           paddingBottom: i < resumeData.education.length - 1 ? 14 : 0,
-                          borderBottom: i < resumeData.education.length - 1 ? "1px solid var(--gray-100)" : "none"
+                          borderBottom: i < resumeData.education.length - 1 ? (isDarkMode ? "1px solid rgba(70,100,150,0.2)" : "1px solid var(--gray-100)") : "none"
                         }}>
-                          {edu.degree && <div style={{ fontSize: 14, fontWeight: 650, color: "var(--gray-900)", marginBottom: 4 }}>{edu.degree}</div>}
+                          {edu.degree && <div style={{ fontSize: 14, fontWeight: 650, color: isDarkMode ? "#e8eef7" : "var(--gray-900)", marginBottom: 4 }}>{edu.degree}</div>}
                           {(edu.institution || edu.year) && (
-                            <div style={{ fontSize: 12.5, color: "var(--gray-500)", marginBottom: 4 }}>
+                            <div style={{ fontSize: 12.5, color: isDarkMode ? "#8a9bb5" : "var(--gray-500)", marginBottom: 4 }}>
                               {edu.institution}{edu.institution && edu.year ? ' · ' : ''}{edu.year}
                             </div>
                           )}
-                          {edu.gpa && <div style={{ fontSize: 12.5, color: "var(--gray-600)" }}>CGPA: {edu.gpa}</div>}
+                          {edu.gpa && <div style={{ fontSize: 12.5, color: isDarkMode ? "#b4c3d9" : "var(--gray-600)" }}>CGPA: {edu.gpa}</div>}
                         </div>
                       ))}
                     </Card>
@@ -2017,16 +2029,16 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed }) => {
 
                   {/* Projects Card */}
                   {resumeData.projects && resumeData.projects.length > 0 && (
-                    <Card style={{ marginBottom: 12, padding: 20 }}>
-                      <div style={{ fontSize: 14, fontWeight: 650, color: "var(--gray-900)", marginBottom: 14 }}>Projects</div>
+                    <Card isDarkMode={isDarkMode} style={{ marginBottom: 12, padding: 20 }}>
+                      <div style={{ fontSize: 14, fontWeight: 650, color: isDarkMode ? "#e8eef7" : "var(--gray-900)", marginBottom: 14 }}>Projects</div>
                       {resumeData.projects.map((proj, i) => (
                         <div key={i} style={{ 
                           marginBottom: i < resumeData.projects.length - 1 ? 14 : 0,
                           paddingBottom: i < resumeData.projects.length - 1 ? 14 : 0,
-                          borderBottom: i < resumeData.projects.length - 1 ? "1px solid var(--gray-100)" : "none"
+                          borderBottom: i < resumeData.projects.length - 1 ? (isDarkMode ? "1px solid rgba(70,100,150,0.2)" : "1px solid var(--gray-100)") : "none"
                         }}>
                           {proj.name && (
-                            <div style={{ fontSize: 13.5, fontWeight: 650, color: "var(--gray-900)", marginBottom: 8 }}>
+                            <div style={{ fontSize: 13.5, fontWeight: 650, color: isDarkMode ? "#e8eef7" : "var(--gray-900)", marginBottom: 8 }}>
                               {proj.name}
                             </div>
                           )}
@@ -2035,9 +2047,9 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed }) => {
                               {proj.technologies.map((tech, j) => (
                                 <span key={j} style={{
                                   padding: "4px 10px", borderRadius: 6,
-                                  background: "var(--gray-100)", fontSize: 11.5,
-                                  color: "var(--gray-600)", fontWeight: 500,
-                                  border: "1px solid var(--gray-200)",
+                                  background: isDarkMode ? "rgba(91,127,196,0.15)" : "var(--gray-100)", fontSize: 11.5,
+                                  color: isDarkMode ? "#b4c3d9" : "var(--gray-600)", fontWeight: 500,
+                                  border: isDarkMode ? "1px solid rgba(91,127,196,0.3)" : "1px solid var(--gray-200)",
                                 }}>{tech}</span>
                               ))}
                             </div>
@@ -2050,30 +2062,30 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed }) => {
               )}
 
               {/* Issues */}
-              <Card style={{ marginTop: 14 }}>
-                <div style={{ fontSize: 13.5, fontWeight: 650, color: "var(--gray-900)", marginBottom: 14 }}>Issues Found</div>
+              <Card isDarkMode={isDarkMode} style={{ marginTop: 14 }}>
+                <div style={{ fontSize: 13.5, fontWeight: 650, color: isDarkMode ? "#e8eef7" : "var(--gray-900)", marginBottom: 14 }}>Issues Found</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                   {issues.map((issue, i) => (
                     <div key={i} style={{
                       display: "flex", alignItems: "flex-start", gap: 10,
                       padding: "10px 14px", borderRadius: 10,
-                      background: issue.type === "error" ? "#fef2f2" : issue.type === "warning" ? "#fffbeb" : "var(--gray-50)",
-                      border: `1px solid ${issue.type === "error" ? "#fecaca" : issue.type === "warning" ? "#fde68a" : "var(--gray-150)"}`,
+                      background: issue.type === "error" ? (isDarkMode ? "rgba(239,68,68,0.15)" : "#fef2f2") : issue.type === "warning" ? (isDarkMode ? "rgba(245,158,11,0.15)" : "#fffbeb") : (isDarkMode ? "rgba(91,127,196,0.1)" : "var(--gray-50)"),
+                      border: `1px solid ${issue.type === "error" ? (isDarkMode ? "rgba(239,68,68,0.3)" : "#fecaca") : issue.type === "warning" ? (isDarkMode ? "rgba(245,158,11,0.3)" : "#fde68a") : (isDarkMode ? "rgba(91,127,196,0.2)" : "var(--gray-150)")}`,
                     }}>
-                      <div style={{ width: 6, height: 6, borderRadius: "50%", marginTop: 5, flexShrink: 0, background: issue.type === "error" ? "#ef4444" : issue.type === "warning" ? "#f59e0b" : "var(--gray-400)" }}/>
-                      <span style={{ fontSize: 13, color: "var(--gray-700)", lineHeight: 1.5 }}>{issue.text}</span>
+                      <div style={{ width: 6, height: 6, borderRadius: "50%", marginTop: 5, flexShrink: 0, background: issue.type === "error" ? "#ef4444" : issue.type === "warning" ? "#f59e0b" : (isDarkMode ? "#6b93d6" : "var(--gray-400)") }}/>
+                      <span style={{ fontSize: 13, color: isDarkMode ? "#e8eef7" : "var(--gray-700)", lineHeight: 1.5 }}>{issue.text}</span>
                     </div>
                   ))}
                 </div>
               </Card>
 
               {/* Suggestions */}
-              <Card style={{ marginTop: 14 }}>
-                <div style={{ fontSize: 13.5, fontWeight: 650, color: "var(--gray-900)", marginBottom: 14 }}>AI Suggestions</div>
+              <Card isDarkMode={isDarkMode} style={{ marginTop: 14 }}>
+                <div style={{ fontSize: 13.5, fontWeight: 650, color: isDarkMode ? "#e8eef7" : "var(--gray-900)", marginBottom: 14 }}>AI Suggestions</div>
                 {suggestions.map((s, i) => (
-                  <div key={i} style={{ display: "flex", gap: 10, padding: "8px 0", borderBottom: i < suggestions.length - 1 ? "1px solid var(--gray-100)" : "none" }}>
-                    <Icon name="zap" size={14} color="var(--gray-400)" style={{ marginTop: 2, flexShrink: 0 }}/>
-                    <span style={{ fontSize: 13, color: "var(--gray-600)", lineHeight: 1.6 }}>{s}</span>
+                  <div key={i} style={{ display: "flex", gap: 10, padding: "8px 0", borderBottom: i < suggestions.length - 1 ? (isDarkMode ? "1px solid rgba(70,100,150,0.2)" : "1px solid var(--gray-100)") : "none" }}>
+                    <Icon name="zap" size={14} color={isDarkMode ? "#6b93d6" : "var(--gray-400)"} style={{ marginTop: 2, flexShrink: 0 }}/>
+                    <span style={{ fontSize: 13, color: isDarkMode ? "#b4c3d9" : "var(--gray-600)", lineHeight: 1.6 }}>{s}</span>
                   </div>
                 ))}
               </Card>
@@ -2082,10 +2094,10 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed }) => {
         </div>
 
         {/* Score */}
-        <Card style={{ padding: "28px 24px", textAlign: "center" }}>
-          <div style={{ fontSize: 12, color: "var(--gray-400)", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 20 }}>ATS Score</div>
-          <CircularProgress value={uploaded ? atsScore : 0} size={140} label="Score"/>
-          {loading && <div style={{ fontSize: 12, color: "var(--gray-500)", marginTop: 10 }}>{loadingStage || "Analyzing..."}</div>}
+        <Card isDarkMode={isDarkMode} style={{ padding: "28px 24px", textAlign: "center" }}>
+          <div style={{ fontSize: 12, color: isDarkMode ? "#8a9bb5" : "var(--gray-400)", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 20 }}>ATS Score</div>
+          <CircularProgress value={uploaded ? atsScore : 0} size={140} label="Score" isDarkMode={isDarkMode}/>
+          {loading && <div style={{ fontSize: 12, color: isDarkMode ? "#b4c3d9" : "var(--gray-500)", marginTop: 10 }}>{loadingStage || "Analyzing..."}</div>}
           <div style={{ marginTop: 24, display: "flex", flexDirection: "column", gap: 10 }}>
             {[
               { label: "Formatting", val: scoreBreakdown.formatting_score },
@@ -2093,16 +2105,16 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed }) => {
               { label: "Impact", val: scoreBreakdown.readability_score },
             ].map(item => (
               <div key={item.label}>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 5, color: "var(--gray-500)", fontWeight: 500 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 5, color: isDarkMode ? "#b4c3d9" : "var(--gray-500)", fontWeight: 500 }}>
                   <span>{item.label}</span><span>{item.val}%</span>
                 </div>
-                <div style={{ height: 4, background: "var(--gray-100)", borderRadius: 99 }}>
-                  <div style={{ height: "100%", borderRadius: 99, width: `${uploaded ? item.val : 0}%`, background: "var(--gray-700)", transition: "width 1s ease" }}/>
+                <div style={{ height: 4, background: isDarkMode ? "rgba(91,127,196,0.2)" : "var(--gray-100)", borderRadius: 99 }}>
+                  <div style={{ height: "100%", borderRadius: 99, width: `${uploaded ? item.val : 0}%`, background: isDarkMode ? "#6b93d6" : "var(--gray-700)", transition: "width 1s ease" }}/>
                 </div>
               </div>
             ))}
           </div>
-          {uploaded && <Btn variant="primary" style={{ marginTop: 20, width: "100%", justifyContent: "center", padding: "10px" }}>Download report</Btn>}
+          {uploaded && <Btn variant="primary" style={{ marginTop: 20, width: "100%", justifyContent: "center", padding: "10px", background: isDarkMode ? "#5b7fc4" : undefined }}>Download report</Btn>}
         </Card>
       </div>
     </div>
@@ -2110,7 +2122,7 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed }) => {
 }
 
 // ─── JD Matcher ───────────────────────────────────────────────────────────────
-const JDMatcher = ({ resumeId, onJobMatched }) => {
+const JDMatcher = ({ resumeId, onJobMatched, isDarkMode }) => {
   const [jd, setJD] = useState("");
   const [loading, setLoading] = useState(false);
   const [loadingStage, setLoadingStage] = useState("");
@@ -2179,50 +2191,50 @@ const JDMatcher = ({ resumeId, onJobMatched }) => {
   return (
     <div style={{ padding: 28, display: "flex", flexDirection: "column", gap: 22, animation: "fadeIn 0.4s ease" }}>
       <div>
-        <h2 style={{ fontSize: 20, fontWeight: 700, color: "var(--gray-900)", letterSpacing: "-0.04em", marginBottom: 4 }}>JD Matcher</h2>
-        <p style={{ fontSize: 13.5, color: "var(--gray-500)" }}>Paste a job description to discover your match percentage and skill gaps.</p>
+        <h2 style={{ fontSize: 20, fontWeight: 700, color: isDarkMode ? "#e8eef7" : "var(--gray-900)", letterSpacing: "-0.04em", marginBottom: 4 }}>JD Matcher</h2>
+        <p style={{ fontSize: 13.5, color: isDarkMode ? "#b4c3d9" : "var(--gray-500)" }}>Paste a job description to discover your match percentage and skill gaps.</p>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          <Card style={{ padding: 20 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: "var(--gray-700)", marginBottom: 10 }}>Paste Job Description</div>
+          <Card isDarkMode={isDarkMode} style={{ padding: 20 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: isDarkMode ? "#e8eef7" : "var(--gray-700)", marginBottom: 10 }}>Paste Job Description</div>
             <textarea
               value={jd}
               onChange={e => setJD(e.target.value)}
               placeholder="Paste the full job description here..."
               disabled={loading}
               style={{
-                width: "100%", height: 200, border: "1px solid var(--gray-200)",
+                width: "100%", height: 200, border: isDarkMode ? "1px solid rgba(91,127,196,0.3)" : "1px solid var(--gray-200)",
                 borderRadius: 10, padding: "12px 14px", fontSize: 13,
-                color: "var(--gray-700)", background: "var(--gray-50)",
+                color: isDarkMode ? "#e8eef7" : "var(--gray-700)", background: isDarkMode ? "#1e2a3a" : "var(--gray-50)",
                 outline: "none", resize: "none", fontFamily: "inherit",
                 lineHeight: 1.65,
               }}
             />
-            <Btn variant="primary" onClick={analyzeMatch} disabled={loading} style={{ marginTop: 12, width: "100%", justifyContent: "center" }} icon={<Icon name="search" size={14}/>}> 
+            <Btn variant="primary" onClick={analyzeMatch} disabled={loading} style={{ marginTop: 12, width: "100%", justifyContent: "center", background: isDarkMode ? "#5b7fc4" : undefined }} icon={<Icon name="search" size={14}/>}> 
               {loading ? "Analyzing..." : "Analyze match"}
             </Btn>
-            {error && <div style={{ marginTop: 10, fontSize: 12.5, color: "#b91c1c", fontWeight: 600 }}>{error}</div>}
+            {error && <div style={{ marginTop: 10, fontSize: 12.5, color: "#ef4444", fontWeight: 600 }}>{error}</div>}
           </Card>
 
           {analyzed && (
-            <Card style={{ padding: 20 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: "var(--gray-700)", marginBottom: 14 }}>Focus Areas</div>
+            <Card isDarkMode={isDarkMode} style={{ padding: 20 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: isDarkMode ? "#e8eef7" : "var(--gray-700)", marginBottom: 14 }}>Focus Areas</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {focusAreas.length === 0 && (
-                  <div style={{ fontSize: 12.5, color: "var(--gray-500)" }}>No focus areas returned for this JD.</div>
+                  <div style={{ fontSize: 12.5, color: isDarkMode ? "#8a9bb5" : "var(--gray-500)" }}>No focus areas returned for this JD.</div>
                 )}
                 {focusAreas.map((a, i) => (
                   <div key={i} style={{
                     display: "flex", alignItems: "center", gap: 10,
                     padding: "10px 14px", borderRadius: 10,
-                    background: "var(--gray-900)", color: "var(--white)",
+                    background: isDarkMode ? "#5b7fc4" : "var(--gray-900)", color: "var(--white)",
                     fontSize: 13, fontWeight: 500,
                   }}>
-                    <Icon name="target" size={14} color="rgba(255,255,255,0.6)"/>
+                    <Icon name="target" size={14} color="rgba(255,255,255,0.7)"/>
                     {a.skill || "Skill"}
-                    <span style={{ marginLeft: "auto", fontSize: 11, color: "rgba(255,255,255,0.65)" }}>{a.priority || "MEDIUM"}</span>
+                    <span style={{ marginLeft: "auto", fontSize: 11, color: "rgba(255,255,255,0.75)" }}>{a.priority || "MEDIUM"}</span>
                   </div>
                 ))}
               </div>
@@ -2232,10 +2244,10 @@ const JDMatcher = ({ resumeId, onJobMatched }) => {
 
         {analyzed && (
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            <Card style={{ padding: "24px 22px", textAlign: "center" }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: "var(--gray-400)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 16 }}>Overall Match</div>
-              <CircularProgress value={overallMatch} size={130} label="Match"/>
-              <div style={{ marginTop: 18, fontSize: 13, color: "var(--gray-500)", lineHeight: 1.6 }}>
+            <Card isDarkMode={isDarkMode} style={{ padding: "24px 22px", textAlign: "center" }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: isDarkMode ? "#8a9bb5" : "var(--gray-400)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 16 }}>Overall Match</div>
+              <CircularProgress value={overallMatch} size={130} label="Match" isDarkMode={isDarkMode}/>
+              <div style={{ marginTop: 18, fontSize: 13, color: isDarkMode ? "#b4c3d9" : "var(--gray-500)", lineHeight: 1.6 }}>
                 You match <strong style={{ color: "var(--gray-900)" }}>{overallMatch}%</strong> of this job's requirements.
               </div>
             </Card>
@@ -2325,7 +2337,7 @@ const JDMatcher = ({ resumeId, onJobMatched }) => {
 };
 
 // ─── Quiz ────────────────────────────────────────────────────────────────────
-const Quiz = ({ resumeId, resumeData, jobDescription, onQuizComplete }) => {
+const Quiz = ({ resumeId, resumeData, jobDescription, onQuizComplete, isDarkMode }) => {
   const [domain, setDomain] = useState("Coding DSA");
   const [difficulty, setDifficulty] = useState("Easy");
   const [phase, setPhase] = useState("setup"); // setup | rules | quiz | result
@@ -2690,7 +2702,7 @@ const Quiz = ({ resumeId, resumeData, jobDescription, onQuizComplete }) => {
 };
 
 // ─── Mock Interview ───────────────────────────────────────────────────────────
-const MockInterview = ({ resumeId, resumeData, jobDescription, onInterviewProgress }) => {
+const MockInterview = ({ resumeId, resumeData, jobDescription, onInterviewProgress, isDarkMode }) => {
   const [mode, setMode] = useState("Technical");
   const [session, setSession] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -3000,7 +3012,7 @@ const MockInterview = ({ resumeId, resumeData, jobDescription, onInterviewProgre
 };
 
 // ─── Job Finder ───────────────────────────────────────────────────────────────
-const JobFinder = ({ resumeId, resumeData, onJobsUpdated }) => {
+const JobFinder = ({ resumeId, resumeData, onJobsUpdated, isDarkMode }) => {
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -3343,6 +3355,7 @@ const JobFinder = ({ resumeId, resumeData, onJobsUpdated }) => {
 // ─── Dashboard Shell ──────────────────────────────────────────────────────────
 const Dashboard = ({ onLogout }) => {
   const [active, setActive] = useState("resume");
+  const [isDarkMode, setIsDarkMode] = useState(false);
   const [learningStateVersion, setLearningStateVersion] = useState(0);
   const [resumeContext, setResumeContext] = useState({ 
     resumeId: null, 
@@ -3409,37 +3422,37 @@ const Dashboard = ({ onLogout }) => {
   const pages = {
     dashboard: {
       title: "Overview",
-      render: () => <DashboardOverview resumeContext={resumeContext} overviewMetrics={overviewMetrics}/>,
+      render: () => <DashboardOverview resumeContext={resumeContext} overviewMetrics={overviewMetrics} isDarkMode={isDarkMode}/>,
       resetOnResumeChange: false,
     },
     resume: {
       title: "Resume Analyzer",
-      render: () => <ResumeAnalyzer onResumeParsed={handleResumeParsed} onResumeAnalyzed={handleResumeAnalyzed}/>,
+      render: () => <ResumeAnalyzer onResumeParsed={handleResumeParsed} onResumeAnalyzed={handleResumeAnalyzed} isDarkMode={isDarkMode}/>,
       resetOnResumeChange: false,
     },
     matcher: {
       title: "JD Matcher",
-      render: () => <JDMatcher resumeId={resumeContext.resumeId} onJobMatched={handleJobDescriptionMatched}/>,
+      render: () => <JDMatcher resumeId={resumeContext.resumeId} onJobMatched={handleJobDescriptionMatched} isDarkMode={isDarkMode}/>,
       resetOnResumeChange: true,
     },
     roadmap: {
       title: "Learning Roadmap",
-      render: () => <Roadmap resumeId={resumeContext.resumeId} jobDescription={resumeContext.jobDescription} onProgressChange={handleRoadmapProgress}/>,
+      render: () => <Roadmap resumeId={resumeContext.resumeId} jobDescription={resumeContext.jobDescription} onProgressChange={handleRoadmapProgress} isDarkMode={isDarkMode}/>,
       resetOnResumeChange: true,
     },
     quiz: {
       title: "Adaptive Quiz",
-      render: () => <Quiz resumeId={resumeContext.resumeId} resumeData={resumeContext.resumeData} jobDescription={resumeContext.jobDescription} onQuizComplete={handleQuizComplete}/>,
+      render: () => <Quiz resumeId={resumeContext.resumeId} resumeData={resumeContext.resumeData} jobDescription={resumeContext.jobDescription} onQuizComplete={handleQuizComplete} isDarkMode={isDarkMode}/>,
       resetOnResumeChange: true,
     },
     interview: {
       title: "Mock Interview",
-      render: () => <MockInterview resumeId={resumeContext.resumeId} resumeData={resumeContext.resumeData} jobDescription={resumeContext.jobDescription} onInterviewProgress={handleInterviewProgress}/>,
+      render: () => <MockInterview resumeId={resumeContext.resumeId} resumeData={resumeContext.resumeData} jobDescription={resumeContext.jobDescription} onInterviewProgress={handleInterviewProgress} isDarkMode={isDarkMode}/>,
       resetOnResumeChange: true,
     },
     jobs: {
       title: "Job Finder",
-      render: () => <JobFinder resumeId={resumeContext.resumeId} resumeData={resumeContext.resumeData} onJobsUpdated={handleJobsUpdated}/>,
+      render: () => <JobFinder resumeId={resumeContext.resumeId} resumeData={resumeContext.resumeData} onJobsUpdated={handleJobsUpdated} isDarkMode={isDarkMode}/>,
       resetOnResumeChange: true,
     },
   };
@@ -3458,7 +3471,7 @@ const Dashboard = ({ onLogout }) => {
   }));
 
   return (
-    <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: "var(--gray-50)", position: "relative" }}>
+    <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: isDarkMode ? "#1a2332" : "var(--gray-50)", position: "relative" }}>
       {/* Animated Background Particles */}
       <div style={{ position: "fixed", inset: 0, overflow: "hidden", pointerEvents: "none", zIndex: 0 }}>
         {particles.map(p => (
@@ -3471,9 +3484,9 @@ const Dashboard = ({ onLogout }) => {
               width: p.size,
               height: p.size,
               borderRadius: "50%",
-              background: "rgba(160, 160, 160, 0.22)",
+              background: isDarkMode ? "rgba(100, 130, 200, 0.15)" : "rgba(160, 160, 160, 0.22)",
               animation: `${p.animation} ${p.duration}s ease-in-out ${p.delay}s infinite`,
-              boxShadow: `0 0 ${p.size * 2}px rgba(160, 160, 160, 0.12)`,
+              boxShadow: isDarkMode ? `0 0 ${p.size * 2}px rgba(100, 130, 200, 0.12)` : `0 0 ${p.size * 2}px rgba(160, 160, 160, 0.12)`,
               filter: "blur(0.5px)"
             }}
           />
@@ -3487,7 +3500,7 @@ const Dashboard = ({ onLogout }) => {
           width: 320,
           height: 320,
           borderRadius: "50%",
-          background: "radial-gradient(circle, rgba(180, 180, 180, 0.1), transparent 70%)",
+          background: isDarkMode ? "radial-gradient(circle, rgba(70, 100, 180, 0.12), transparent 70%)" : "radial-gradient(circle, rgba(180, 180, 180, 0.1), transparent 70%)",
           animation: "floatSlow 22s ease-in-out infinite",
           filter: "blur(50px)"
         }}/>
@@ -3498,7 +3511,7 @@ const Dashboard = ({ onLogout }) => {
           width: 380,
           height: 380,
           borderRadius: "50%",
-          background: "radial-gradient(circle, rgba(170, 170, 170, 0.08), transparent 70%)",
+          background: isDarkMode ? "radial-gradient(circle, rgba(80, 110, 190, 0.1), transparent 70%)" : "radial-gradient(circle, rgba(170, 170, 170, 0.08), transparent 70%)",
           animation: "floatSlow 26s ease-in-out infinite 4s",
           filter: "blur(55px)"
         }}/>
@@ -3509,15 +3522,15 @@ const Dashboard = ({ onLogout }) => {
           width: 300,
           height: 300,
           borderRadius: "50%",
-          background: "radial-gradient(circle, rgba(165, 165, 165, 0.07), transparent 70%)",
+          background: isDarkMode ? "radial-gradient(circle, rgba(90, 120, 200, 0.08), transparent 70%)" : "radial-gradient(circle, rgba(165, 165, 165, 0.07), transparent 70%)",
           animation: "floatSlow 24s ease-in-out infinite 8s",
           filter: "blur(52px)"
         }}/>
       </div>
 
-      <Sidebar active={active} setActive={setActive}/>
+      <Sidebar active={active} setActive={setActive} isDarkMode={isDarkMode}/>
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", position: "relative", zIndex: 1 }}>
-        <Topbar title={current.title} onLogout={onLogout}/>
+        <Topbar title={current.title} onLogout={onLogout} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode}/>
         <main style={{ flex: 1, overflowY: "auto", position: "relative" }}>
           {Object.entries(pages).map(([pageId, page]) => {
             const isVisible = active === pageId;
