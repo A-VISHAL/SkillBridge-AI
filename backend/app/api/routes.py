@@ -18,6 +18,7 @@ router = APIRouter()
 resume_store = {}
 progress_store = {}
 interview_sessions = {}
+interview_session_contexts = {}
 
 
 def _get_resume_or_404(resume_id: str) -> ParsedResume:
@@ -661,8 +662,14 @@ async def start_interview(
     """Start mock interview session"""
     try:
         resume_text = ""
-        if resume_id and resume_id in resume_store:
-            resume_text = resume_store[resume_id].raw_text
+        resume_data = {}
+        if resume_id:
+            resume = _get_resume_or_404(resume_id)
+            resume_text = resume.raw_text
+            try:
+                resume_data = resume.dict()
+            except Exception:
+                resume_data = {}
 
         parsed_quiz_context = {}
         if quiz_context:
@@ -684,9 +691,13 @@ async def start_interview(
             mode,
             count,
             resume_text=resume_text,
+            resume_data=resume_data,
             quiz_context=parsed_quiz_context,
             roadmap_context=roadmap_context,
         )
+
+        if not questions_data:
+            raise HTTPException(500, "Interview model returned no questions")
         
         questions = [InterviewQuestion(**q) for q in questions_data]
         
@@ -698,6 +709,22 @@ async def start_interview(
         )
         
         interview_sessions[session_id] = session
+        project_context = []
+        if isinstance(resume_data, dict):
+            for project in (resume_data.get("projects", []) or [])[:8]:
+                if isinstance(project, dict):
+                    name = str(project.get("name", "")).strip()
+                    if name:
+                        project_context.append(name)
+
+        interview_session_contexts[session_id] = {
+            "job_description": job_description,
+            "resume_text": resume_text,
+            "quiz_context": parsed_quiz_context,
+            "roadmap_context": roadmap_context,
+            "project_context": project_context,
+            "mode": mode,
+        }
 
         # Persist interview session + generated questions to Supabase (best-effort)
         if supabase_service.enabled:
@@ -725,8 +752,18 @@ async def start_interview(
             if not interview_ok:
                 print(f"Warning: failed to persist interview session: {interview_err}")
         
-        return session.dict()
+        payload = session.dict()
+        payload["generation_source"] = "model"
+        return payload
         
+    except HTTPException:
+        raise
+    except ai_service.AIServiceError as e:
+        if e.code == "rate_limit":
+            raise HTTPException(429, "Interview API is rate-limited right now. Please wait 5-10 seconds and try again.")
+        if e.code in {"auth", "config"}:
+            raise HTTPException(502, "Interview model is temporarily unavailable due to configuration/auth issue.")
+        raise HTTPException(500, f"Error starting interview: {str(e)}")
     except Exception as e:
         raise HTTPException(500, f"Error starting interview: {str(e)}")
 
@@ -750,10 +787,17 @@ async def evaluate_interview_answer(
             raise HTTPException(404, "Question not found")
         
         # Evaluate with AI
+        context = interview_session_contexts.get(session_id, {})
         feedback_data = await ai_service.evaluate_interview_answer(
             question.question,
             answer,
-            question.expected_keywords
+            question.expected_keywords,
+            jd_text=str(context.get("job_description", "")),
+            resume_text=str(context.get("resume_text", "")),
+            quiz_context=context.get("quiz_context", {}),
+            roadmap_context=context.get("roadmap_context", []),
+            project_context=context.get("project_context", []),
+            mode=str(context.get("mode", session.mode)),
         )
         
         feedback = InterviewFeedback(
@@ -782,6 +826,14 @@ async def evaluate_interview_answer(
         
         return feedback.dict()
         
+    except HTTPException:
+        raise
+    except ai_service.AIServiceError as e:
+        if e.code == "rate_limit":
+            raise HTTPException(429, "Interview API is rate-limited right now. Please wait a few seconds and retry your answer.")
+        if e.code in {"auth", "config"}:
+            raise HTTPException(502, "Interview model evaluation is temporarily unavailable.")
+        raise HTTPException(500, f"Error evaluating answer: {str(e)}")
     except Exception as e:
         raise HTTPException(500, f"Error evaluating answer: {str(e)}")
 

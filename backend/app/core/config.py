@@ -88,6 +88,18 @@ class Settings:
     )
     QUIZ_MODEL: str = _get_env("QUIZ_MODEL", "OXLO_QUIZ_MODEL", default="deepseek-coder-33b")
 
+    # Interview-specific model routing
+    INTERVIEW_API_KEY: str = _normalize_api_key(
+        _get_env("INTERVIEW_API_KEY", "OXLO_INTERVIEW_API_KEY", "OXLO_API_KEY", "OXLO_API_TOKEN")
+    )
+    INTERVIEW_CHAT_ENDPOINT: str = _get_env(
+        "INTERVIEW_CHAT_ENDPOINT",
+        "OXLO_INTERVIEW_CHAT_ENDPOINT",
+        "OXLO_CHAT_ENDPOINT",
+        default="https://api.oxlo.ai/v1/chat/completions",
+    )
+    INTERVIEW_MODEL: str = _get_env("INTERVIEW_MODEL", "OXLO_INTERVIEW_MODEL", default="gemma-3-27b")
+
     # Fallback policy: only allow fallback for explicit provider rate limits
     ENABLE_RATE_LIMIT_FALLBACK: bool = _get_env_bool("ENABLE_RATE_LIMIT_FALLBACK", default=True)
 

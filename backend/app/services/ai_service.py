@@ -575,6 +575,21 @@ async def call_quiz_chat(
     )
 
 
+async def call_interview_chat(
+    messages: List[Dict[str, str]],
+    temperature: float = 0.7,
+    max_tokens: int = 2000,
+) -> str:
+    return await call_model_chat(
+        messages=messages,
+        endpoint=settings.INTERVIEW_CHAT_ENDPOINT,
+        api_key=settings.INTERVIEW_API_KEY,
+        model=settings.INTERVIEW_MODEL,
+        temperature=temperature,
+        max_tokens=max_tokens,
+    )
+
+
 def _allow_rate_limit_fallback(error: Exception) -> bool:
     return (
         settings.ENABLE_RATE_LIMIT_FALLBACK
@@ -1374,6 +1389,7 @@ async def generate_interview_questions(
     mode: str,
     count: int = 5,
     resume_text: str = "",
+    resume_data: Optional[Dict[str, Any]] = None,
     quiz_context: Optional[Dict[str, Any]] = None,
     roadmap_context: Optional[List[Dict[str, Any]]] = None,
 ) -> List[Dict]:
@@ -1381,174 +1397,336 @@ async def generate_interview_questions(
 
     quiz_context = quiz_context or {}
     roadmap_context = roadmap_context or []
+    resume_data = resume_data or {}
 
-    def _normalize_text(value: str) -> str:
-        return " ".join(str(value or "").strip().lower().split())
-
-    def _extract_resume_signals(text: str) -> List[str]:
-        signals = []
-        lower = text.lower()
-        keyword_map = [
-            ("React", ["react", "hooks", "jsx", "component"]),
-            ("JavaScript", ["javascript", "typescript", "es6", "dom"]),
-            ("Python", ["python", "django", "flask", "fastapi"]),
-            ("Backend", ["node", "express", "backend", "api"]),
-            ("Databases", ["sql", "postgres", "mysql", "mongodb", "database"]),
-            ("DSA", ["algorithm", "data structure", "binary search", "tree", "graph"]),
-        ]
-        for label, keywords in keyword_map:
-            if any(keyword in lower for keyword in keywords):
-                signals.append(label)
-        return signals[:5]
+    def _extract_project_focus() -> List[str]:
+        projects = resume_data.get("projects", []) if isinstance(resume_data, dict) else []
+        focus: List[str] = []
+        if isinstance(projects, list):
+            for project in projects[:6]:
+                if not isinstance(project, dict):
+                    continue
+                name = str(project.get("name", "")).strip()
+                description = str(project.get("description", "")).strip()
+                tech_stack = project.get("technologies") or project.get("tech_stack") or []
+                if name:
+                    focus.append(name)
+                if description:
+                    focus.append(description[:120])
+                if isinstance(tech_stack, list):
+                    focus.extend([str(t).strip() for t in tech_stack[:4] if str(t).strip()])
+        return focus[:8]
 
     def _extract_roadmap_focus() -> List[str]:
-        focus = []
-        for task in roadmap_context[:5]:
+        focus: List[str] = []
+        for task in roadmap_context[:8]:
             skill = str(task.get("skill", "")).strip()
             task_text = str(task.get("task", "")).strip()
             if skill:
                 focus.append(skill)
-            elif task_text:
-                focus.append(task_text[:80])
-        return focus
+            if task_text:
+                focus.append(task_text[:120])
+        return focus[:10]
 
     def _extract_quiz_focus() -> List[str]:
-        focus = []
+        focus: List[str] = []
         weak_topics = quiz_context.get("weakTopics") or quiz_context.get("weak_topics") or []
         if isinstance(weak_topics, list):
             focus.extend([str(topic).strip() for topic in weak_topics if str(topic).strip()])
+        recent_questions = quiz_context.get("questions") or []
+        if isinstance(recent_questions, list):
+            for item in recent_questions[:5]:
+                if isinstance(item, dict):
+                    q_topic = str(item.get("topic", "")).strip()
+                    if q_topic:
+                        focus.append(q_topic)
         domain = str(quiz_context.get("domain", "")).strip()
-        difficulty = str(quiz_context.get("difficulty", "")).strip()
         if domain:
             focus.append(domain)
-        if difficulty:
-            focus.append(difficulty)
-        return focus[:5]
+        return focus[:10]
 
-    resume_signals = _extract_resume_signals(resume_text)
+    def _normalize_interview_question(item: Dict[str, Any], index: int) -> Optional[Dict[str, Any]]:
+        if not isinstance(item, dict):
+            return None
+
+        question_text = str(item.get("question", "")).strip()
+        if not question_text:
+            return None
+
+        q_type = str(item.get("type", "Technical")).strip().title()
+        if q_type not in {"Technical", "Hr", "Behavioral", "System Design"}:
+            q_type = "Technical" if not mode.lower().startswith("hr") else "HR"
+        if q_type == "Hr":
+            q_type = "HR"
+
+        difficulty = str(item.get("difficulty", "Medium")).strip().title()
+        if difficulty not in {"Easy", "Medium", "Hard", "Advanced"}:
+            difficulty = "Medium"
+
+        expected_keywords = item.get("expected_keywords", [])
+        if not isinstance(expected_keywords, list):
+            expected_keywords = []
+        expected_keywords = [str(k).strip() for k in expected_keywords if str(k).strip()][:8]
+        if len(expected_keywords) < 3:
+            expected_keywords = [w for w in re.findall(r"[A-Za-z][A-Za-z0-9+.#-]{2,}", question_text)[:5]]
+
+        criteria = item.get("evaluation_criteria", [])
+        if not isinstance(criteria, list):
+            criteria = []
+        criteria = [str(c).strip() for c in criteria if str(c).strip()][:6]
+        if len(criteria) < 3:
+            criteria = ["Clarity", "Technical depth", "Relevance"]
+
+        return {
+            "id": str(item.get("id", f"int-{index + 1}")),
+            "type": q_type,
+            "difficulty": difficulty,
+            "question": question_text,
+            "expected_keywords": expected_keywords,
+            "evaluation_criteria": criteria,
+        }
+
+    def _dedupe(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        seen = set()
+        output: List[Dict[str, Any]] = []
+        for item in items:
+            key = " ".join(str(item.get("question", "")).strip().lower().split())
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            output.append(item)
+        return output
+
+    normalized_count = max(1, int(count or 5))
+    project_focus = _extract_project_focus()
     roadmap_focus = _extract_roadmap_focus()
     quiz_focus = _extract_quiz_focus()
-    primary_focus = resume_signals[0] if resume_signals else (quiz_context.get("domain", "core stack") or "core stack")
-    secondary_focus = roadmap_focus[0] if roadmap_focus else (quiz_focus[0] if quiz_focus else "roadmap work")
-    quiz_topic = str(quiz_context.get("domain", "quiz topic")).strip() or "quiz topic"
+    mode_label = "HR" if mode.lower().startswith("hr") else "Technical"
 
-    def _fallback_questions() -> List[Dict[str, Any]]:
-        if mode.lower().startswith("hr"):
-            return [
-                {
-                    "id": "hr-1",
-                    "type": "HR",
-                    "difficulty": "Easy",
-                    "question": f"Tell me about yourself and how your background fits this role, especially around {primary_focus}.",
-                    "expected_keywords": ["background", "role", "experience", primary_focus.lower()],
-                    "evaluation_criteria": ["Clarity", "Relevance", "Confidence"],
-                },
-                {
-                    "id": "hr-2",
-                    "type": "HR",
-                    "difficulty": "Medium",
-                    "question": f"Which project from your resume are you most proud of and how does it connect to your roadmap learning around {secondary_focus}?",
-                    "expected_keywords": ["project", "impact", "challenge", secondary_focus.lower()],
-                    "evaluation_criteria": ["Ownership", "Impact", "Communication"],
-                },
-                {
-                    "id": "hr-3",
-                    "type": "Behavioral",
-                    "difficulty": "Medium",
-                    "question": f"Describe a time you had to learn something quickly while following your roadmap and preparing for {quiz_topic}.",
-                    "expected_keywords": ["learn", "roadmap", "adapt", quiz_topic.lower()],
-                    "evaluation_criteria": ["Learning agility", "Structure", "Outcome"],
-                },
-                {
-                    "id": "hr-4",
-                    "type": "Behavioral",
-                    "difficulty": "Hard",
-                    "question": f"Tell me about a conflict or challenge on a team project and how you resolved it while working on {secondary_focus}.",
-                    "expected_keywords": ["conflict", "team", "resolution", secondary_focus.lower()],
-                    "evaluation_criteria": ["Collaboration", "Problem solving", "Maturity"],
-                },
-                {
-                    "id": "hr-5",
-                    "type": "HR",
-                    "difficulty": "Medium",
-                    "question": f"Why should we hire you for a role focused on {quiz_topic}, and what have you already done on your roadmap to close the gap?",
-                    "expected_keywords": ["skills", "fit", "value", "growth"],
-                    "evaluation_criteria": ["Fit", "Confidence", "Specificity"],
-                },
+    prompt = f"""Generate exactly {normalized_count} mock interview questions in JSON array format.
+
+Mode: {mode_label}
+Job Description:
+{(jd_text or "")[:2200]}
+
+Resume Extract:
+{(resume_text or "")[:2800]}
+
+Project Highlights:
+{json.dumps(project_focus[:8], ensure_ascii=True)}
+
+Roadmap Progress Signals:
+{json.dumps(roadmap_focus[:8], ensure_ascii=True)}
+
+Quiz Signals:
+{json.dumps(quiz_focus[:8], ensure_ascii=True)}
+
+Rules:
+1) Questions must be personalized to this candidate profile and JD.
+2) Include resume projects, roadmap progress, and quiz weak areas in questioning strategy.
+3) Do not return generic interview questions.
+4) Questions must be unique and progressively challenging.
+5) Return ONLY a JSON array with objects containing keys:
+   id, type, difficulty, question, expected_keywords (array), evaluation_criteria (array)
+6) expected_keywords must contain 3-8 concrete terms.
+7) evaluation_criteria must contain 3-6 scoring dimensions.
+"""
+
+    compact_prompt = f"""Return {normalized_count} personalized {mode_label} interview questions as JSON array only.
+Use resume + JD + roadmap + quiz + project context.
+Keys per item: id,type,difficulty,question,expected_keywords,evaluation_criteria.
+No duplicates."""
+
+    messages = [
+        {"role": "system", "content": "You are a senior interviewer generating realistic, candidate-specific interview questions."},
+        {"role": "user", "content": prompt},
+    ]
+
+    try:
+        response = await call_interview_chat(messages, temperature=0.65, max_tokens=1800)
+        parsed = json.loads(_extract_json_block(response))
+        if isinstance(parsed, list):
+            normalized = []
+            for index, item in enumerate(parsed):
+                question = _normalize_interview_question(item, index)
+                if question:
+                    normalized.append(question)
+            normalized = _dedupe(normalized)
+            if len(normalized) >= normalized_count:
+                return normalized[:normalized_count]
+    except Exception as first_error:
+        try:
+            retry_messages = [
+                {"role": "system", "content": "You are a senior interviewer generating realistic, candidate-specific interview questions."},
+                {"role": "user", "content": compact_prompt},
             ]
+            retry_response = await call_interview_chat(retry_messages, temperature=0.5, max_tokens=1300)
+            retry_parsed = json.loads(_extract_json_block(retry_response))
+            if isinstance(retry_parsed, list):
+                normalized = []
+                for index, item in enumerate(retry_parsed):
+                    question = _normalize_interview_question(item, index)
+                    if question:
+                        normalized.append(question)
+                normalized = _dedupe(normalized)
+                if len(normalized) >= normalized_count:
+                    return normalized[:normalized_count]
+        except Exception as retry_error:
+            raise AIServiceError("interview_generation", f"Interview generation failed: {str(first_error)} | Retry failed: {str(retry_error)}") from retry_error
 
-        return [
-            {
-                "id": "tech-1",
-                "type": "Technical",
-                "difficulty": "Easy",
-                "question": f"Walk me through the most relevant project from your resume and the problem it solved using {primary_focus}.",
-                "expected_keywords": resume_signals[:2] + ["project", "problem", "solution"],
-                "evaluation_criteria": ["Clarity", "Technical depth", "Business impact"],
-            },
-            {
-                "id": "tech-2",
-                "type": "Technical",
-                "difficulty": "Medium",
-                "question": f"Which topic from your recent {quiz_topic} quiz was the hardest, and how would you improve it before the next interview?",
-                "expected_keywords": ["hardest", "improve", "quiz", quiz_topic.lower()],
-                "evaluation_criteria": ["Self-awareness", "Learning plan", "Technical accuracy"],
-            },
-            {
-                "id": "tech-3",
-                "type": "Technical",
-                "difficulty": "Medium",
-                "question": f"Explain one roadmap task you completed and what you built or learned from it, especially around {secondary_focus}.",
-                "expected_keywords": ["roadmap", "built", "learned", secondary_focus.lower()],
-                "evaluation_criteria": ["Ownership", "Execution", "Reflection"],
-            },
-            {
-                "id": "tech-4",
-                "type": "Technical",
-                "difficulty": "Hard",
-                "question": f"How would you design a scalable solution for one skill area from your roadmap such as {primary_focus}?",
-                "expected_keywords": ["scalable", "architecture", "trade-off", "design"],
-                "evaluation_criteria": ["System thinking", "Trade-offs", "Depth"],
-            },
-            {
-                "id": "tech-5",
-                "type": "Technical",
-                "difficulty": "Hard",
-                "question": f"If you scored lower on the {quiz_topic} quiz, what exact steps will you take before the next interview and which roadmap tasks will you revisit?",
-                "expected_keywords": ["practice", "revision", "weak", "plan"],
-                "evaluation_criteria": ["Honesty", "Actionability", "Growth mindset"],
-            },
-        ]
+    raise AIServiceError("interview_generation", "Interview generation returned insufficient validated questions")
 
-    return _fallback_questions()[:count]
+async def evaluate_interview_answer(
+    question: str,
+    answer: str,
+    expected_keywords: List[str],
+    jd_text: str = "",
+    resume_text: str = "",
+    quiz_context: Optional[Dict[str, Any]] = None,
+    roadmap_context: Optional[List[Dict[str, Any]]] = None,
+    project_context: Optional[List[str]] = None,
+    mode: str = "Technical",
+) -> Dict:
+    """Evaluate interview answer using interview model route."""
 
-async def evaluate_interview_answer(question: str, answer: str, expected_keywords: List[str]) -> Dict:
-    """Evaluate interview answer"""
-
-    cleaned_answer = answer.strip().lower()
-    cleaned_keywords = [str(keyword).strip().lower() for keyword in expected_keywords if str(keyword).strip()]
-    keyword_hits = sum(1 for keyword in cleaned_keywords if keyword in cleaned_answer)
-    coverage = (keyword_hits / len(cleaned_keywords)) if cleaned_keywords else 0
-    deterministic_score = 0 if not cleaned_answer else max(0, min(10, round(coverage * 10)))
-
-    if not cleaned_answer:
+    if not (answer or "").strip():
         return {
             "score": 0,
             "strengths": [],
             "weaknesses": ["No answer provided"],
-            "model_answer": "Answer the question directly and include the expected keywords.",
+            "model_answer": "Provide a concise structured answer with one concrete project example and measurable outcome.",
             "confidence_level": "Low",
-            "improvement_tips": ["Answer each part of the question", "Use one example", "Mention the expected keywords"],
+            "improvement_tips": ["Answer directly", "Use STAR structure", "Include impact metrics"],
         }
 
-    return {
-        "score": deterministic_score,
-        "strengths": ["Answered the question directly"] if deterministic_score >= 5 else [],
-        "weaknesses": ["Missing expected keywords or details"] if deterministic_score < 7 else [],
-        "model_answer": "A stronger answer should directly cover the expected keywords and include a concrete example.",
-        "confidence_level": "High" if deterministic_score >= 7 else "Medium" if deterministic_score >= 4 else "Low",
-        "improvement_tips": ["Use the STAR method", "Mention concrete examples", "Tie your answer back to the role"],
-    }
+    quiz_context = quiz_context or {}
+    roadmap_context = roadmap_context or []
+    project_context = project_context or []
+    keyword_context = [str(k).strip() for k in expected_keywords if str(k).strip()][:10]
+
+    prompt = f"""Evaluate this interview answer and score it from 0 to 10.
+
+Mode: {mode}
+Question: {question}
+Candidate Answer: {answer}
+Expected Keywords: {json.dumps(keyword_context, ensure_ascii=True)}
+Job Description Context: {(jd_text or '')[:1600]}
+Resume Context: {(resume_text or '')[:1600]}
+Quiz Context: {json.dumps(quiz_context, ensure_ascii=True)[:1200]}
+Roadmap Context: {json.dumps(roadmap_context, ensure_ascii=True)[:1200]}
+Project Context: {json.dumps(project_context, ensure_ascii=True)[:900]}
+
+Scoring dimensions:
+1) Relevance to question and role
+2) Technical depth / clarity
+3) Use of candidate-specific evidence (projects/roadmap/quiz learnings)
+4) Communication and structure
+
+Return ONLY JSON object with keys:
+score (integer 0-10), strengths (array), weaknesses (array), model_answer (string), confidence_level (High/Medium/Low), improvement_tips (array)
+
+Formatting rules for model_answer:
+1) Keep it concise (max 120 words)
+2) Use this exact structure with line breaks:
+    Summary: ...
+    Strength: ...
+    Gap: ...
+    Better answer: ...
+"""
+
+    compact_prompt = f"""Score this answer 0-10 and return JSON keys: score,strengths,weaknesses,model_answer,confidence_level,improvement_tips.
+Question: {question}
+Answer: {answer}
+Expected Keywords: {json.dumps(keyword_context, ensure_ascii=True)}"""
+
+    def _normalize_feedback(raw: Dict[str, Any]) -> Dict[str, Any]:
+        try:
+            score = int(round(float(raw.get("score", 0))))
+        except Exception:
+            score = 0
+        score = max(0, min(10, score))
+
+        strengths = raw.get("strengths", [])
+        if not isinstance(strengths, list):
+            strengths = []
+        strengths = [str(s).strip() for s in strengths if str(s).strip()][:6]
+
+        weaknesses = raw.get("weaknesses", [])
+        if not isinstance(weaknesses, list):
+            weaknesses = []
+        weaknesses = [str(s).strip() for s in weaknesses if str(s).strip()][:6]
+
+        tips = raw.get("improvement_tips", [])
+        if not isinstance(tips, list):
+            tips = []
+        tips = [str(s).strip() for s in tips if str(s).strip()][:6]
+
+        model_answer = str(raw.get("model_answer", "")).strip()
+        if model_answer and len(model_answer) > 900:
+            model_answer = model_answer[:900].rstrip() + "..."
+
+        if not model_answer:
+            summary = "Your answer is relevant but needs stronger structure and role alignment."
+            strength_line = strengths[0] if strengths else "You addressed the core question."
+            gap_line = weaknesses[0] if weaknesses else "Add clearer technical depth and measurable impact."
+            better_line = "Use a STAR-style response with one concrete project, key decision, and measurable result."
+            model_answer = (
+                f"Summary: {summary}\n"
+                f"Strength: {strength_line}\n"
+                f"Gap: {gap_line}\n"
+                f"Better answer: {better_line}"
+            )
+
+        # Force a predictable structure even if provider returns free-form prose.
+        if "Summary:" not in model_answer or "Strength:" not in model_answer or "Gap:" not in model_answer or "Better answer:" not in model_answer:
+            summary = "Your answer is partially correct but can be clearer and more interview-ready."
+            strength_line = strengths[0] if strengths else "You attempted to connect your experience to the question."
+            gap_line = weaknesses[0] if weaknesses else "Include deeper reasoning, trade-offs, and measurable outcomes."
+            better_line = "Answer in STAR format, mention one project example, explain decisions, and quantify impact."
+            model_answer = (
+                f"Summary: {summary}\n"
+                f"Strength: {strength_line}\n"
+                f"Gap: {gap_line}\n"
+                f"Better answer: {better_line}"
+            )
+
+        confidence_level = str(raw.get("confidence_level", "Medium")).strip().title()
+        if confidence_level not in {"High", "Medium", "Low"}:
+            confidence_level = "Medium"
+
+        return {
+            "score": score,
+            "strengths": strengths,
+            "weaknesses": weaknesses,
+            "model_answer": model_answer,
+            "confidence_level": confidence_level,
+            "improvement_tips": tips,
+        }
+
+    messages = [
+        {"role": "system", "content": "You are an expert interviewer evaluating answers with strict but fair scoring."},
+        {"role": "user", "content": prompt},
+    ]
+
+    try:
+        response = await call_interview_chat(messages, temperature=0.25, max_tokens=900)
+        parsed = json.loads(_extract_json_block(response))
+        if isinstance(parsed, dict):
+            return _normalize_feedback(parsed)
+    except Exception as first_error:
+        try:
+            retry_messages = [
+                {"role": "system", "content": "Return strict JSON only."},
+                {"role": "user", "content": compact_prompt},
+            ]
+            retry_response = await call_interview_chat(retry_messages, temperature=0.2, max_tokens=600)
+            retry_parsed = json.loads(_extract_json_block(retry_response))
+            if isinstance(retry_parsed, dict):
+                return _normalize_feedback(retry_parsed)
+        except Exception as retry_error:
+            raise AIServiceError("interview_evaluation", f"Interview evaluation failed: {str(first_error)} | Retry failed: {str(retry_error)}") from retry_error
+
+    raise AIServiceError("interview_evaluation", "Interview evaluation returned invalid payload")
 
 
 def _calculate_ats_score_rule_based(
