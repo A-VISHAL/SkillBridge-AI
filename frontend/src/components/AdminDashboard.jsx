@@ -235,7 +235,7 @@ export function AdminDashboard({ onLogout }) {
         <aside style={{ position: 'sticky', top: 0, height: '100vh', padding: 20, borderRight: '1px solid rgba(255,255,255,0.08)', background: 'rgba(8,11,20,0.7)', backdropFilter: 'blur(18px)' }}>
           <div style={{ padding: 14, borderRadius: 22, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}>
             <div style={{ fontSize: 14, fontWeight: 800, letterSpacing: '-0.04em' }}>SkillBridge Admin</div>
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', marginTop: 4 }}>Connected to Supabase</div>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', marginTop: 4 }}>Empowering careers, one skill at a time</div>
           </div>
 
           <nav style={{ display: 'grid', gap: 10, marginTop: 18 }}>

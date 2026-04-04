@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { AnimatePresence, motion, useScroll, useTransform } from "framer-motion";
 import Roadmap from "./components/Roadmap";
 import { AuthPage } from "./components/AuthPage";
 import { AdminDashboard } from "./components/AdminDashboard";
@@ -103,6 +104,10 @@ const globalStyles = `
   @keyframes floatSlow {
     0%, 100% { transform: translateY(0px) translateX(0px); }
     50% { transform: translateY(-20px) translateX(10px); }
+  }
+  @keyframes orbitSpin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
   }
 
   .fade-up { animation: fadeUp 0.6s ease forwards; }
@@ -309,6 +314,288 @@ const ProgressBar = ({ value, label, sublabel }) => (
   </div>
 );
 
+const ProjectExperiencePanel = () => {
+  const panelRef = useRef(null);
+  const [activeDeck, setActiveDeck] = useState(0);
+  const [signalIndex, setSignalIndex] = useState(0);
+  const [hoveredOrbit, setHoveredOrbit] = useState("");
+
+  const tracks = [
+    {
+      title: "Deep-Scan Diagnostics",
+      short: "Resume intelligence",
+      detail: "Extract structure, strengths, and writing gaps from your uploaded resume.",
+    },
+    {
+      title: "Alignment Engine",
+      short: "JD mapping",
+      detail: "Compare your profile against role requirements and prioritize what matters.",
+    },
+    {
+      title: "Adaptive Growth Path",
+      short: "Roadmap + practice",
+      detail: "Follow a guided loop of learning, quiz checks, and interview prep.",
+    },
+    {
+      title: "Career Launch Workspace",
+      short: "Opportunity pipeline",
+      detail: "Search and track opportunities using context from your evolving profile.",
+    },
+  ];
+
+  const liveSignals = [
+    "Parsing resume context",
+    "Mapping role alignment",
+    "Refreshing growth tasks",
+    "Preparing interview cycle",
+  ];
+
+  const { scrollYProgress } = useScroll({
+    target: panelRef,
+    offset: ["start 86%", "end 18%"],
+  });
+
+  const pathLength = useTransform(scrollYProgress, [0, 1], [0, 1]);
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      setSignalIndex((prev) => (prev + 1) % liveSignals.length);
+    }, 1700);
+    return () => window.clearInterval(id);
+  }, [liveSignals.length]);
+
+  const rotateDeck = () => setActiveDeck((prev) => (prev + 1) % tracks.length);
+
+  return (
+    <motion.section
+      ref={panelRef}
+      initial={{ opacity: 0, y: 28 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, amount: 0.2 }}
+      transition={{ duration: 0.65, ease: "easeOut" }}
+      style={{ marginTop: 64, width: "100%", maxWidth: 1220, marginLeft: "auto", marginRight: "auto", textAlign: "left", display: "grid", gap: 18 }}
+    >
+      <div>
+        <div style={{ fontSize: 12, letterSpacing: "0.13em", textTransform: "uppercase", color: "var(--gray-400)", fontWeight: 700 }}>Journey Map</div>
+        <h2 style={{ marginTop: 8, marginBottom: 0, fontSize: "clamp(26px, 4vw, 40px)", lineHeight: 1.08, letterSpacing: "-0.04em", color: "var(--gray-900)" }}>
+          A narrative interface for the SkillBridge career journey.
+        </h2>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))", gap: 16 }}>
+        <div style={{ position: "relative", borderRadius: 26, border: "1px solid var(--gray-150)", background: "linear-gradient(180deg, rgba(255,255,255,0.95), rgba(246,246,246,0.96))", padding: "18px 14px 20px", overflow: "hidden" }}>
+          <svg viewBox="0 0 120 620" preserveAspectRatio="none" style={{ position: "absolute", left: 6, top: 6, bottom: 6, width: 110, height: "calc(100% - 12px)", pointerEvents: "none" }}>
+            <path d="M62 20 C18 84, 102 170, 60 250 C18 325, 102 420, 62 600" fill="none" stroke="rgba(180,180,180,0.35)" strokeWidth="3" strokeLinecap="round" />
+            <motion.path
+              d="M62 20 C18 84, 102 170, 60 250 C18 325, 102 420, 62 600"
+              fill="none"
+              stroke="rgba(20,20,20,0.9)"
+              strokeWidth="3.2"
+              strokeLinecap="round"
+              style={{ pathLength }}
+            />
+          </svg>
+
+          <div style={{ position: "relative", display: "grid", gap: 14, paddingLeft: 84 }}>
+            {tracks.map((track, index) => (
+              <motion.div
+                key={track.title}
+                initial={{ opacity: 0, x: 16 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true, amount: 0.45 }}
+                transition={{ duration: 0.4, delay: index * 0.08 }}
+                style={{
+                  borderRadius: 16,
+                  border: "1px solid var(--gray-150)",
+                  background: "rgba(255,255,255,0.8)",
+                  padding: "12px 13px",
+                  position: "relative",
+                }}
+              >
+                <span style={{ position: "absolute", left: -42, top: 16, width: 10, height: 10, borderRadius: "50%", background: "var(--gray-900)", boxShadow: "0 0 0 4px rgba(255,255,255,0.95)" }} />
+                <div style={{ fontSize: 14.5, fontWeight: 700, letterSpacing: "-0.02em", color: "var(--gray-900)" }}>{track.title}</div>
+                <div style={{ marginTop: 4, fontSize: 12.5, color: "var(--gray-500)", lineHeight: 1.55 }}>{track.detail}</div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ borderRadius: 26, border: "1px solid var(--gray-150)", background: "linear-gradient(180deg, rgba(255,255,255,0.94), rgba(246,246,246,0.95))", padding: 16 }}>
+          <div style={{ fontSize: 11.5, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--gray-400)", fontWeight: 700, marginBottom: 8 }}>Glass Deck</div>
+          <div style={{ position: "relative", height: 300, perspective: 1200 }}>
+            {tracks.map((_, stackIndex) => {
+              const track = tracks[(activeDeck + stackIndex) % tracks.length];
+              return (
+                <motion.button
+                  key={`${track.title}-${stackIndex}`}
+                  type="button"
+                  onClick={() => stackIndex === 0 && rotateDeck()}
+                  animate={{
+                    y: stackIndex * 16,
+                    x: stackIndex * 9,
+                    scale: 1 - stackIndex * 0.045,
+                    rotateZ: stackIndex * -1.7,
+                    rotateY: stackIndex === 0 ? 0 : -8,
+                    opacity: stackIndex === 0 ? 1 : 0.28 - stackIndex * 0.04,
+                  }}
+                  transition={{ duration: 0.48, ease: "easeOut" }}
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    zIndex: tracks.length - stackIndex,
+                    borderRadius: 22,
+                    border: "1px solid rgba(255,255,255,0.62)",
+                    background: stackIndex === 0
+                      ? "linear-gradient(145deg, rgba(255,255,255,0.96), rgba(244,244,244,0.92))"
+                      : "linear-gradient(145deg, rgba(255,255,255,0.76), rgba(242,242,242,0.64))",
+                    boxShadow: "0 18px 36px rgba(0,0,0,0.08)",
+                    backdropFilter: "blur(18px)",
+                    WebkitBackdropFilter: "blur(18px)",
+                    padding: 18,
+                    textAlign: "left",
+                    cursor: stackIndex === 0 ? "pointer" : "default",
+                    pointerEvents: stackIndex === 0 ? "auto" : "none",
+                    overflow: "hidden",
+                  }}
+                >
+                  {stackIndex === 0 ? (
+                    <>
+                      <div style={{ fontSize: 12, color: "var(--gray-500)", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>{track.short}</div>
+                      <div style={{ marginTop: 10, fontSize: 24, fontWeight: 800, letterSpacing: "-0.04em", lineHeight: 1.12, color: "var(--gray-900)", maxWidth: 300 }}>{track.title}</div>
+                      <p style={{ marginTop: 10, marginBottom: 0, color: "var(--gray-600)", lineHeight: 1.6, fontSize: 13.5 }}>{track.detail}</p>
+                    </>
+                  ) : (
+                    <>
+                      <div style={{ fontSize: 11, color: "var(--gray-400)", fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" }}>Queued</div>
+                      <div style={{ marginTop: 8, fontSize: 18, fontWeight: 750, letterSpacing: "-0.03em", lineHeight: 1.15, color: "var(--gray-700)", maxWidth: 240 }}>{track.title}</div>
+                      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(255,255,255,0.35), rgba(255,255,255,0.6))" }} />
+                    </>
+                  )}
+                  {stackIndex === 0 && (
+                    <span style={{ display: "inline-flex", marginTop: 14, padding: "6px 10px", borderRadius: 999, background: "var(--gray-900)", color: "var(--white)", fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                      Reveal next
+                    </span>
+                  )}
+                </motion.button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(290px, 1fr))", gap: 16 }}>
+        <div style={{ borderRadius: 24, border: "1px solid var(--gray-150)", background: "linear-gradient(180deg, var(--white), var(--gray-50))", padding: 16 }}>
+          <div style={{ fontSize: 11.5, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--gray-400)", fontWeight: 700 }}>Bento Live Preview</div>
+          <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 10 }}>
+            <div style={{ borderRadius: 16, border: "1px solid var(--gray-150)", background: "var(--white)", padding: 10 }}>
+              <div style={{ fontSize: 12.5, color: "var(--gray-600)", marginBottom: 8, fontWeight: 600 }}>Resume activity heat-map</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(9, 1fr)", gap: 4 }}>
+                {Array.from({ length: 54 }).map((_, idx) => (
+                  <motion.span
+                    key={idx}
+                    animate={{ opacity: [0.22, 0.88, 0.3] }}
+                    transition={{ duration: 1.6, repeat: Infinity, delay: (idx % 9) * 0.08 + Math.floor(idx / 9) * 0.03 }}
+                    style={{ display: "block", width: "100%", aspectRatio: "1 / 1", borderRadius: 3, background: "linear-gradient(180deg, var(--gray-800), var(--gray-500))" }}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gap: 10 }}>
+              <div style={{ borderRadius: 16, border: "1px solid var(--gray-150)", background: "var(--white)", padding: 10 }}>
+                <div style={{ fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--gray-400)", fontWeight: 700 }}>Alignment ticker</div>
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={liveSignals[signalIndex]}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.28 }}
+                    style={{ marginTop: 8, fontSize: 13, color: "var(--gray-700)", fontWeight: 600, lineHeight: 1.45 }}
+                  >
+                    {liveSignals[signalIndex]}
+                  </motion.div>
+                </AnimatePresence>
+              </div>
+
+              <div style={{ borderRadius: 16, border: "1px solid var(--gray-150)", background: "var(--white)", padding: 10 }}>
+                <div style={{ fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--gray-400)", fontWeight: 700 }}>Practice loop</div>
+                <motion.button
+                  whileTap={{ scale: 0.98 }}
+                  animate={{ scale: [1, 1.04, 1], boxShadow: ["0 8px 18px rgba(0,0,0,0.12)", "0 12px 24px rgba(0,0,0,0.2)", "0 8px 18px rgba(0,0,0,0.12)"] }}
+                  transition={{ duration: 1.7, repeat: Infinity }}
+                  style={{
+                    marginTop: 10,
+                    width: "100%",
+                    border: "none",
+                    borderRadius: 999,
+                    padding: "10px 12px",
+                    background: "var(--gray-900)",
+                    color: "var(--white)",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  Continue Practice
+                </motion.button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ borderRadius: 24, border: "1px solid var(--gray-150)", background: "linear-gradient(180deg, var(--white), var(--gray-50))", padding: 16 }}>
+          <div style={{ fontSize: 11.5, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--gray-400)", fontWeight: 700, marginBottom: 16 }}>Core Features</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            {[
+              { 
+                title: "Resume Intelligence", 
+                subtitle: "AI-powered analysis extracts skills, experience, and qualifications. Identifies gaps and recommends improvements.",
+                stat: "AI Analysis"
+              },
+              { 
+                title: "JD Mapping Engine", 
+                subtitle: "Matches your profile against job descriptions in real-time. Highlights alignment opportunities.",
+                stat: "Alignment Score"
+              },
+              { 
+                title: "Growth Roadmap", 
+                subtitle: "Personalized learning path with curated resources, quizzes, and hands-on projects aligned to career goals.",
+                stat: "Progress Tracked"
+              },
+              { 
+                title: "Interview Preparation", 
+                subtitle: "Real-time practice with AI-powered feedback, behavioral patterns analysis, and confidence building.",
+                stat: "Mock Interviews"
+              }
+            ].map((feature, idx) => (
+              <motion.div
+                key={idx}
+                whileHover={{ y: -3, boxShadow: "0 12px 32px rgba(0,0,0,0.09)" }}
+                style={{
+                  padding: "16px 14px",
+                  borderRadius: 14,
+                  border: "1px solid var(--gray-150)",
+                  background: "var(--white)",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 10,
+                  transition: "all 0.2s ease",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "var(--gray-800)", flex: 1 }}>{feature.title}</div>
+                  <div style={{ fontSize: 9, fontWeight: 600, letterSpacing: "0.05em", color: "var(--gray-500)", textTransform: "uppercase", padding: "3px 7px", background: "var(--gray-100)", borderRadius: 4, whiteSpace: "nowrap" }}>{feature.stat}</div>
+                </div>
+                <div style={{ fontSize: 11, color: "var(--gray-600)", lineHeight: 1.5, fontWeight: 400 }}>{feature.subtitle}</div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </motion.section>
+  );
+};
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // LANDING PAGE
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -455,7 +742,7 @@ const LandingPage = ({ onEnterApp }) => {
       </nav>
 
       {/* Hero */}
-      <section style={{ paddingTop: 160, paddingBottom: 120, textAlign: "center", maxWidth: 860, margin: "0 auto", padding: "160px 24px 120px" }}>
+      <section style={{ paddingTop: 160, paddingBottom: 120, textAlign: "center", maxWidth: 1280, margin: "0 auto", padding: "160px 24px 120px" }}>
         <div className="fade-up" style={{ animationDelay: "0.1s", opacity: 0, animationFillMode: "forwards" }}>
           <Badge variant="neutral" style={{ marginBottom: 24 }}>✦ Powered by Claude AI</Badge>
         </div>
@@ -485,34 +772,7 @@ const LandingPage = ({ onEnterApp }) => {
           </Btn>
         </div>
 
-        {/* Floating preview card */}
-        <div className="fade-up" style={{ animationDelay: "0.6s", opacity: 0, animationFillMode: "forwards", marginTop: 64 }}>
-          <div className="glass card-hover" style={{
-            borderRadius: "var(--radius-xl)", padding: "28px 32px",
-            boxShadow: "var(--shadow-xl)", maxWidth: 640, margin: "0 auto",
-            animation: "float 6s ease-in-out infinite",
-          }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-              <div>
-                <div style={{ fontSize: 12, color: "var(--gray-400)", fontWeight: 500, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 4 }}>Your Progress Today</div>
-                <div style={{ fontSize: 18, fontWeight: 700, color: "var(--gray-900)", letterSpacing: "-0.03em" }}>3 tasks completed</div>
-              </div>
-              <CircularProgress value={78} size={80} label="ATS"/>
-            </div>
-            <div style={{ display: "flex", gap: 10 }}>
-              {[
-                { label: "Resume score", val: 82, color: "var(--gray-700)" },
-                { label: "JD match", val: 74, color: "var(--gray-500)" },
-                { label: "Quiz streak", val: 91, color: "var(--gray-400)" },
-              ].map(item => (
-                <div key={item.label} style={{ flex: 1, background: "var(--gray-50)", borderRadius: 12, padding: "12px 14px", border: "1px solid var(--gray-150)" }}>
-                  <div style={{ fontSize: 20, fontWeight: 700, color: "var(--gray-900)", letterSpacing: "-0.03em" }}>{item.val}%</div>
-                  <div style={{ fontSize: 11, color: "var(--gray-400)", marginTop: 2, fontWeight: 500 }}>{item.label}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+        <ProjectExperiencePanel />
       </section>
 
       {/* Features */}
@@ -2749,10 +3009,12 @@ function StudentPortal({ onExit }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export default function App() {
-  const [authRole, setAuthRole] = useState(() => {
-    if (typeof window === "undefined") return "";
-    return window.localStorage.getItem("skillbridge.authRole") || "";
-  });
+  const [authRole, setAuthRole] = useState("");
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.removeItem("skillbridge.authRole");
+  }, []);
 
   const handleLogin = (role) => {
     setAuthRole(role);
