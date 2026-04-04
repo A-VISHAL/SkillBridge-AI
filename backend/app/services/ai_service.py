@@ -528,6 +528,21 @@ async def call_jd_chat(
     )
 
 
+async def call_roadmap_chat(
+    messages: List[Dict[str, str]],
+    temperature: float = 0.7,
+    max_tokens: int = 2000,
+) -> str:
+    return await call_model_chat(
+        messages=messages,
+        endpoint=settings.ROADMAP_CHAT_ENDPOINT,
+        api_key=settings.ROADMAP_API_KEY,
+        model=settings.ROADMAP_MODEL,
+        temperature=temperature,
+        max_tokens=max_tokens,
+    )
+
+
 def _allow_rate_limit_fallback(error: Exception) -> bool:
     return (
         settings.ENABLE_RATE_LIMIT_FALLBACK
@@ -773,7 +788,13 @@ Return JSON with keys: match_percentage, hire_probability, matched_skills, missi
         raise ValueError(f"Failed to parse AI JD match response: {str(e)}")
 
 
-async def generate_roadmap(resume_text: str, jd_text: str, skill_gaps: List[str]) -> Dict[str, Any]:
+async def generate_roadmap(
+    resume_text: str,
+    jd_text: str,
+    skill_gaps: List[str],
+    resume_data: Optional[Dict[str, Any]] = None,
+    jd_analysis: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
     """Generate a detailed weekly roadmap from resume and JD, with complete week coverage."""
 
     def _unique_items(items: List[str]) -> List[str]:
@@ -928,7 +949,10 @@ async def generate_roadmap(resume_text: str, jd_text: str, skill_gaps: List[str]
             for task in tasks_by_week[week]:
                 task_text = task["task"].strip()
                 if task_text.lower() in global_seen:
-                    task_text = f"Week {week}: {task_text}"
+                    task_text = (
+                        f"{task_text} Deliverable: publish a distinct Week {week} artifact tied to "
+                        f"{task.get('skill', primary)} and one explicit JD requirement."
+                    )
                     task["task"] = task_text
                 global_seen.add(task_text.lower())
                 normalized_tasks.append(task)
@@ -957,13 +981,27 @@ async def generate_roadmap(resume_text: str, jd_text: str, skill_gaps: List[str]
             "completion_criteria": completion_criteria,
         }
 
-    prompt = f"""Create a personalized 12-week roadmap from the resume and JD.
+    resume_context = _build_resume_context_for_jd(resume_text, resume_data, max_chars=1800)
+    jd_analysis_summary = ""
+    if isinstance(jd_analysis, dict):
+        jd_analysis_summary = json.dumps({
+            "match_percentage": jd_analysis.get("match_percentage"),
+            "missing_skills": jd_analysis.get("missing_skills", [])[:8],
+            "focus_areas": jd_analysis.get("focus_areas", [])[:5],
+            "weaknesses": jd_analysis.get("weaknesses", [])[:5],
+            "suggestions": jd_analysis.get("suggestions", [])[:5],
+        })
 
-Resume:
-{resume_text[:700]}
+    prompt = f"""Create a personalized 12-week roadmap from extracted resume data, JD analysis, and the full JD.
+
+Extracted Resume Context:
+{resume_context}
+
+JD Analysis Summary:
+{jd_analysis_summary or 'Not provided'}
 
 Job Description:
-{jd_text[:700]}
+{jd_text[:1800]}
 
 Missing skills:
 {', '.join(skill_gaps[:8])}
@@ -979,7 +1017,10 @@ Rules:
 1) Include ALL weeks 1..12.
 2) At least 3 unique tasks per week.
 3) No repeated task text.
-4) Task content must be specific and tied to resume/JD gaps."""
+4) Task content must be specific and tied to resume/JD gaps.
+5) Every week must contain different tasks with concrete deliverables.
+6) Do not output generic tasks like "practice" without a specific artifact.
+7) Focus on generating practical tasks, not broad advice."""
 
     messages = [
         {
@@ -990,7 +1031,7 @@ Rules:
     ]
 
     try:
-        response = await call_oxlo_chat(messages, temperature=0.6, max_tokens=4000)
+        response = await call_roadmap_chat(messages, temperature=0.6, max_tokens=4200)
         parsed = json.loads(response)
         return _normalize_payload(parsed)
     except Exception as e:

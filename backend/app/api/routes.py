@@ -49,6 +49,38 @@ def _get_resume_or_404(resume_id: str) -> ParsedResume:
 
     raise HTTPException(404, "Resume not found. Please upload your resume again.")
 
+
+def _build_roadmap_context_from_match(match_data: dict) -> List[dict]:
+    """Build lightweight roadmap context without invoking roadmap generation."""
+    if not isinstance(match_data, dict):
+        return []
+
+    tasks: List[dict] = []
+    focus_areas = match_data.get("focus_areas", []) if isinstance(match_data.get("focus_areas"), list) else []
+    missing_skills = match_data.get("missing_skills", []) if isinstance(match_data.get("missing_skills"), list) else []
+
+    ordered_skills: List[str] = []
+    for area in focus_areas:
+        if isinstance(area, dict):
+            skill = str(area.get("skill", "")).strip()
+            if skill and skill not in ordered_skills:
+                ordered_skills.append(skill)
+
+    for skill in missing_skills:
+        value = str(skill).strip()
+        if value and value not in ordered_skills:
+            ordered_skills.append(value)
+
+    for idx, skill in enumerate(ordered_skills[:6], start=1):
+        tasks.append({
+            "week": idx,
+            "skill": skill,
+            "task": f"Build and document one outcome-focused mini-project for {skill} mapped to JD requirements.",
+            "resources": [f"{skill} official docs", "Role-aligned implementation guide"],
+        })
+
+    return tasks
+
 # ============ Health & Status ============
 
 @router.get("/api/test-ai")
@@ -353,17 +385,15 @@ async def generate_roadmap(
 ):
     """Generate personalized learning roadmap"""
     try:
-        if resume_id not in resume_store:
-            raise HTTPException(404, "Resume not found. Please upload your resume first.")
-        
-        resume = resume_store[resume_id]
+        resume = _get_resume_or_404(resume_id)
         
         # Get missing skills from JD match
         try:
-            match_data = await ai_service.match_resume_to_jd(resume.raw_text, job_description)
+            match_data = await ai_service.match_resume_to_jd(resume.raw_text, job_description, resume.dict())
             missing_skills = match_data.get("missing_skills", [])
         except Exception as match_error:
             # Fallback: use generic skill gaps if match fails
+            match_data = {}
             missing_skills = ["System Design", "Advanced Architecture", "Leadership"]
             print(f"Warning: JD match failed, using default skills: {str(match_error)}")
         
@@ -371,7 +401,9 @@ async def generate_roadmap(
         roadmap_data = await ai_service.generate_roadmap(
             resume.raw_text,
             job_description,
-            missing_skills
+            missing_skills,
+            resume.dict(),
+            match_data,
         )
         
         tasks = [RoadmapTask(**task) for task in roadmap_data.get("tasks", [])]
@@ -435,12 +467,7 @@ async def generate_quiz(
         try:
             if resume_text and job_description:
                 match_data = await ai_service.match_resume_to_jd(resume_text, job_description)
-                roadmap_data = await ai_service.generate_roadmap(
-                    resume_text,
-                    job_description,
-                    match_data.get("missing_skills", []),
-                )
-                roadmap_context = roadmap_data.get("tasks", [])
+                roadmap_context = _build_roadmap_context_from_match(match_data)
         except Exception:
             roadmap_context = []
 
@@ -572,12 +599,7 @@ async def start_interview(
         try:
             if resume_text and job_description:
                 match_data = await ai_service.match_resume_to_jd(resume_text, job_description)
-                roadmap_data = await ai_service.generate_roadmap(
-                    resume_text,
-                    job_description,
-                    match_data.get("missing_skills", []),
-                )
-                roadmap_context = roadmap_data.get("tasks", [])
+                roadmap_context = _build_roadmap_context_from_match(match_data)
         except Exception:
             roadmap_context = []
 

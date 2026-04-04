@@ -64,6 +64,18 @@ class Settings:
     )
     JD_MODEL: str = _get_env("JD_MODEL", "OXLO_JD_MODEL", default="deepseek-v3.2")
 
+    # Roadmap-specific model routing
+    ROADMAP_API_KEY: str = _normalize_api_key(
+        _get_env("ROADMAP_API_KEY", "OXLO_ROADMAP_API_KEY")
+    )
+    ROADMAP_CHAT_ENDPOINT: str = _get_env(
+        "ROADMAP_CHAT_ENDPOINT",
+        "OXLO_ROADMAP_CHAT_ENDPOINT",
+        "OXLO_CHAT_ENDPOINT",
+        default="https://api.oxlo.ai/v1/chat/completions",
+    )
+    ROADMAP_MODEL: str = _get_env("ROADMAP_MODEL", "OXLO_ROADMAP_MODEL", default="gpt-oss-20b")
+
     # Fallback policy: only allow fallback for explicit provider rate limits
     ENABLE_RATE_LIMIT_FALLBACK: bool = _get_env_bool("ENABLE_RATE_LIMIT_FALLBACK", default=True)
 
