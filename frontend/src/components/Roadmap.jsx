@@ -123,7 +123,7 @@ const CelebrationPopup = ({ visible, onClose }) => {
 };
 
 export default function Roadmap({ resumeId, jobDescription, onProgressChange }) {
-  const [durationWeeks, setDurationWeeks] = useState(12);
+  const [durationWeeks, setDurationWeeks] = useState(null);
   const [roadmap, setRoadmap] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');

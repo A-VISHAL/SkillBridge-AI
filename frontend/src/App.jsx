@@ -316,7 +316,7 @@ const ProgressBar = ({ value, label, sublabel }) => (
   </div>
 );
 
-const ProjectExperiencePanel = () => {
+const ProjectExperiencePanel = ({ isDarkMode }) => {
   const panelRef = useRef(null);
   const [activeDeck, setActiveDeck] = useState(0);
   const [signalIndex, setSignalIndex] = useState(0);
@@ -379,19 +379,19 @@ const ProjectExperiencePanel = () => {
     >
       <div>
         <div style={{ fontSize: 12, letterSpacing: "0.13em", textTransform: "uppercase", color: "var(--gray-400)", fontWeight: 700 }}>Journey Map</div>
-        <h2 style={{ marginTop: 8, marginBottom: 0, fontSize: "clamp(26px, 4vw, 40px)", lineHeight: 1.08, letterSpacing: "-0.04em", color: "var(--gray-900)" }}>
+        <h2 style={{ marginTop: 8, marginBottom: 0, fontSize: "clamp(26px, 4vw, 40px)", lineHeight: 1.08, letterSpacing: "-0.04em", color: isDarkMode ? "#f3f6ff" : "var(--gray-900)" }}>
           A narrative interface for the SkillBridge career journey.
         </h2>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))", gap: 16 }}>
-        <div style={{ position: "relative", borderRadius: 26, border: "1px solid var(--gray-150)", background: "linear-gradient(180deg, rgba(255,255,255,0.95), rgba(246,246,246,0.96))", padding: "18px 14px 20px", overflow: "hidden" }}>
+        <div style={{ position: "relative", borderRadius: 26, border: isDarkMode ? "1px solid rgba(124,143,255,0.24)" : "1px solid var(--gray-150)", background: isDarkMode ? "rgba(18,26,42,0.62)" : "linear-gradient(180deg, rgba(255,255,255,0.95), rgba(246,246,246,0.96))", padding: "18px 14px 20px", overflow: "hidden" }}>
           <svg viewBox="0 0 120 620" preserveAspectRatio="none" style={{ position: "absolute", left: 6, top: 6, bottom: 6, width: 110, height: "calc(100% - 12px)", pointerEvents: "none" }}>
-            <path d="M62 20 C18 84, 102 170, 60 250 C18 325, 102 420, 62 600" fill="none" stroke="rgba(180,180,180,0.35)" strokeWidth="3" strokeLinecap="round" />
+            <path d="M62 20 C18 84, 102 170, 60 250 C18 325, 102 420, 62 600" fill="none" stroke={isDarkMode ? "rgba(124,143,255,0.25)" : "rgba(180,180,180,0.35)"} strokeWidth="3" strokeLinecap="round" />
             <motion.path
               d="M62 20 C18 84, 102 170, 60 250 C18 325, 102 420, 62 600"
               fill="none"
-              stroke="rgba(20,20,20,0.9)"
+              stroke={isDarkMode ? "rgba(143,161,255,0.9)" : "rgba(20,20,20,0.9)"}
               strokeWidth="3.2"
               strokeLinecap="round"
               style={{ pathLength }}
@@ -408,21 +408,21 @@ const ProjectExperiencePanel = () => {
                 transition={{ duration: 0.4, delay: index * 0.08 }}
                 style={{
                   borderRadius: 16,
-                  border: "1px solid var(--gray-150)",
-                  background: "rgba(255,255,255,0.8)",
+                  border: isDarkMode ? "1px solid rgba(124,143,255,0.2)" : "1px solid var(--gray-150)",
+                  background: isDarkMode ? "rgba(16,24,40,0.5)" : "rgba(255,255,255,0.8)",
                   padding: "12px 13px",
                   position: "relative",
                 }}
               >
-                <span style={{ position: "absolute", left: -42, top: 16, width: 10, height: 10, borderRadius: "50%", background: "var(--gray-900)", boxShadow: "0 0 0 4px rgba(255,255,255,0.95)" }} />
-                <div style={{ fontSize: 14.5, fontWeight: 700, letterSpacing: "-0.02em", color: "var(--gray-900)" }}>{track.title}</div>
-                <div style={{ marginTop: 4, fontSize: 12.5, color: "var(--gray-500)", lineHeight: 1.55 }}>{track.detail}</div>
+                <span style={{ position: "absolute", left: -42, top: 16, width: 10, height: 10, borderRadius: "50%", background: isDarkMode ? "#8ea0ff" : "var(--gray-900)", boxShadow: isDarkMode ? "0 0 0 4px rgba(18,26,42,0.95)" : "0 0 0 4px rgba(255,255,255,0.95)" }} />
+                <div style={{ fontSize: 14.5, fontWeight: 700, letterSpacing: "-0.02em", color: isDarkMode ? "#f3f6ff" : "var(--gray-900)" }}>{track.title}</div>
+                <div style={{ marginTop: 4, fontSize: 12.5, color: isDarkMode ? "#bec9e8" : "var(--gray-500)", lineHeight: 1.55 }}>{track.detail}</div>
               </motion.div>
             ))}
           </div>
         </div>
 
-        <div style={{ borderRadius: 26, border: "1px solid var(--gray-150)", background: "linear-gradient(180deg, rgba(255,255,255,0.94), rgba(246,246,246,0.95))", padding: 16 }}>
+        <div style={{ borderRadius: 26, border: isDarkMode ? "1px solid rgba(124,143,255,0.24)" : "1px solid var(--gray-150)", background: isDarkMode ? "rgba(18,26,42,0.62)" : "linear-gradient(180deg, rgba(255,255,255,0.94), rgba(246,246,246,0.95))", padding: 16 }}>
           <div style={{ fontSize: 11.5, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--gray-400)", fontWeight: 700, marginBottom: 8 }}>Glass Deck</div>
           <div style={{ position: "relative", height: 300, perspective: 1200 }}>
             {tracks.map((_, stackIndex) => {
@@ -446,10 +446,10 @@ const ProjectExperiencePanel = () => {
                     inset: 0,
                     zIndex: tracks.length - stackIndex,
                     borderRadius: 22,
-                    border: "1px solid rgba(255,255,255,0.62)",
+                    border: isDarkMode ? "1px solid rgba(143,161,255,0.4)" : "1px solid rgba(255,255,255,0.62)",
                     background: stackIndex === 0
-                      ? "linear-gradient(145deg, rgba(255,255,255,0.96), rgba(244,244,244,0.92))"
-                      : "linear-gradient(145deg, rgba(255,255,255,0.76), rgba(242,242,242,0.64))",
+                      ? (isDarkMode ? "linear-gradient(145deg, rgba(16,24,40,0.96), rgba(12,18,32,0.92))" : "linear-gradient(145deg, rgba(255,255,255,0.96), rgba(244,244,244,0.92))")
+                      : (isDarkMode ? "linear-gradient(145deg, rgba(16,24,40,0.76), rgba(12,18,32,0.64))" : "linear-gradient(145deg, rgba(255,255,255,0.76), rgba(242,242,242,0.64))"),
                     boxShadow: "0 18px 36px rgba(0,0,0,0.08)",
                     backdropFilter: "blur(18px)",
                     WebkitBackdropFilter: "blur(18px)",
@@ -462,19 +462,19 @@ const ProjectExperiencePanel = () => {
                 >
                   {stackIndex === 0 ? (
                     <>
-                      <div style={{ fontSize: 12, color: "var(--gray-500)", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>{track.short}</div>
-                      <div style={{ marginTop: 10, fontSize: 24, fontWeight: 800, letterSpacing: "-0.04em", lineHeight: 1.12, color: "var(--gray-900)", maxWidth: 300 }}>{track.title}</div>
-                      <p style={{ marginTop: 10, marginBottom: 0, color: "var(--gray-600)", lineHeight: 1.6, fontSize: 13.5 }}>{track.detail}</p>
+                      <div style={{ fontSize: 12, color: isDarkMode ? "#97a6d4" : "var(--gray-500)", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>{track.short}</div>
+                      <div style={{ marginTop: 10, fontSize: 24, fontWeight: 800, letterSpacing: "-0.04em", lineHeight: 1.12, color: isDarkMode ? "#f3f6ff" : "var(--gray-900)", maxWidth: 300 }}>{track.title}</div>
+                      <p style={{ marginTop: 10, marginBottom: 0, color: isDarkMode ? "#bec9e8" : "var(--gray-600)", lineHeight: 1.6, fontSize: 13.5 }}>{track.detail}</p>
                     </>
                   ) : (
                     <>
                       <div style={{ fontSize: 11, color: "var(--gray-400)", fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" }}>Queued</div>
-                      <div style={{ marginTop: 8, fontSize: 18, fontWeight: 750, letterSpacing: "-0.03em", lineHeight: 1.15, color: "var(--gray-700)", maxWidth: 240 }}>{track.title}</div>
-                      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(255,255,255,0.35), rgba(255,255,255,0.6))" }} />
+                      <div style={{ marginTop: 8, fontSize: 18, fontWeight: 750, letterSpacing: "-0.03em", lineHeight: 1.15, color: isDarkMode ? "#bec9e8" : "var(--gray-700)", maxWidth: 240 }}>{track.title}</div>
+                      <div style={{ position: "absolute", inset: 0, background: isDarkMode ? "linear-gradient(180deg, rgba(16,24,40,0.35), rgba(16,24,40,0.6))" : "linear-gradient(180deg, rgba(255,255,255,0.35), rgba(255,255,255,0.6))" }} />
                     </>
                   )}
                   {stackIndex === 0 && (
-                    <span style={{ display: "inline-flex", marginTop: 14, padding: "6px 10px", borderRadius: 999, background: "var(--gray-900)", color: "var(--white)", fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                    <span style={{ display: "inline-flex", marginTop: 14, padding: "6px 10px", borderRadius: 999, background: isDarkMode ? "#8ea0ff" : "var(--gray-900)", color: isDarkMode ? "#0b0f19" : "var(--white)", fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>
                       Reveal next
                     </span>
                   )}
@@ -486,25 +486,25 @@ const ProjectExperiencePanel = () => {
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(290px, 1fr))", gap: 16 }}>
-        <div style={{ borderRadius: 24, border: "1px solid var(--gray-150)", background: "linear-gradient(180deg, var(--white), var(--gray-50))", padding: 16 }}>
+        <div style={{ borderRadius: 24, border: isDarkMode ? "1px solid rgba(124,143,255,0.24)" : "1px solid var(--gray-150)", background: isDarkMode ? "rgba(18,26,42,0.62)" : "linear-gradient(180deg, var(--white), var(--gray-50))", padding: 16 }}>
           <div style={{ fontSize: 11.5, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--gray-400)", fontWeight: 700 }}>Bento Live Preview</div>
           <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 10 }}>
-            <div style={{ borderRadius: 16, border: "1px solid var(--gray-150)", background: "var(--white)", padding: 10 }}>
-              <div style={{ fontSize: 12.5, color: "var(--gray-600)", marginBottom: 8, fontWeight: 600 }}>Resume activity heat-map</div>
+            <div style={{ borderRadius: 16, border: isDarkMode ? "1px solid rgba(124,143,255,0.2)" : "1px solid var(--gray-150)", background: isDarkMode ? "rgba(16,24,40,0.5)" : "var(--white)", padding: 10 }}>
+              <div style={{ fontSize: 12.5, color: isDarkMode ? "#bec9e8" : "var(--gray-600)", marginBottom: 8, fontWeight: 600 }}>Resume activity heat-map</div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(9, 1fr)", gap: 4 }}>
                 {Array.from({ length: 54 }).map((_, idx) => (
                   <motion.span
                     key={idx}
                     animate={{ opacity: [0.22, 0.88, 0.3] }}
                     transition={{ duration: 1.6, repeat: Infinity, delay: (idx % 9) * 0.08 + Math.floor(idx / 9) * 0.03 }}
-                    style={{ display: "block", width: "100%", aspectRatio: "1 / 1", borderRadius: 3, background: "linear-gradient(180deg, var(--gray-800), var(--gray-500))" }}
+                    style={{ display: "block", width: "100%", aspectRatio: "1 / 1", borderRadius: 3, background: isDarkMode ? "linear-gradient(180deg, #8ea0ff, #5b72ff)" : "linear-gradient(180deg, var(--gray-800), var(--gray-500))" }}
                   />
                 ))}
               </div>
             </div>
 
             <div style={{ display: "grid", gap: 10 }}>
-              <div style={{ borderRadius: 16, border: "1px solid var(--gray-150)", background: "var(--white)", padding: 10 }}>
+              <div style={{ borderRadius: 16, border: isDarkMode ? "1px solid rgba(124,143,255,0.2)" : "1px solid var(--gray-150)", background: isDarkMode ? "rgba(16,24,40,0.5)" : "var(--white)", padding: 10 }}>
                 <div style={{ fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--gray-400)", fontWeight: 700 }}>Alignment ticker</div>
                 <AnimatePresence mode="wait">
                   <motion.div
@@ -513,27 +513,28 @@ const ProjectExperiencePanel = () => {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
                     transition={{ duration: 0.28 }}
-                    style={{ marginTop: 8, fontSize: 13, color: "var(--gray-700)", fontWeight: 600, lineHeight: 1.45 }}
+                    style={{ marginTop: 8, fontSize: 13, color: isDarkMode ? "#f3f6ff" : "var(--gray-700)", fontWeight: 600, lineHeight: 1.45 }}
                   >
                     {liveSignals[signalIndex]}
                   </motion.div>
                 </AnimatePresence>
               </div>
 
-              <div style={{ borderRadius: 16, border: "1px solid var(--gray-150)", background: "var(--white)", padding: 10 }}>
+              <div style={{ borderRadius: 16, border: isDarkMode ? "1px solid rgba(124,143,255,0.2)" : "1px solid var(--gray-150)", background: isDarkMode ? "rgba(16,24,40,0.5)" : "var(--white)", padding: 10 }}>
                 <div style={{ fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--gray-400)", fontWeight: 700 }}>Practice loop</div>
                 <motion.button
                   whileTap={{ scale: 0.98 }}
                   animate={{ scale: [1, 1.04, 1], boxShadow: ["0 8px 18px rgba(0,0,0,0.12)", "0 12px 24px rgba(0,0,0,0.2)", "0 8px 18px rgba(0,0,0,0.12)"] }}
                   transition={{ duration: 1.7, repeat: Infinity }}
+                  onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
                   style={{
                     marginTop: 10,
                     width: "100%",
                     border: "none",
                     borderRadius: 999,
                     padding: "10px 12px",
-                    background: "var(--gray-900)",
-                    color: "var(--white)",
+                    background: isDarkMode ? "#8ea0ff" : "var(--gray-900)",
+                    color: isDarkMode ? "#0b0f19" : "var(--white)",
                     fontWeight: 700,
                     cursor: "pointer",
                   }}
@@ -545,7 +546,7 @@ const ProjectExperiencePanel = () => {
           </div>
         </div>
 
-        <div style={{ borderRadius: 24, border: "1px solid var(--gray-150)", background: "linear-gradient(180deg, var(--white), var(--gray-50))", padding: 16 }}>
+        <div style={{ borderRadius: 24, border: isDarkMode ? "1px solid rgba(124,143,255,0.24)" : "1px solid var(--gray-150)", background: isDarkMode ? "rgba(18,26,42,0.62)" : "linear-gradient(180deg, var(--white), var(--gray-50))", padding: 16 }}>
           <div style={{ fontSize: 11.5, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--gray-400)", fontWeight: 700, marginBottom: 16 }}>Core Features</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             {[
@@ -576,8 +577,8 @@ const ProjectExperiencePanel = () => {
                 style={{
                   padding: "16px 14px",
                   borderRadius: 14,
-                  border: "1px solid var(--gray-150)",
-                  background: "var(--white)",
+                  border: isDarkMode ? "1px solid rgba(124,143,255,0.2)" : "1px solid var(--gray-150)",
+                  background: isDarkMode ? "rgba(16,24,40,0.5)" : "var(--white)",
                   display: "flex",
                   flexDirection: "column",
                   gap: 10,
@@ -585,10 +586,10 @@ const ProjectExperiencePanel = () => {
                 }}
               >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "var(--gray-800)", flex: 1 }}>{feature.title}</div>
-                  <div style={{ fontSize: 9, fontWeight: 600, letterSpacing: "0.05em", color: "var(--gray-500)", textTransform: "uppercase", padding: "3px 7px", background: "var(--gray-100)", borderRadius: 4, whiteSpace: "nowrap" }}>{feature.stat}</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: isDarkMode ? "#f3f6ff" : "var(--gray-800)", flex: 1 }}>{feature.title}</div>
+                  <div style={{ fontSize: 9, fontWeight: 600, letterSpacing: "0.05em", color: isDarkMode ? "#97a6d4" : "var(--gray-500)", textTransform: "uppercase", padding: "3px 7px", background: isDarkMode ? "rgba(143,161,255,0.15)" : "var(--gray-100)", borderRadius: 4, whiteSpace: "nowrap" }}>{feature.stat}</div>
                 </div>
-                <div style={{ fontSize: 11, color: "var(--gray-600)", lineHeight: 1.5, fontWeight: 400 }}>{feature.subtitle}</div>
+                <div style={{ fontSize: 11, color: isDarkMode ? "#bec9e8" : "var(--gray-600)", lineHeight: 1.5, fontWeight: 400 }}>{feature.subtitle}</div>
               </motion.div>
             ))}
           </div>
@@ -1003,14 +1004,14 @@ const LandingPage = ({ onEnterApp }) => {
 
       {/* Journey section appears after first screen */}
       <section style={{ maxWidth: 1280, margin: "0 auto", padding: "24px 24px 20px" }}>
-        <ProjectExperiencePanel />
+        <ProjectExperiencePanel isDarkMode={isDarkMode} />
       </section>
 
       {/* Features */}
       <section id="features" data-key="features" style={{ maxWidth: 1100, margin: "0 auto", padding: "80px 24px" }}>
         <div style={{ textAlign: "center", marginBottom: 56 }}>
           <div style={{ fontSize: 12, color: "var(--gray-400)", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 12 }}>Features</div>
-          <h2 style={{ fontSize: "clamp(28px, 4vw, 42px)", fontWeight: 700, letterSpacing: "-0.035em", color: "var(--gray-900)", lineHeight: 1.12 }}>
+          <h2 style={{ fontSize: "clamp(28px, 4vw, 42px)", fontWeight: 700, letterSpacing: "-0.035em", color: isDarkMode ? "#f3f6ff" : "var(--gray-900)", lineHeight: 1.12 }}>
             Everything you need to level up
           </h2>
         </div>
@@ -1019,16 +1020,18 @@ const LandingPage = ({ onEnterApp }) => {
             <Card key={f.title} style={{
               animationDelay: `${i * 0.07}s`,
               ...(visible.features ? { animation: `fadeUp 0.6s ${i * 0.07}s ease forwards` } : { opacity: 0 }),
+              border: isDarkMode ? "1px solid rgba(124,143,255,0.24)" : undefined,
+              background: isDarkMode ? "rgba(18,26,42,0.62)" : undefined,
             }}>
               <div style={{
-                width: 40, height: 40, borderRadius: 12, background: "var(--gray-100)",
+                width: 40, height: 40, borderRadius: 12, background: isDarkMode ? "rgba(143,161,255,0.15)" : "var(--gray-100)",
                 display: "flex", alignItems: "center", justifyContent: "center",
                 marginBottom: 16,
               }}>
-                <Icon name={f.icon} size={18} color="var(--gray-700)"/>
+                <Icon name={f.icon} size={18} color={isDarkMode ? "#8ea0ff" : "var(--gray-700)"}/>
               </div>
-              <h3 style={{ fontSize: 15.5, fontWeight: 650, color: "var(--gray-900)", marginBottom: 8, letterSpacing: "-0.02em" }}>{f.title}</h3>
-              <p style={{ fontSize: 13.5, color: "var(--gray-500)", lineHeight: 1.65 }}>{f.desc}</p>
+              <h3 style={{ fontSize: 15.5, fontWeight: 650, color: isDarkMode ? "#f3f6ff" : "var(--gray-900)", marginBottom: 8, letterSpacing: "-0.02em" }}>{f.title}</h3>
+              <p style={{ fontSize: 13.5, color: isDarkMode ? "#bec9e8" : "var(--gray-500)", lineHeight: 1.65 }}>{f.desc}</p>
             </Card>
           ))}
         </div>
@@ -1038,7 +1041,7 @@ const LandingPage = ({ onEnterApp }) => {
       <section id="how-it-works" data-key="howto" style={{ maxWidth: 1200, margin: "0 auto", padding: "100px 24px" }}>
         <div style={{ textAlign: "center", marginBottom: 80 }}>
           <div style={{ fontSize: 11, color: "var(--gray-400)", fontWeight: 600, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 14 }}>PROCESS</div>
-          <h2 style={{ fontSize: "clamp(32px, 5vw, 48px)", fontWeight: 700, letterSpacing: "-0.04em", color: "var(--gray-900)", lineHeight: 1.1 }}>
+          <h2 style={{ fontSize: "clamp(32px, 5vw, 48px)", fontWeight: 700, letterSpacing: "-0.04em", color: isDarkMode ? "#f3f6ff" : "var(--gray-900)", lineHeight: 1.1 }}>
             From zero to hired in 4 steps
           </h2>
         </div>
@@ -1068,15 +1071,15 @@ const LandingPage = ({ onEnterApp }) => {
                 width: 56,
                 height: 56,
                 borderRadius: "50%",
-                background: "var(--gray-100)",
-                border: "1px solid var(--gray-200)",
+                background: isDarkMode ? "rgba(16,24,40,0.8)" : "var(--gray-100)",
+                border: isDarkMode ? "1px solid rgba(124,143,255,0.3)" : "1px solid var(--gray-200)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 marginBottom: 24,
                 fontSize: 16,
                 fontWeight: 700,
-                color: "var(--gray-400)",
+                color: isDarkMode ? "#8ea0ff" : "var(--gray-400)",
                 fontFamily: "'DM Mono', monospace",
                 transition: "all 0.3s ease"
               }}>
@@ -1091,7 +1094,7 @@ const LandingPage = ({ onEnterApp }) => {
                   left: "calc(50% + 28px)",
                   width: "calc(100% - 56px)",
                   height: 2,
-                  background: "var(--gray-200)",
+                  background: isDarkMode ? "rgba(124,143,255,0.25)" : "var(--gray-200)",
                   zIndex: -1
                 }}/>
               )}
@@ -1101,7 +1104,7 @@ const LandingPage = ({ onEnterApp }) => {
                 <h3 style={{ 
                   fontSize: 17, 
                   fontWeight: 700, 
-                  color: "var(--gray-900)", 
+                  color: isDarkMode ? "#f3f6ff" : "var(--gray-900)", 
                   marginBottom: 12, 
                   letterSpacing: "-0.02em" 
                 }}>
@@ -1109,7 +1112,7 @@ const LandingPage = ({ onEnterApp }) => {
                 </h3>
                 <p style={{ 
                   fontSize: 13.5, 
-                  color: "var(--gray-500)", 
+                  color: isDarkMode ? "#bec9e8" : "var(--gray-500)", 
                   lineHeight: 1.7,
                   maxWidth: 220
                 }}>
@@ -1124,7 +1127,7 @@ const LandingPage = ({ onEnterApp }) => {
       {/* Testimonials */}
       <section data-key="testimonials" style={{ maxWidth: 1100, margin: "0 auto", padding: "80px 24px" }}>
         <div style={{ textAlign: "center", marginBottom: 56 }}>
-          <h2 style={{ fontSize: "clamp(28px, 4vw, 42px)", fontWeight: 700, letterSpacing: "-0.035em", color: "var(--gray-900)" }}>
+          <h2 style={{ fontSize: "clamp(28px, 4vw, 42px)", fontWeight: 700, letterSpacing: "-0.035em", color: isDarkMode ? "#f3f6ff" : "var(--gray-900)" }}>
             Trusted by ambitious professionals
           </h2>
         </div>
@@ -1132,20 +1135,22 @@ const LandingPage = ({ onEnterApp }) => {
           {testimonials.map((t, i) => (
             <Card key={t.name} style={{
               ...(visible.testimonials ? { animation: `fadeUp 0.6s ${i * 0.1}s ease forwards` } : { opacity: 0 }),
+              border: isDarkMode ? "1px solid rgba(124,143,255,0.24)" : undefined,
+              background: isDarkMode ? "rgba(18,26,42,0.62)" : undefined,
             }}>
               <div style={{ display: "flex", gap: 4, marginBottom: 16 }}>
-                {[...Array(5)].map((_, j) => <Icon key={j} name="star" size={13} color="var(--gray-400)"/>)}
+                {[...Array(5)].map((_, j) => <Icon key={j} name="star" size={13} color={isDarkMode ? "#8ea0ff" : "var(--gray-400)"}/>)}
               </div>
-              <p style={{ fontSize: 14, color: "var(--gray-600)", lineHeight: 1.7, marginBottom: 20 }}>"{t.text}"</p>
+              <p style={{ fontSize: 14, color: isDarkMode ? "#bec9e8" : "var(--gray-600)", lineHeight: 1.7, marginBottom: 20 }}>"{t.text}"</p>
               <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
                 <div style={{
                   width: 36, height: 36, borderRadius: "50%",
-                  background: "var(--gray-900)", color: "var(--white)",
+                  background: isDarkMode ? "#8ea0ff" : "var(--gray-900)", color: isDarkMode ? "#0b0f19" : "var(--white)",
                   display: "flex", alignItems: "center", justifyContent: "center",
                   fontSize: 13, fontWeight: 700,
                 }}>{t.avatar}</div>
                 <div>
-                  <div style={{ fontSize: 13.5, fontWeight: 650, color: "var(--gray-900)" }}>{t.name}</div>
+                  <div style={{ fontSize: 13.5, fontWeight: 650, color: isDarkMode ? "#f3f6ff" : "var(--gray-900)" }}>{t.name}</div>
                   <div style={{ fontSize: 12, color: "var(--gray-400)" }}>{t.role}</div>
                 </div>
               </div>
@@ -1160,40 +1165,46 @@ const LandingPage = ({ onEnterApp }) => {
           <div style={{ fontSize: 12, color: "var(--gray-400)", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 10 }}>
             Pricing
           </div>
-          <h2 style={{ fontSize: "clamp(28px, 4vw, 42px)", fontWeight: 700, letterSpacing: "-0.035em", color: "var(--gray-900)", lineHeight: 1.12 }}>
+          <h2 style={{ fontSize: "clamp(28px, 4vw, 42px)", fontWeight: 700, letterSpacing: "-0.035em", color: isDarkMode ? "#f3f6ff" : "var(--gray-900)", lineHeight: 1.12 }}>
             Plans for every stage
           </h2>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 18 }}>
-          <Card>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "var(--gray-900)", marginBottom: 10 }}>Starter</div>
-            <div style={{ fontSize: 34, fontWeight: 800, color: "var(--gray-900)", letterSpacing: "-0.03em", marginBottom: 4 }}>$0</div>
-            <div style={{ fontSize: 12.5, color: "var(--gray-500)", marginBottom: 16 }}>For exploring the platform</div>
-            <div style={{ fontSize: 13.5, color: "var(--gray-600)", lineHeight: 1.7, marginBottom: 18 }}>
+          <Card style={{
+            border: isDarkMode ? "1px solid rgba(124,143,255,0.24)" : undefined,
+            background: isDarkMode ? "rgba(18,26,42,0.62)" : undefined,
+          }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: isDarkMode ? "#f3f6ff" : "var(--gray-900)", marginBottom: 10 }}>Starter</div>
+            <div style={{ fontSize: 34, fontWeight: 800, color: isDarkMode ? "#f3f6ff" : "var(--gray-900)", letterSpacing: "-0.03em", marginBottom: 4 }}>$0</div>
+            <div style={{ fontSize: 12.5, color: isDarkMode ? "#97a6d4" : "var(--gray-500)", marginBottom: 16 }}>For exploring the platform</div>
+            <div style={{ fontSize: 13.5, color: isDarkMode ? "#bec9e8" : "var(--gray-600)", lineHeight: 1.7, marginBottom: 18 }}>
               Resume parsing, basic JD matching, and limited quiz attempts.
             </div>
-            <Btn variant="secondary" style={{ width: "100%", justifyContent: "center" }} onClick={onEnterApp}>Get started</Btn>
+            <Btn variant="secondary" style={{ width: "100%", justifyContent: "center", borderColor: isDarkMode ? "rgba(128,145,255,0.28)" : undefined, background: isDarkMode ? "#121b2b" : undefined, color: isDarkMode ? "#e6ecff" : undefined }} onClick={onEnterApp}>Get started</Btn>
           </Card>
-          <Card style={{ border: "1px solid var(--gray-900)", boxShadow: "var(--shadow-lg)" }}>
+          <Card style={{ border: isDarkMode ? "1px solid rgba(143,161,255,0.5)" : "1px solid var(--gray-900)", boxShadow: "var(--shadow-lg)", background: isDarkMode ? "rgba(18,26,42,0.8)" : undefined }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "var(--gray-900)" }}>Pro</div>
-              <Badge variant="neutral">Most popular</Badge>
+              <div style={{ fontSize: 13, fontWeight: 700, color: isDarkMode ? "#f3f6ff" : "var(--gray-900)" }}>Pro</div>
+              <Badge variant="neutral" style={{ background: isDarkMode ? "rgba(143,161,255,0.2)" : undefined, color: isDarkMode ? "#8ea0ff" : undefined }}>Most popular</Badge>
             </div>
-            <div style={{ fontSize: 34, fontWeight: 800, color: "var(--gray-900)", letterSpacing: "-0.03em", marginBottom: 4 }}>$19<span style={{ fontSize: 14, fontWeight: 600, color: "var(--gray-500)" }}>/mo</span></div>
-            <div style={{ fontSize: 12.5, color: "var(--gray-500)", marginBottom: 16 }}>For active job seekers</div>
-            <div style={{ fontSize: 13.5, color: "var(--gray-600)", lineHeight: 1.7, marginBottom: 18 }}>
+            <div style={{ fontSize: 34, fontWeight: 800, color: isDarkMode ? "#f3f6ff" : "var(--gray-900)", letterSpacing: "-0.03em", marginBottom: 4 }}>$19<span style={{ fontSize: 14, fontWeight: 600, color: isDarkMode ? "#97a6d4" : "var(--gray-500)" }}>/mo</span></div>
+            <div style={{ fontSize: 12.5, color: isDarkMode ? "#97a6d4" : "var(--gray-500)", marginBottom: 16 }}>For active job seekers</div>
+            <div style={{ fontSize: 13.5, color: isDarkMode ? "#bec9e8" : "var(--gray-600)", lineHeight: 1.7, marginBottom: 18 }}>
               Unlimited quizzes, advanced roadmap, AI interview feedback, and job tracking.
             </div>
             <Btn variant="primary" style={{ width: "100%", justifyContent: "center" }} onClick={onEnterApp}>Start Pro</Btn>
           </Card>
-          <Card>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "var(--gray-900)", marginBottom: 10 }}>Teams</div>
-            <div style={{ fontSize: 34, fontWeight: 800, color: "var(--gray-900)", letterSpacing: "-0.03em", marginBottom: 4 }}>Custom</div>
-            <div style={{ fontSize: 12.5, color: "var(--gray-500)", marginBottom: 16 }}>For institutes and cohorts</div>
-            <div style={{ fontSize: 13.5, color: "var(--gray-600)", lineHeight: 1.7, marginBottom: 18 }}>
+          <Card style={{
+            border: isDarkMode ? "1px solid rgba(124,143,255,0.24)" : undefined,
+            background: isDarkMode ? "rgba(18,26,42,0.62)" : undefined,
+          }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: isDarkMode ? "#f3f6ff" : "var(--gray-900)", marginBottom: 10 }}>Teams</div>
+            <div style={{ fontSize: 34, fontWeight: 800, color: isDarkMode ? "#f3f6ff" : "var(--gray-900)", letterSpacing: "-0.03em", marginBottom: 4 }}>Custom</div>
+            <div style={{ fontSize: 12.5, color: isDarkMode ? "#97a6d4" : "var(--gray-500)", marginBottom: 16 }}>For institutes and cohorts</div>
+            <div style={{ fontSize: 13.5, color: isDarkMode ? "#bec9e8" : "var(--gray-600)", lineHeight: 1.7, marginBottom: 18 }}>
               Admin dashboard, cohort analytics, role-specific learning paths, and support.
             </div>
-            <Btn variant="secondary" style={{ width: "100%", justifyContent: "center" }} onClick={onEnterApp}>Contact sales</Btn>
+            <Btn variant="secondary" style={{ width: "100%", justifyContent: "center", borderColor: isDarkMode ? "rgba(128,145,255,0.28)" : undefined, background: isDarkMode ? "#121b2b" : undefined, color: isDarkMode ? "#e6ecff" : undefined }} onClick={onEnterApp}>Contact sales</Btn>
           </Card>
         </div>
       </section>
@@ -1201,9 +1212,10 @@ const LandingPage = ({ onEnterApp }) => {
       {/* CTA Banner */}
       <section style={{ maxWidth: 1100, margin: "0 auto 100px", padding: "0 24px" }}>
         <div style={{
-          background: "var(--gray-900)", borderRadius: "var(--radius-xl)",
+          background: isDarkMode ? "rgba(18,26,42,0.9)" : "var(--gray-900)", borderRadius: "var(--radius-xl)",
           padding: "60px 64px", textAlign: "center",
           boxShadow: "var(--shadow-xl)",
+          border: isDarkMode ? "1px solid rgba(143,161,255,0.3)" : undefined,
         }}>
           <h2 style={{ fontSize: "clamp(24px, 3.5vw, 38px)", fontWeight: 700, color: "var(--white)", letterSpacing: "-0.04em", marginBottom: 14 }}>
             Start your career transformation today
@@ -1211,14 +1223,14 @@ const LandingPage = ({ onEnterApp }) => {
           <p style={{ fontSize: 16, color: "rgba(255,255,255,0.5)", marginBottom: 32 }}>
             Join thousands of professionals accelerating their careers with AI.
           </p>
-          <Btn variant="secondary" onClick={onEnterApp} style={{ padding: "13px 32px", fontSize: 15 }}>
+          <Btn variant="secondary" onClick={onEnterApp} style={{ padding: "13px 32px", fontSize: 15, borderColor: isDarkMode ? "rgba(143,161,255,0.4)" : undefined, background: isDarkMode ? "rgba(143,161,255,0.15)" : undefined, color: isDarkMode ? "#e6ecff" : undefined }}>
             Get started free — no credit card
           </Btn>
         </div>
       </section>
 
       {/* Footer */}
-      <footer style={{ borderTop: "1px solid var(--gray-150)", padding: "32px 48px", maxWidth: 1100, margin: "0 auto" }}>
+      <footer style={{ borderTop: isDarkMode ? "1px solid rgba(124,143,255,0.2)" : "1px solid var(--gray-150)", padding: "32px 48px", maxWidth: 1100, margin: "0 auto" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <div style={{ width: 24, height: 24, borderRadius: 7, background: "var(--gray-900)", display: "flex", alignItems: "center", justifyContent: "center" }}>
