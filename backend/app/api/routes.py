@@ -936,6 +936,34 @@ async def search_jobs(
         }
         
         jobs = await job_service.find_matching_jobs(resume, preferences)
+
+        if supabase_service.enabled:
+            for job in jobs:
+                job_description_id = str(uuid.uuid4())
+                job_payload = {
+                    "source": "job_recommendation",
+                    "resume_id": resume_id,
+                    "role": role,
+                    "location": location,
+                    "match_percentage": job.match_percentage,
+                    "salary": job.salary,
+                    "description": job.description,
+                    "required_skills": job.required_skills,
+                    "apply_link": job.apply_link,
+                    "posted_date": job.posted_date,
+                    "job_source": job.source,
+                }
+                jd_ok, jd_err = supabase_service.save_job_description(
+                    job_description_id=job_description_id,
+                    raw_text=job.description,
+                    user_id=resume_id,
+                    title=job.title,
+                    company=job.company,
+                    location=job.location,
+                    parsed_data=job_payload,
+                )
+                if not jd_ok:
+                    print(f"Warning: failed to persist job recommendation: {jd_err}")
         
         return {"jobs": [job.dict() for job in jobs]}
 

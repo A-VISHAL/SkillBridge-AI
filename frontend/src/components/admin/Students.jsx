@@ -48,7 +48,18 @@ const calculateEligibility = (student, settings) => {
   );
   const cgpaOk = student.cgpa === null ? false : student.cgpa >= Number(settings?.min_cgpa ?? defaultSettings.min_cgpa);
   const atsOk = Number(student.ats_score || 0) >= Number(settings?.min_ats_score ?? defaultSettings.min_ats_score);
-  return cgpaOk && atsOk && hasSkills;
+  const missingRules = [];
+  if (!cgpaOk) missingRules.push(`CGPA < ${Number(settings?.min_cgpa ?? defaultSettings.min_cgpa)}`);
+  if (!atsOk) missingRules.push(`ATS < ${Number(settings?.min_ats_score ?? defaultSettings.min_ats_score)}%`);
+  if (!hasSkills && requiredSkills.length) missingRules.push(`Missing ${requiredSkills.filter((skill) => !student.skills.some((value) => value.toLowerCase().includes(skill.toLowerCase()))).join(', ')}`);
+
+  return {
+    eligible: cgpaOk && atsOk && hasSkills,
+    meetsCGPA: cgpaOk,
+    meetsATS: atsOk,
+    meetsSkills: hasSkills,
+    missingRules,
+  };
 };
 
 const mergeStudentRecords = (resumes, matches, progressMetrics, roadmaps, roadmapTasks, settings) => {
@@ -90,9 +101,12 @@ const mergeStudentRecords = (resumes, matches, progressMetrics, roadmaps, roadma
       roadmap,
     };
 
+    const eligibility = calculateEligibility(student, settings);
+
     return {
       ...student,
-      eligible: calculateEligibility(student, settings),
+      eligible: eligibility.eligible,
+      eligibility,
     };
   });
 };
@@ -133,7 +147,7 @@ export function useAdminData() {
       safeSelect(supabase.from('jd_matches').select('resume_id, match_percentage, strengths, weaknesses, matched_skills, missing_skills, created_at').order('created_at', { ascending: false })),
       safeSelect(supabase.from('progress_metrics').select('resume_id, completed_tasks, total_tasks, weak_areas')),
       safeSelect(supabase.from('admin_settings').select('min_cgpa, min_ats_score, required_skills, updated_at').order('updated_at', { ascending: false }).limit(1), [defaultSettings]),
-      safeSelect(supabase.from('job_descriptions').select('id, title, company, location, raw_text, created_at').order('created_at', { ascending: false })),
+      safeSelect(supabase.from('job_descriptions').select('id, title, company, location, raw_text, parsed_data, created_at').order('created_at', { ascending: false })),
       safeSelect(supabase.from('roadmaps').select('id, resume_id, job_description_id, duration_weeks, daily_hours, milestones, completion_criteria, created_at').order('created_at', { ascending: false })),
       safeSelect(supabase.from('roadmap_tasks').select('id, roadmap_id, week, task, skill, difficulty, estimated_hours, completed, milestone, priority, resources').order('week', { ascending: true })),
     ]);
@@ -291,6 +305,11 @@ export default function StudentsSection({ students, settings, loading, error, on
               <div>
                 <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: '-0.03em' }}>{student.name}</div>
                 <div style={{ marginTop: 4, fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>{student.eligible ? 'Eligible ✅' : 'Not Eligible ❌'}</div>
+                  {!student.eligible && student.eligibility?.missingRules?.length > 0 && (
+                    <div style={{ marginTop: 8, fontSize: 11, color: 'rgba(255,255,255,0.48)', lineHeight: 1.45 }}>
+                      {student.eligibility.missingRules.slice(0, 3).join(' · ')}
+                    </div>
+                  )}
               </div>
               <div style={{ minWidth: 72, height: 72, borderRadius: '50%', background: 'conic-gradient(#22c55e 0deg, #22c55e ' + (student.ats_score * 3.6) + 'deg, rgba(255,255,255,0.08) ' + (student.ats_score * 3.6) + 'deg 360deg)', display: 'grid', placeItems: 'center' }}>
                 <div style={{ width: 54, height: 54, borderRadius: '50%', background: '#0f172a', display: 'grid', placeItems: 'center', textAlign: 'center' }}>

@@ -96,6 +96,7 @@ class SupabaseService:
         title: str = "",
         company: str = "",
         location: str = "",
+        parsed_data: Optional[Dict[str, Any]] = None,
     ) -> Tuple[bool, str]:
         payload: Dict[str, Any] = {
             "id": job_description_id,
@@ -104,7 +105,7 @@ class SupabaseService:
             "company": company or "",
             "location": location or "",
             "raw_text": raw_text,
-            "parsed_data": {},
+            "parsed_data": parsed_data or {},
         }
         ok, _, err = self._insert("job_descriptions", payload)
         return ok, err

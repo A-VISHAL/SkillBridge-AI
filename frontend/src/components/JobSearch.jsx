@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { searchJobs } from '../utils/api'
+import { isSupabaseReady, supabase } from '../lib/supabaseClient'
 
 const Card = ({ children, style = {} }) => (
   <div style={{
@@ -50,7 +51,36 @@ export default function JobSearch({ resumeId, resumeData }) {
     setLoading(true)
     try {
       const result = await searchJobs(resumeId, role, 'India')
-      setJobs(result.jobs)
+      const recommendedJobs = Array.isArray(result.jobs) ? result.jobs : []
+      setJobs(recommendedJobs)
+
+      if (isSupabaseReady && supabase && recommendedJobs.length > 0) {
+        const rows = recommendedJobs.map((job) => ({
+          user_id: resumeId,
+          title: job.title || 'Recommended job',
+          company: job.company || '',
+          location: job.location || '',
+          raw_text: job.description || '',
+          parsed_data: {
+            source: 'job_recommendation',
+            job_id: job.id || null,
+            role,
+            location: 'India',
+            match_percentage: job.match_percentage || 0,
+            salary: job.salary || null,
+            description: job.description || '',
+            required_skills: Array.isArray(job.required_skills) ? job.required_skills : [],
+            apply_link: job.apply_link || '',
+            posted_date: job.posted_date || '',
+            job_source: job.source || '',
+          },
+        }))
+
+        const { error: saveError } = await supabase.from('job_descriptions').insert(rows)
+        if (saveError) {
+          console.warn('Failed to persist job recommendations:', saveError)
+        }
+      }
     } catch (err) {
       alert(err.message)
     } finally {

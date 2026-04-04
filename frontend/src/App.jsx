@@ -3,6 +3,7 @@ import { AnimatePresence, motion, useScroll, useTransform } from "framer-motion"
 import Roadmap from "./components/Roadmap";
 import { AuthPage } from "./components/AuthPage";
 import { AdminDashboard } from "./components/AdminDashboard";
+import { isSupabaseReady, supabase } from "./lib/supabaseClient";
 
 // ─── Design tokens ───────────────────────────────────────────────────────────
 const tokens = {
@@ -3083,7 +3084,36 @@ const JobFinder = ({ resumeId, resumeData, onJobsUpdated, isDarkMode }) => {
       }
 
       const data = await response.json();
-      setJobs(Array.isArray(data.jobs) ? data.jobs : []);
+      const recommendedJobs = Array.isArray(data.jobs) ? data.jobs : [];
+      setJobs(recommendedJobs);
+
+      if (isSupabaseReady && supabase && recommendedJobs.length > 0) {
+        const rows = recommendedJobs.map((job) => ({
+          user_id: resumeId,
+          title: job.title || "Recommended job",
+          company: job.company || "",
+          location: job.location || "",
+          raw_text: job.description || "",
+          parsed_data: {
+            source: "job_recommendation",
+            job_id: job.id || null,
+            role: role || "Software Engineer",
+            location: location || "India",
+            match_percentage: job.match_percentage || 0,
+            salary: job.salary || null,
+            description: job.description || "",
+            required_skills: Array.isArray(job.required_skills) ? job.required_skills : [],
+            apply_link: job.apply_link || "",
+            posted_date: job.posted_date || "",
+            job_source: job.source || "",
+          },
+        }));
+
+        const { error: saveError } = await supabase.from("job_descriptions").insert(rows);
+        if (saveError) {
+          console.warn("Failed to persist job recommendations:", saveError);
+        }
+      }
     } catch (e) {
       console.error(e);
       setError("Could not load jobs right now. Please try again.");
