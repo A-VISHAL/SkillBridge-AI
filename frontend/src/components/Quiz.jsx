@@ -81,12 +81,21 @@ export default function Quiz({ resumeId }) {
   const [loading, setLoading] = useState(false)
   const [selected, setSelected] = useState(null)
   const [showExpl, setShowExpl] = useState(false)
+  const [currentQuestion, setCurrentQuestion] = useState(0)
+  const [score, setScore] = useState(0)
+  const [answers, setAnswers] = useState([])
+  const [quizCompleted, setQuizCompleted] = useState(false)
+  const [showCongrats, setShowCongrats] = useState(false)
 
   const handleGenerate = async () => {
     setLoading(true)
     try {
       const result = await generateQuiz(topic, 'Medium', 5)
       setQuestions(result.questions)
+      setCurrentQuestion(0)
+      setScore(0)
+      setAnswers([])
+      setQuizCompleted(false)
     } catch (err) {
       alert(err.message)
     } finally {
@@ -94,16 +103,74 @@ export default function Quiz({ resumeId }) {
     }
   }
 
+  const handleNext = () => {
+    const isCorrect = selected === questions[currentQuestion].correctAnswerIndex
+    const newAnswers = [...answers, { questionIdx: currentQuestion, selected, correct: isCorrect }]
+    setAnswers(newAnswers)
+    
+    if (isCorrect) {
+      setScore(score + 1)
+    }
+
+    if (currentQuestion + 1 < questions.length) {
+      setCurrentQuestion(currentQuestion + 1)
+      setSelected(null)
+      setShowExpl(false)
+    } else {
+      // Quiz completed
+      const finalScore = isCorrect ? score + 1 : score
+      const percentage = Math.round((finalScore / questions.length) * 100)
+      setQuizCompleted(true)
+      if (percentage >= 80) {
+        setShowCongrats(true)
+      }
+    }
+  }
+
+  const handleRetake = () => {
+    setCurrentQuestion(0)
+    setScore(0)
+    setAnswers([])
+    setQuizCompleted(false)
+    setShowCongrats(false)
+    setSelected(null)
+    setShowExpl(false)
+  }
+
+  const percentage = quizCompleted ? Math.round((score / questions.length) * 100) : 0
+  const passed = percentage >= 80
+
   return (
     <div style={{ padding: 28, animation: "fadeIn 0.4s ease" }}>
+      {/* Congratulations Modal */}
+      {showCongrats && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          zIndex: 9999, backdropFilter: "blur(4px)"
+        }}>
+          <div style={{
+            background: "var(--white)", borderRadius: 24, padding: 40,
+            maxWidth: 500, textAlign: "center", boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
+            animation: "fadeUp 0.4s ease"
+          }}>
+            <div style={{ fontSize: 60, marginBottom: 16 }}>🎉</div>
+            <h1 style={{ fontSize: 28, fontWeight: 700, color: "var(--gray-900)", marginBottom: 8, letterSpacing: "-0.02em" }}>Congratulations!</h1>
+            <p style={{ fontSize: 16, color: "var(--gray-600)", marginBottom: 24, lineHeight: 1.6 }}>You've successfully completed the {topic} quiz with a score of <strong>{percentage}%</strong></p>
+            <p style={{ fontSize: 13, color: "var(--gray-500)", marginBottom: 32 }}>Great job! Keep practicing to master more skills.</p>
+            <Btn onClick={() => setShowCongrats(false)} style={{ width: "100%", justifyContent: "center" }}>Continue</Btn>
+          </div>
+        </div>
+      )}
+
       <div style={{ marginBottom: 24 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
           <h2 style={{ fontSize: 20, fontWeight: 700, color: "var(--gray-900)", letterSpacing: "-0.04em" }}>Adaptive Quiz</h2>
-          {questions && <Badge>Question 1 / {questions.length}</Badge>}
+          {questions && !quizCompleted && <Badge>Question {currentQuestion + 1} / {questions.length}</Badge>}
         </div>
-        {questions && (
+        {questions && !quizCompleted && (
           <div style={{ height: 4, background: "var(--gray-100)", borderRadius: 99 }}>
-            <div style={{ height: "100%", borderRadius: 99, width: "20%", background: "var(--gray-700)", transition: "width 1s ease" }}/>
+            <div style={{ height: "100%", borderRadius: 99, width: `${((currentQuestion + 1) / questions.length) * 100}%`, background: "var(--gray-700)", transition: "width 0.4s ease" }}/>
           </div>
         )}
       </div>
@@ -135,16 +202,38 @@ export default function Quiz({ resumeId }) {
         </div>
       )}
 
-      {questions && questions.length > 0 && (
+      {quizCompleted && (
+        <Card style={{ maxWidth: 600, textAlign: "center" }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: "var(--gray-400)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 16 }}>Quiz Result</div>
+          <div style={{ fontSize: 56, fontWeight: 800, color: passed ? "var(--gray-900)" : "var(--gray-600)", marginBottom: 8, letterSpacing: "-0.02em" }}>
+            {percentage}%
+          </div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: passed ? "var(--gray-900)" : "var(--gray-600)", marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+            {passed ? "PASS" : "TRY AGAIN"}
+          </div>
+          <p style={{ fontSize: 13, color: "var(--gray-600)", marginBottom: 28, lineHeight: 1.5 }}>
+            {passed 
+              ? `Passing criteria is 80%. You cleared ${topic} section.`
+              : `Passing criteria is 80%. Score more than 80% to pass.`
+            }
+          </p>
+          <div style={{ display: "flex", gap: 12 }}>
+            <Btn variant="secondary" style={{ flex: 1, justifyContent: "center" }}>Back to Setup</Btn>
+            <Btn onClick={handleRetake} style={{ flex: 1, justifyContent: "center" }}>Retake Quiz</Btn>
+          </div>
+        </Card>
+      )}
+
+      {questions && questions.length > 0 && !quizCompleted && (
         <div style={{ maxWidth: 600 }}>
           <Card style={{ marginBottom: 16 }}>
             <div style={{ fontSize: 11, fontWeight: 600, color: "var(--gray-400)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 14 }}>{topic}</div>
-            <p style={{ fontSize: 16, fontWeight: 550, color: "var(--gray-900)", lineHeight: 1.6, letterSpacing: "-0.02em" }}>{questions[0].question}</p>
+            <p style={{ fontSize: 16, fontWeight: 550, color: "var(--gray-900)", lineHeight: 1.6, letterSpacing: "-0.02em" }}>{questions[currentQuestion].question}</p>
           </Card>
 
-          {questions[0].options && (
+          {questions[currentQuestion].options && (
             <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
-              {questions[0].options.map((opt, i) => {
+              {questions[currentQuestion].options.map((opt, i) => {
                 const isSelected = selected === i;
                 let bg = "var(--white)", border = "var(--gray-200)", color = "var(--gray-700)";
                 if (isSelected) { bg = "var(--gray-900)"; border = "var(--gray-900)"; color = "var(--white)"; }
@@ -180,8 +269,10 @@ export default function Quiz({ resumeId }) {
           )}
 
           <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
-            <Btn variant="secondary" style={{ flex: 1, justifyContent: "center" }}>Previous</Btn>
-            <Btn style={{ flex: 2, justifyContent: "center" }}>Next question</Btn>
+            <Btn variant="secondary" style={{ flex: 1, justifyContent: "center" }} disabled={currentQuestion === 0}>Previous</Btn>
+            <Btn onClick={handleNext} style={{ flex: 2, justifyContent: "center" }} disabled={selected === null}>
+              {currentQuestion + 1 === questions.length ? "Submit Quiz" : "Next question"}
+            </Btn>
           </div>
         </div>
       )}

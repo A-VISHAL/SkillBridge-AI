@@ -1921,6 +1921,7 @@ const Quiz = ({ resumeId, resumeData, jobDescription, onQuizComplete }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [score, setScore] = useState(0);
+  const [showCongrats, setShowCongrats] = useState(false);
 
   const passingPercentage = 80;
 
@@ -1978,6 +1979,7 @@ const Quiz = ({ resumeId, resumeData, jobDescription, onQuizComplete }) => {
       ]);
       setAnswers({});
       setIndex(0);
+      setShowCongrats(false);
       persistQuizContext({
         domain,
         difficulty,
@@ -2019,6 +2021,7 @@ const Quiz = ({ resumeId, resumeData, jobDescription, onQuizComplete }) => {
 
     const computed = questions.length > 0 ? Math.round((correct / questions.length) * 100) : 0;
     setScore(computed);
+    setShowCongrats(computed >= passingPercentage);
     persistQuizContext({
       score: computed,
       weakTopics: Array.from(new Set(weakTopics)),
@@ -2040,6 +2043,52 @@ const Quiz = ({ resumeId, resumeData, jobDescription, onQuizComplete }) => {
 
   return (
     <div style={{ padding: 28, animation: "fadeIn 0.4s ease", display: "grid", gridTemplateColumns: "1.7fr 1fr", gap: 18 }}>
+      {showCongrats && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(10, 10, 10, 0.48)",
+            backdropFilter: "blur(4px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1200,
+            padding: 20,
+          }}
+        >
+          <div
+            style={{
+              width: "min(520px, 100%)",
+              borderRadius: 24,
+              border: "1px solid var(--gray-200)",
+              background: "var(--white)",
+              boxShadow: "0 22px 64px rgba(0,0,0,0.22)",
+              padding: 28,
+              textAlign: "center",
+            }}
+          >
+            <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.12em", color: "var(--gray-500)", textTransform: "uppercase", marginBottom: 8 }}>
+              Quiz Completed
+            </div>
+            <div style={{ fontSize: 34, fontWeight: 800, color: "#166534", letterSpacing: "-0.03em", marginBottom: 8 }}>
+              Congratulations
+            </div>
+            <div style={{ fontSize: 14, color: "var(--gray-600)", lineHeight: 1.7, marginBottom: 18 }}>
+              You passed the {domain} assessment with a score of <strong>{score}%</strong>.
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <Btn variant="secondary" onClick={() => setShowCongrats(false)} style={{ flex: 1, justifyContent: "center" }}>
+                Close
+              </Btn>
+              <Btn variant="primary" onClick={() => { setShowCongrats(false); setPhase("setup"); }} style={{ flex: 1, justifyContent: "center" }}>
+                Continue
+              </Btn>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div>
         <div style={{ marginBottom: 18 }}>
           <h2 style={{ fontSize: 22, fontWeight: 700, color: "var(--gray-900)", letterSpacing: "-0.04em" }}>Adaptive Quiz</h2>
