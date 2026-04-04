@@ -2699,6 +2699,7 @@ const MockInterview = ({ resumeId, resumeData, jobDescription, onInterviewProgre
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [score, setScore] = useState(0);
+  const [generationSource, setGenerationSource] = useState(null);
   const [feedbackScores, setFeedbackScores] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [completed, setCompleted] = useState(false);
@@ -2711,6 +2712,50 @@ const MockInterview = ({ resumeId, resumeData, jobDescription, onInterviewProgre
     } catch {
       return {};
     }
+  };
+
+  const parseApiError = (error, fallbackMessage) => {
+    const raw = String(error?.message || "").trim();
+    if (!raw) return fallbackMessage;
+
+    try {
+      const parsed = JSON.parse(raw);
+      const detail = String(parsed?.detail || "").trim();
+      if (detail) {
+        if (detail.toLowerCase().includes("rate-limit") || detail.toLowerCase().includes("rate limit")) {
+          return "Interview API rate limit reached. Please wait 5-10 seconds and try again.";
+        }
+        return detail;
+      }
+    } catch {
+      // Non-JSON payload.
+    }
+
+    if (raw.toLowerCase().includes("rate_limit_exceeded") || raw.toLowerCase().includes("rate limit")) {
+      return "Interview API rate limit reached. Please wait 5-10 seconds and try again.";
+    }
+
+    return raw.length > 220 ? fallbackMessage : raw;
+  };
+
+  const formatFeedbackMessage = (feedback) => {
+    const scoreLine = `Score: ${feedback?.score ?? 0}/10`;
+    const confidenceLine = `Confidence: ${feedback?.confidence_level || "Medium"}`;
+
+    const strengths = Array.isArray(feedback?.strengths) ? feedback.strengths.slice(0, 3) : [];
+    const weaknesses = Array.isArray(feedback?.weaknesses) ? feedback.weaknesses.slice(0, 3) : [];
+    const tips = Array.isArray(feedback?.improvement_tips) ? feedback.improvement_tips.slice(0, 3) : [];
+
+    const strengthsLine = strengths.length > 0 ? `Strengths: ${strengths.join(" | ")}` : "Strengths: Keep your answer specific and role-aligned.";
+    const gapsLine = weaknesses.length > 0 ? `Gaps: ${weaknesses.join(" | ")}` : "Gaps: Add more concrete depth and measurable impact.";
+    const tipsLine = tips.length > 0 ? `Next step: ${tips.join(" | ")}` : "Next step: Use STAR structure and include one measurable project outcome.";
+
+    const modelAnswer = String(feedback?.model_answer || "").trim();
+    const structuredModelAnswer = modelAnswer
+      ? `Model guidance:\n${modelAnswer}`
+      : "Model guidance:\nSummary: Good attempt.\nStrength: You addressed the topic.\nGap: Add deeper technical decisions and outcomes.\nBetter answer: Use STAR and quantify impact.";
+
+    return [scoreLine, confidenceLine, strengthsLine, gapsLine, tipsLine, structuredModelAnswer].join("\n");
   };
 
   const scrollToBottom = () => {
@@ -2726,6 +2771,7 @@ const MockInterview = ({ resumeId, resumeData, jobDescription, onInterviewProgre
     setMode(selectedMode);
     setLoading(true);
     setError("");
+    setGenerationSource(null);
     setCompleted(false);
 
     try {
@@ -2748,9 +2794,14 @@ const MockInterview = ({ resumeId, resumeData, jobDescription, onInterviewProgre
 
       const data = await response.json();
       const nextSession = data?.session_id ? data : null;
-      const firstQuestion = nextSession?.questions?.[0]?.question || "Tell me about yourself and the most relevant project from your resume.";
+      const firstQuestion = nextSession?.questions?.[0]?.question;
+
+      if (!firstQuestion) {
+        throw new Error("Interview model did not return questions");
+      }
 
       setSession(nextSession);
+      setGenerationSource(data?.generation_source || null);
       setMessages([
         { role: "ai", text: "Interview started from your resume, quiz history, and roadmap context. Your score begins at 0." },
         { role: "ai", text: firstQuestion },
@@ -2770,7 +2821,7 @@ const MockInterview = ({ resumeId, resumeData, jobDescription, onInterviewProgre
       scrollToBottom();
     } catch (e) {
       console.error(e);
-      setError("Could not start the interview right now. Please try again.");
+      setError(parseApiError(e, "Could not start the interview right now. Please try again."));
     } finally {
       setLoading(false);
     }
@@ -2822,7 +2873,7 @@ const MockInterview = ({ resumeId, resumeData, jobDescription, onInterviewProgre
         updatedAt: new Date().toISOString(),
       });
 
-      const feedbackText = `Score: ${feedback.score ?? 0}/10. ${feedback.model_answer || "Review the expected keywords and try again."}`;
+      const feedbackText = formatFeedbackMessage(feedback);
       const nextQuestion = session.questions?.[currentIndex + 1];
 
       setMessages((prev) => {
@@ -2844,7 +2895,7 @@ const MockInterview = ({ resumeId, resumeData, jobDescription, onInterviewProgre
       scrollToBottom();
     } catch (e) {
       console.error(e);
-      setError("Could not evaluate your answer right now. Please try again.");
+      setError(parseApiError(e, "Could not evaluate your answer right now. Please try again."));
     } finally {
       setSubmitting(false);
     }
@@ -2860,6 +2911,9 @@ const MockInterview = ({ resumeId, resumeData, jobDescription, onInterviewProgre
           <p style={{ fontSize: 13.5, color: "var(--gray-500)" }}>Questions are based on your resume, quiz history, and roadmap progress.</p>
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          {generationSource && (
+            <Badge>{generationSource === "model" ? "Source: Live API model" : "Source: Fallback"}</Badge>
+          )}
           <div style={{ textAlign: "right" }}>
             <div style={{ fontSize: 20, fontWeight: 700, color: "var(--gray-900)", letterSpacing: "-0.04em" }}>{score}</div>
             <div style={{ fontSize: 11, color: "var(--gray-400)", fontWeight: 500 }}>Interview score</div>
