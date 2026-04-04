@@ -6,6 +6,7 @@ import StudentsSection, { useAdminData } from './admin/Students';
 
 const navItems = [
   { id: 'overview', label: 'Dashboard Overview' },
+  { id: 'summary', label: 'Executive Summary' },
   { id: 'students', label: 'Students' },
   { id: 'eligibility', label: 'Eligibility Control' },
   { id: 'jobs', label: 'Job Management' },
@@ -534,6 +535,212 @@ export function AdminDashboard({ onLogout }) {
                     </div>
                   </div>
                 </div>
+              </motion.div>
+            )}
+
+            {active === 'summary' && (
+              <motion.div key="summary" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+                <SectionShell title="Executive Summary" subtitle="Comprehensive overview of student performance, eligibility, and placement readiness.">
+                  
+                  {/* Summary Text Insights */}
+                  <div style={{ ...metricStyle, padding: 28 }}>
+                    <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 20, color: '#e8eef7' }}>Dashboard Insights</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                      <div style={{ padding: 16, borderRadius: 12, background: 'rgba(91,127,196,0.1)', border: '1px solid rgba(91,127,196,0.25)' }}>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: '#6b93d6', marginBottom: 8 }}>📊 Student Overview</div>
+                        <div style={{ fontSize: 14, color: '#e8eef7', lineHeight: 1.7 }}>
+                          Currently tracking <strong>{totalStudents}</strong> students with an average ATS score of <strong>{Math.round(averageAts)}</strong>. 
+                          The average CGPA across all students is <strong>{totalStudents ? (students.reduce((sum, s) => sum + Number(s.cgpa || 0), 0) / totalStudents).toFixed(2) : '0.00'}</strong>.
+                          {totalStudents > 0 && ` The top performer has achieved an ATS score of ${Math.max(...students.map(s => Number(s.ats_score || 0)))}.`}
+                        </div>
+                      </div>
+
+                      <div style={{ padding: 16, borderRadius: 12, background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.25)' }}>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: '#22c55e', marginBottom: 8 }}>✅ Eligibility Status</div>
+                        <div style={{ fontSize: 14, color: '#e8eef7', lineHeight: 1.7 }}>
+                          Out of {totalStudents} students, <strong>{eligibilityBreakdown.totalEligible}</strong> ({Math.round((eligibilityBreakdown.totalEligible / totalStudents) * 100)}%) 
+                          meet all eligibility criteria. <strong>{eligibilityBreakdown.cgpaCount}</strong> students meet the CGPA requirement (≥{savedSettings.min_cgpa}), 
+                          <strong> {eligibilityBreakdown.atsCount}</strong> meet the ATS threshold (≥{savedSettings.min_ats_score}%), 
+                          and <strong>{eligibilityBreakdown.skillsCount}</strong> possess all required skills.
+                        </div>
+                      </div>
+
+                      <div style={{ padding: 16, borderRadius: 12, background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.25)' }}>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: '#8b5cf6', marginBottom: 8 }}>🎯 Skills Analysis</div>
+                        <div style={{ fontSize: 14, color: '#e8eef7', lineHeight: 1.7 }}>
+                          {(() => {
+                            const skillCount = {};
+                            students.forEach(student => {
+                              (student.skills || []).forEach(skill => {
+                                const skillName = typeof skill === 'string' ? skill : skill.name;
+                                skillCount[skillName] = (skillCount[skillName] || 0) + 1;
+                              });
+                            });
+                            const topSkills = Object.entries(skillCount).sort((a, b) => b[1] - a[1]).slice(0, 3);
+                            return topSkills.length > 0 
+                              ? `The most common skills are ${topSkills.map(([skill, count]) => `${skill} (${count} students)`).join(', ')}. `
+                              : 'No skill data available yet. ';
+                          })()}
+                          {savedSettings.required_skills?.length > 0 && `Required skills for placement include: ${savedSettings.required_skills.join(', ')}.`}
+                        </div>
+                      </div>
+
+                      <div style={{ padding: 16, borderRadius: 12, background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.25)' }}>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: '#f59e0b', marginBottom: 8 }}>💼 Job Market</div>
+                        <div style={{ fontSize: 14, color: '#e8eef7', lineHeight: 1.7 }}>
+                          There are currently <strong>{activeJobs}</strong> active job openings available for students. 
+                          {activeJobs > 0 && ` Students can explore these opportunities through the Job Finder section.`}
+                          {activeJobs === 0 && ` Add job descriptions to help students find relevant opportunities.`}
+                        </div>
+                      </div>
+
+                      <div style={{ padding: 16, borderRadius: 12, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)' }}>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: '#ef4444', marginBottom: 8 }}>⚠️ Areas of Concern</div>
+                        <div style={{ fontSize: 14, color: '#e8eef7', lineHeight: 1.7 }}>
+                          {eligibilityBreakdown.notEligible > 0 && `${eligibilityBreakdown.notEligible} students (${Math.round((eligibilityBreakdown.notEligible / totalStudents) * 100)}%) do not meet all eligibility criteria. `}
+                          {(() => {
+                            const lowAts = students.filter(s => Number(s.ats_score || 0) < 40).length;
+                            const lowCgpa = students.filter(s => Number(s.cgpa || 0) < 6).length;
+                            const concerns = [];
+                            if (lowAts > 0) concerns.push(`${lowAts} students have ATS scores below 40`);
+                            if (lowCgpa > 0) concerns.push(`${lowCgpa} students have CGPA below 6.0`);
+                            return concerns.length > 0 ? concerns.join(', ') + '. Focus on improving these metrics through targeted interventions.' : 'All students are performing well across key metrics.';
+                          })()}
+                        </div>
+                      </div>
+
+                      <div style={{ padding: 16, borderRadius: 12, background: 'rgba(56,189,248,0.1)', border: '1px solid rgba(56,189,248,0.25)' }}>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: '#38bdf8', marginBottom: 8 }}>📈 Recommendations</div>
+                        <div style={{ fontSize: 14, color: '#e8eef7', lineHeight: 1.7 }}>
+                          {placementReadiness < 50 && 'Consider lowering eligibility thresholds or providing additional training to increase placement readiness. '}
+                          {eligibilityBreakdown.skillsCount < totalStudents * 0.7 && 'Focus on upskilling programs to help more students acquire required technical skills. '}
+                          {averageAts < 60 && 'Conduct resume workshops to improve ATS scores across the student body. '}
+                          {placementReadiness >= 70 && 'Strong placement readiness! Continue monitoring and supporting students through the placement process.'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Key Metrics Summary */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
+                    <div style={{ ...metricStyle, padding: 24, textAlign: 'center' }}>
+                      <div style={{ fontSize: 12, color: '#8a9bb5', marginBottom: 8, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Placement Readiness</div>
+                      <div style={{ fontSize: 40, fontWeight: 800, color: placementReadiness >= 70 ? '#22c55e' : placementReadiness >= 50 ? '#f59e0b' : '#ef4444', lineHeight: 1 }}>
+                        {placementReadiness}%
+                      </div>
+                      <div style={{ marginTop: 8, fontSize: 11, color: '#8a9bb5' }}>
+                        {placementReadiness >= 70 ? 'Excellent' : placementReadiness >= 50 ? 'Good' : 'Needs Improvement'}
+                      </div>
+                    </div>
+
+                    <div style={{ ...metricStyle, padding: 24, textAlign: 'center' }}>
+                      <div style={{ fontSize: 12, color: '#8a9bb5', marginBottom: 8, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Eligible Students</div>
+                      <div style={{ fontSize: 40, fontWeight: 800, color: '#e8eef7', lineHeight: 1 }}>
+                        {eligibilityBreakdown.totalEligible}
+                      </div>
+                      <div style={{ marginTop: 8, fontSize: 11, color: '#8a9bb5' }}>
+                        Out of {totalStudents} total
+                      </div>
+                    </div>
+
+                    <div style={{ ...metricStyle, padding: 24, textAlign: 'center' }}>
+                      <div style={{ fontSize: 12, color: '#8a9bb5', marginBottom: 8, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Avg Performance</div>
+                      <div style={{ fontSize: 40, fontWeight: 800, color: '#e8eef7', lineHeight: 1 }}>
+                        {Math.round(averageAts)}
+                      </div>
+                      <div style={{ marginTop: 8, fontSize: 11, color: '#8a9bb5' }}>
+                        Average ATS Score
+                      </div>
+                    </div>
+
+                    <div style={{ ...metricStyle, padding: 24, textAlign: 'center' }}>
+                      <div style={{ fontSize: 12, color: '#8a9bb5', marginBottom: 8, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Active Opportunities</div>
+                      <div style={{ fontSize: 40, fontWeight: 800, color: '#e8eef7', lineHeight: 1 }}>
+                        {activeJobs}
+                      </div>
+                      <div style={{ marginTop: 8, fontSize: 11, color: '#8a9bb5' }}>
+                        Job openings
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Summary Charts */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: 16 }}>
+                    {/* Eligibility Breakdown Pie */}
+                    <div style={{ ...metricStyle, padding: 24 }}>
+                      <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 16, color: '#e8eef7' }}>Eligibility Breakdown</div>
+                      <ResponsiveContainer width="100%" height={250}>
+                        <PieChart>
+                          <Pie
+                            data={[
+                              { name: 'Fully Eligible', value: eligibilityBreakdown.totalEligible, fill: '#22c55e' },
+                              { name: 'Not Eligible', value: eligibilityBreakdown.notEligible, fill: '#ef4444' }
+                            ]}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={60}
+                            outerRadius={90}
+                            paddingAngle={4}
+                            dataKey="value"
+                            label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                          />
+                          <Tooltip contentStyle={{ background: '#253447', border: '1px solid rgba(91,127,196,0.3)', borderRadius: 12, color: '#e8eef7' }} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+
+                    {/* ATS Distribution */}
+                    <div style={{ ...metricStyle, padding: 24 }}>
+                      <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 16, color: '#e8eef7' }}>ATS Score Distribution</div>
+                      <ResponsiveContainer width="100%" height={250}>
+                        <BarChart data={chartData}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(91,127,196,0.2)" />
+                          <XAxis dataKey="name" stroke="#8a9bb5" style={{ fontSize: 12 }} />
+                          <YAxis stroke="#8a9bb5" style={{ fontSize: 12 }} />
+                          <Tooltip contentStyle={{ background: '#253447', border: '1px solid rgba(91,127,196,0.3)', borderRadius: 12, color: '#e8eef7' }} />
+                          <Bar dataKey="value" radius={[10, 10, 0, 0]}>
+                            {chartData.map((entry, index) => <Cell key={entry.name} fill={colors[index % colors.length]} />)}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+
+                    {/* CGPA Distribution */}
+                    <div style={{ ...metricStyle, padding: 24 }}>
+                      <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 16, color: '#e8eef7' }}>CGPA Distribution</div>
+                      <ResponsiveContainer width="100%" height={250}>
+                        <BarChart data={[
+                          { range: '4-5', count: students.filter(s => !isNaN(Number(s.cgpa)) && Number(s.cgpa) >= 4 && Number(s.cgpa) < 5).length },
+                          { range: '5-6', count: students.filter(s => !isNaN(Number(s.cgpa)) && Number(s.cgpa) >= 5 && Number(s.cgpa) < 6).length },
+                          { range: '6-7', count: students.filter(s => !isNaN(Number(s.cgpa)) && Number(s.cgpa) >= 6 && Number(s.cgpa) < 7).length },
+                          { range: '7-8', count: students.filter(s => !isNaN(Number(s.cgpa)) && Number(s.cgpa) >= 7 && Number(s.cgpa) < 8).length },
+                          { range: '8-9', count: students.filter(s => !isNaN(Number(s.cgpa)) && Number(s.cgpa) >= 8 && Number(s.cgpa) < 9).length },
+                          { range: '9-10', count: students.filter(s => !isNaN(Number(s.cgpa)) && Number(s.cgpa) >= 9).length },
+                        ]}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(91,127,196,0.2)" />
+                          <XAxis dataKey="range" stroke="#8a9bb5" style={{ fontSize: 12 }} />
+                          <YAxis stroke="#8a9bb5" style={{ fontSize: 12 }} />
+                          <Tooltip contentStyle={{ background: '#253447', border: '1px solid rgba(91,127,196,0.3)', borderRadius: 12, color: '#e8eef7' }} />
+                          <Bar dataKey="count" radius={[8, 8, 0, 0]} fill="#38bdf8" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+
+                    {/* Skills Gap */}
+                    <div style={{ ...metricStyle, padding: 24 }}>
+                      <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 16, color: '#e8eef7' }}>Skills Gap Analysis</div>
+                      <ResponsiveContainer width="100%" height={250}>
+                        <BarChart data={skillGaps}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(91,127,196,0.2)" />
+                          <XAxis dataKey="skill" stroke="#8a9bb5" style={{ fontSize: 12 }} />
+                          <YAxis stroke="#8a9bb5" style={{ fontSize: 12 }} />
+                          <Tooltip contentStyle={{ background: '#253447', border: '1px solid rgba(91,127,196,0.3)', borderRadius: 12, color: '#e8eef7' }} />
+                          <Bar dataKey="students" radius={[10, 10, 0, 0]} fill="#8b5cf6" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                </SectionShell>
               </motion.div>
             )}
 
