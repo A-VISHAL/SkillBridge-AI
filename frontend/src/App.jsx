@@ -605,6 +605,15 @@ const LandingPage = ({ onEnterApp }) => {
   const [visible, setVisible] = useState({});
   const sectionsRef = useRef({});
 
+  const scrollToSection = (sectionId) => {
+    if (typeof window === "undefined") return;
+    const el = document.getElementById(sectionId);
+    if (!el) return;
+    const navOffset = 96;
+    const top = el.getBoundingClientRect().top + window.scrollY - navOffset;
+    window.scrollTo({ top, behavior: "smooth" });
+  };
+
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 40);
     window.addEventListener("scroll", handleScroll);
@@ -728,10 +737,24 @@ const LandingPage = ({ onEnterApp }) => {
           </div>
 
           <div style={{ display: "flex", gap: 32, alignItems: "center" }}>
-            {["Features", "How it works", "Pricing"].map(n => (
-              <a key={n} href="#" style={{ fontSize: 14, color: "var(--gray-500)", textDecoration: "none", fontWeight: 500, letterSpacing: "-0.01em", transition: "color 0.15s" }}
+            {[
+              { label: "Features", id: "features" },
+              { label: "How it works", id: "how-it-works" },
+              { label: "Pricing", id: "pricing" },
+            ].map((item) => (
+              <a
+                key={item.label}
+                href={`#${item.id}`}
+                onClick={(e) => {
+                  e.preventDefault();
+                  scrollToSection(item.id);
+                }}
+                style={{ fontSize: 14, color: "var(--gray-500)", textDecoration: "none", fontWeight: 500, letterSpacing: "-0.01em", transition: "color 0.15s" }}
                 onMouseEnter={e => e.target.style.color = "var(--gray-900)"}
-                onMouseLeave={e => e.target.style.color = "var(--gray-500)"}>{n}</a>
+                onMouseLeave={e => e.target.style.color = "var(--gray-500)"}
+              >
+                {item.label}
+              </a>
             ))}
           </div>
 
@@ -743,8 +766,7 @@ const LandingPage = ({ onEnterApp }) => {
 
       {/* Hero */}
       <section style={{ paddingTop: 160, paddingBottom: 120, textAlign: "center", maxWidth: 1280, margin: "0 auto", padding: "160px 24px 120px" }}>
-        <div className="fade-up" style={{ animationDelay: "0.1s", opacity: 0, animationFillMode: "forwards" }}>
-          <Badge variant="neutral" style={{ marginBottom: 24 }}>✦ Powered by Claude AI</Badge>
+        <div className="fade-up" style={{ animationDelay: "0.1s", opacity: 0, animationFillMode: "forwards", marginBottom: 24 }}>
         </div>
         <h1 className="fade-up" style={{
           fontSize: "clamp(40px, 7vw, 72px)", fontWeight: 700,
@@ -776,7 +798,7 @@ const LandingPage = ({ onEnterApp }) => {
       </section>
 
       {/* Features */}
-      <section data-key="features" style={{ maxWidth: 1100, margin: "0 auto", padding: "80px 24px" }}>
+      <section id="features" data-key="features" style={{ maxWidth: 1100, margin: "0 auto", padding: "80px 24px" }}>
         <div style={{ textAlign: "center", marginBottom: 56 }}>
           <div style={{ fontSize: 12, color: "var(--gray-400)", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 12 }}>Features</div>
           <h2 style={{ fontSize: "clamp(28px, 4vw, 42px)", fontWeight: 700, letterSpacing: "-0.035em", color: "var(--gray-900)", lineHeight: 1.12 }}>
@@ -804,7 +826,7 @@ const LandingPage = ({ onEnterApp }) => {
       </section>
 
       {/* How it works */}
-      <section data-key="howto" style={{ maxWidth: 1200, margin: "0 auto", padding: "100px 24px" }}>
+      <section id="how-it-works" data-key="howto" style={{ maxWidth: 1200, margin: "0 auto", padding: "100px 24px" }}>
         <div style={{ textAlign: "center", marginBottom: 80 }}>
           <div style={{ fontSize: 11, color: "var(--gray-400)", fontWeight: 600, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 14 }}>PROCESS</div>
           <h2 style={{ fontSize: "clamp(32px, 5vw, 48px)", fontWeight: 700, letterSpacing: "-0.04em", color: "var(--gray-900)", lineHeight: 1.1 }}>
@@ -920,6 +942,50 @@ const LandingPage = ({ onEnterApp }) => {
               </div>
             </Card>
           ))}
+        </div>
+      </section>
+
+      {/* Pricing */}
+      <section id="pricing" style={{ maxWidth: 1100, margin: "0 auto", padding: "40px 24px 90px" }}>
+        <div style={{ textAlign: "center", marginBottom: 46 }}>
+          <div style={{ fontSize: 12, color: "var(--gray-400)", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 10 }}>
+            Pricing
+          </div>
+          <h2 style={{ fontSize: "clamp(28px, 4vw, 42px)", fontWeight: 700, letterSpacing: "-0.035em", color: "var(--gray-900)", lineHeight: 1.12 }}>
+            Plans for every stage
+          </h2>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 18 }}>
+          <Card>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "var(--gray-900)", marginBottom: 10 }}>Starter</div>
+            <div style={{ fontSize: 34, fontWeight: 800, color: "var(--gray-900)", letterSpacing: "-0.03em", marginBottom: 4 }}>$0</div>
+            <div style={{ fontSize: 12.5, color: "var(--gray-500)", marginBottom: 16 }}>For exploring the platform</div>
+            <div style={{ fontSize: 13.5, color: "var(--gray-600)", lineHeight: 1.7, marginBottom: 18 }}>
+              Resume parsing, basic JD matching, and limited quiz attempts.
+            </div>
+            <Btn variant="secondary" style={{ width: "100%", justifyContent: "center" }} onClick={onEnterApp}>Get started</Btn>
+          </Card>
+          <Card style={{ border: "1px solid var(--gray-900)", boxShadow: "var(--shadow-lg)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "var(--gray-900)" }}>Pro</div>
+              <Badge variant="neutral">Most popular</Badge>
+            </div>
+            <div style={{ fontSize: 34, fontWeight: 800, color: "var(--gray-900)", letterSpacing: "-0.03em", marginBottom: 4 }}>$19<span style={{ fontSize: 14, fontWeight: 600, color: "var(--gray-500)" }}>/mo</span></div>
+            <div style={{ fontSize: 12.5, color: "var(--gray-500)", marginBottom: 16 }}>For active job seekers</div>
+            <div style={{ fontSize: 13.5, color: "var(--gray-600)", lineHeight: 1.7, marginBottom: 18 }}>
+              Unlimited quizzes, advanced roadmap, AI interview feedback, and job tracking.
+            </div>
+            <Btn variant="primary" style={{ width: "100%", justifyContent: "center" }} onClick={onEnterApp}>Start Pro</Btn>
+          </Card>
+          <Card>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "var(--gray-900)", marginBottom: 10 }}>Teams</div>
+            <div style={{ fontSize: 34, fontWeight: 800, color: "var(--gray-900)", letterSpacing: "-0.03em", marginBottom: 4 }}>Custom</div>
+            <div style={{ fontSize: 12.5, color: "var(--gray-500)", marginBottom: 16 }}>For institutes and cohorts</div>
+            <div style={{ fontSize: 13.5, color: "var(--gray-600)", lineHeight: 1.7, marginBottom: 18 }}>
+              Admin dashboard, cohort analytics, role-specific learning paths, and support.
+            </div>
+            <Btn variant="secondary" style={{ width: "100%", justifyContent: "center" }} onClick={onEnterApp}>Contact sales</Btn>
+          </Card>
         </div>
       </section>
 
