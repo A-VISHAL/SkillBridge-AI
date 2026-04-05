@@ -2836,6 +2836,7 @@ const MockInterview = ({ resumeId, resumeData, jobDescription, onInterviewProgre
   const [feedbackScores, setFeedbackScores] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [completed, setCompleted] = useState(false);
+  const [loadingSeconds, setLoadingSeconds] = useState(0);
   const chatRef = useRef(null);
 
   const textColor = isDarkMode ? "#e8eef7" : "var(--gray-900)";
@@ -2880,6 +2881,26 @@ const MockInterview = ({ resumeId, resumeData, jobDescription, onInterviewProgre
     return raw.length > 220 ? fallbackMessage : raw;
   };
 
+  useEffect(() => {
+    if (!loading) {
+      setLoadingSeconds(0);
+      return undefined;
+    }
+
+    setLoadingSeconds(0);
+    const timer = window.setInterval(() => {
+      setLoadingSeconds((seconds) => seconds + 1);
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [loading]);
+
+  const formatElapsedTime = (seconds) => {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`;
+  };
+
   const formatFeedbackMessage = (feedback) => {
     const scoreLine = `Score: ${feedback?.score ?? 0}/10`;
     const confidenceLine = `Confidence: ${feedback?.confidence_level || "Medium"}`;
@@ -2904,6 +2925,8 @@ const MockInterview = ({ resumeId, resumeData, jobDescription, onInterviewProgre
     window.setTimeout(() => chatRef.current?.scrollTo({ top: 9999, behavior: "smooth" }), 60);
   };
 
+  const wait = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
+
   const startInterview = async (selectedMode) => {
     if (!resumeId) {
       setError("Upload your resume first in Resume Analyzer.");
@@ -2915,12 +2938,14 @@ const MockInterview = ({ resumeId, resumeData, jobDescription, onInterviewProgre
     setError("");
     setGenerationSource(null);
     setCompleted(false);
+    const startedAt = Date.now();
+    const interviewMode = selectedMode || "Technical";
 
     try {
       const formData = new FormData();
       formData.append("resume_id", resumeId);
       formData.append("job_description", jobDescription || "");
-      formData.append("mode", selectedMode);
+      formData.append("mode", interviewMode);
       formData.append("count", 5);
       formData.append("quiz_context", JSON.stringify(loadQuizContext()));
 
@@ -2953,7 +2978,7 @@ const MockInterview = ({ resumeId, resumeData, jobDescription, onInterviewProgre
       setFeedbackScores([]);
       setCurrentIndex(0);
       onInterviewProgress?.({
-        mode: selectedMode,
+        mode: interviewMode,
         score: 0,
         completed: false,
         answered: 0,
@@ -2963,8 +2988,16 @@ const MockInterview = ({ resumeId, resumeData, jobDescription, onInterviewProgre
       scrollToBottom();
     } catch (e) {
       console.error(e);
+      const elapsed = Date.now() - startedAt;
+      if (elapsed < 1200) {
+        await wait(1200 - elapsed);
+      }
       setError(parseApiError(e, "Could not start the interview right now. Please try again."));
     } finally {
+      const elapsed = Date.now() - startedAt;
+      if (elapsed < 1200) {
+        await wait(1200 - elapsed);
+      }
       setLoading(false);
     }
   };
@@ -3076,6 +3109,28 @@ const MockInterview = ({ resumeId, resumeData, jobDescription, onInterviewProgre
               Start HR Interview
             </Btn>
           </div>
+          {loading && (
+            <div style={{ marginTop: 18, padding: 18, borderRadius: 18, border: isDarkMode ? "1px solid rgba(122,147,193,0.35)" : "1px solid var(--gray-200)", background: isDarkMode ? "rgba(91,127,196,0.12)" : "var(--gray-50)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+                <div style={{ width: 42, height: 42, borderRadius: 999, border: isDarkMode ? "3px solid rgba(122,147,193,0.25)" : "3px solid var(--gray-200)", borderTopColor: isDarkMode ? "#8fb0e3" : "var(--gray-800)", animation: "rotate 1s linear infinite" }} />
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: textColor, marginBottom: 4 }}>Interview is starting...</div>
+                  <div style={{ fontSize: 12.5, color: mutedColor, lineHeight: 1.6 }}>
+                    Please wait a few mins while SkillBridge prepares your {mode.toLowerCase()} interview from your resume and progress history.
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+                <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 12px", borderRadius: 999, background: isDarkMode ? "rgba(143,176,227,0.14)" : "var(--white)", border: isDarkMode ? "1px solid rgba(122,147,193,0.35)" : "1px solid var(--gray-200)", color: isDarkMode ? "#dbe8fb" : "var(--gray-700)", fontSize: 12, fontWeight: 700 }}>
+                  <span>Timer</span>
+                  <span>{formatElapsedTime(loadingSeconds)}</span>
+                </div>
+                <div style={{ fontSize: 12, color: mutedColor, fontWeight: 500 }}>
+                  Generating {mode.toLowerCase()} questions, scoring flow, and interview context.
+                </div>
+              </div>
+            </div>
+          )}
           {error && <div style={{ marginTop: 12, color: isDarkMode ? "#fca5a5" : "#b91c1c", fontSize: 12.5, fontWeight: 600 }}>{error}</div>}
           {resumeData?.name && <div style={{ marginTop: 10, color: mutedColor, fontSize: 12.5 }}>Interview profile: {resumeData.name}</div>}
         </div>
