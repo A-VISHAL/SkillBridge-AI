@@ -1604,7 +1604,28 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed, isDarkMode }) => {
   const [suggestions, setSuggestions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [loadingStage, setLoadingStage] = useState("");
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const fileInputRef = useRef(null);
+
+  useEffect(() => {
+    if (!loading) {
+      setElapsedSeconds(0);
+      return undefined;
+    }
+
+    setElapsedSeconds(0);
+    const timer = window.setInterval(() => {
+      setElapsedSeconds((seconds) => seconds + 1);
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [loading]);
+
+  const formatElapsedTime = (seconds) => {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`;
+  };
 
   const uploadResumeFile = async (file) => {
     const formData = new FormData();
@@ -1905,8 +1926,17 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed, isDarkMode }) => {
                   {loading ? "Processing resume..." : "Drop your resume here"}
                 </div>
                 {loading && (
-                  <div style={{ fontSize: 12.5, color: isDarkMode ? "#b4c3d9" : "var(--gray-500)", marginBottom: 8, fontWeight: 500 }}>
-                    {loadingStage || "SkillBridge is evaluating ATS quality, skills, and project evidence..."}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "center", marginBottom: 8 }}>
+                    <div style={{ fontSize: 12.5, color: isDarkMode ? "#b4c3d9" : "var(--gray-500)", fontWeight: 500 }}>
+                      Please wait a few mins. SkillBridge is evaluating ATS quality, skills, and project evidence...
+                    </div>
+                    <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 12px", borderRadius: 999, background: isDarkMode ? "rgba(91,127,196,0.15)" : "var(--gray-100)", border: isDarkMode ? "1px solid rgba(91,127,196,0.28)" : "1px solid var(--gray-200)", color: isDarkMode ? "#dbe8fb" : "var(--gray-700)", fontSize: 12, fontWeight: 700, letterSpacing: "0.03em" }}>
+                      <span>Timer</span>
+                      <span>{formatElapsedTime(elapsedSeconds)}</span>
+                    </div>
+                    <div style={{ fontSize: 12, color: isDarkMode ? "#8a9bb5" : "var(--gray-400)", fontWeight: 500 }}>
+                      {loadingStage || "Running ATS and project-fit analysis..."}
+                    </div>
                   </div>
                 )}
                 <div style={{ fontSize: 13, color: isDarkMode ? "#8a9bb5" : "var(--gray-400)", marginBottom: 20 }}>PDF, DOCX supported · Max 5MB</div>

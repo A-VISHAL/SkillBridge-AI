@@ -41,6 +41,24 @@ def normalize_lines(text: str) -> List[str]:
     return lines
 
 
+def clean_extracted_text(text: str) -> str:
+    """Normalize extracted PDF/DOCX text without flattening section breaks."""
+    cleaned_lines = []
+
+    for raw_line in text.replace('\r', '\n').split('\n'):
+        line = raw_line.strip()
+        if not line:
+            continue
+
+        line = re.sub(r'([a-z])([A-Z])', r'\1 \2', line)
+        line = re.sub(r'([A-Za-z])([0-9])', r'\1 \2', line)
+        line = re.sub(r'([0-9])([A-Za-z])', r'\1 \2', line)
+        line = re.sub(r'\s+', ' ', line)
+        cleaned_lines.append(line)
+
+    return '\n'.join(cleaned_lines).strip()
+
+
 def is_section_heading(line: str) -> bool:
     normalized = re.sub(r'[:\-–—]+$', '', line.strip())
     return any(pattern.match(normalized) for pattern in SECTION_HEADINGS.values())
@@ -76,11 +94,12 @@ def extract_text_from_pdf(file_path: str) -> str:
             for page in doc:
                 text += page.get_text()
             doc.close()
-            return text
+            return clean_extracted_text(text)
 
         if PdfReader is not None:
             reader = PdfReader(file_path)
-            return "\n".join((page.extract_text() or "") for page in reader.pages)
+            text = "\n".join((page.extract_text() or "") for page in reader.pages)
+            return clean_extracted_text(text)
 
         raise RuntimeError("PDF support is unavailable because no PDF parser is installed (PyMuPDF or pypdf)")
     except Exception as e:
