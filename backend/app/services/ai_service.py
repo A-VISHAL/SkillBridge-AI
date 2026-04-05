@@ -461,7 +461,8 @@ async def call_model_chat(
     }
 
     last_response = None
-    async with httpx.AsyncClient(timeout=90.0) as client:
+    timeout_seconds = max(15, min(45, int(getattr(settings, "API_TIMEOUT_SECONDS", 20)) * 2))
+    async with httpx.AsyncClient(timeout=timeout_seconds) as client:
         for headers in header_variants:
             for attempt in range(2):
                 try:
@@ -479,14 +480,14 @@ async def call_model_chat(
                     break
 
                 if response.status_code in (429, 502, 503, 504) and attempt == 0:
-                    wait_seconds = 5
+                    wait_seconds = 2
                     if response.status_code == 429:
                         try:
                             payload_json = response.json()
-                            retry_after = int(payload_json.get("retry_after", 5))
-                            wait_seconds = max(1, min(20, retry_after))
+                            retry_after = int(payload_json.get("retry_after", 2))
+                            wait_seconds = max(1, min(5, retry_after))
                         except Exception:
-                            wait_seconds = 5
+                            wait_seconds = 2
                     await asyncio.sleep(wait_seconds)
                     continue
 
@@ -1544,6 +1545,59 @@ async def generate_interview_questions(
             output.append(item)
         return output
 
+    def _fill_with_fallback(items: List[Dict[str, Any]], target_count: int) -> List[Dict[str, Any]]:
+        """Ensure interview generation returns quickly even when model under-produces."""
+        fallback_pool = [
+            {
+                "type": "Technical" if not mode.lower().startswith("hr") else "HR",
+                "difficulty": "Easy",
+                "question": "Walk me through one project from your resume and explain your exact contribution, stack, and measurable impact.",
+            },
+            {
+                "type": "Technical" if not mode.lower().startswith("hr") else "HR",
+                "difficulty": "Medium",
+                "question": "Which technical trade-off did you make in your most relevant project, and why was that the best decision for the requirement?",
+            },
+            {
+                "type": "Technical" if not mode.lower().startswith("hr") else "HR",
+                "difficulty": "Medium",
+                "question": "Pick one weak area from your recent preparation and explain how you improved it with a concrete practice plan.",
+            },
+            {
+                "type": "Technical" if not mode.lower().startswith("hr") else "HR",
+                "difficulty": "Hard",
+                "question": "If this feature had to support 10x traffic tomorrow, what architecture or implementation changes would you make first?",
+            },
+            {
+                "type": "HR",
+                "difficulty": "Medium",
+                "question": "Tell me about a challenging situation in a team project and how you handled communication, ownership, and outcome.",
+            },
+        ]
+
+        normalized = _dedupe(items)
+        seen_questions = {" ".join(str(item.get("question", "")).strip().lower().split()) for item in normalized}
+
+        fallback_index = 0
+        while len(normalized) < target_count and fallback_index < len(fallback_pool):
+            template = fallback_pool[fallback_index]
+            fallback_index += 1
+            question_text = template["question"]
+            key = " ".join(question_text.strip().lower().split())
+            if not key or key in seen_questions:
+                continue
+            seen_questions.add(key)
+            normalized.append({
+                "id": f"int-fallback-{len(normalized) + 1}",
+                "type": template["type"],
+                "difficulty": template["difficulty"],
+                "question": question_text,
+                "expected_keywords": ["clarity", "impact", "decision"],
+                "evaluation_criteria": ["Clarity", "Technical depth", "Relevance"],
+            })
+
+        return normalized[:target_count]
+
     normalized_count = max(1, int(count or 5))
     project_focus = _extract_project_focus()
     roadmap_focus = _extract_roadmap_focus()
@@ -1554,19 +1608,19 @@ async def generate_interview_questions(
 
 Mode: {mode_label}
 Job Description:
-{(jd_text or "")[:2200]}
+{(jd_text or "")[:1100]}
 
 Resume Extract:
-{(resume_text or "")[:2800]}
+{(resume_text or "")[:1400]}
 
 Project Highlights:
-{json.dumps(project_focus[:8], ensure_ascii=True)}
+{json.dumps(project_focus[:4], ensure_ascii=True)}
 
 Roadmap Progress Signals:
-{json.dumps(roadmap_focus[:8], ensure_ascii=True)}
+{json.dumps(roadmap_focus[:4], ensure_ascii=True)}
 
 Quiz Signals:
-{json.dumps(quiz_focus[:8], ensure_ascii=True)}
+{json.dumps(quiz_focus[:4], ensure_ascii=True)}
 
 Rules:
 1) Questions must be personalized to this candidate profile and JD.
@@ -1590,7 +1644,7 @@ No duplicates."""
     ]
 
     try:
-        response = await call_interview_chat(messages, temperature=0.65, max_tokens=1800)
+        response = await call_interview_chat(messages, temperature=0.5, max_tokens=900)
         parsed = json.loads(_extract_json_block(response))
         if isinstance(parsed, list):
             normalized = []
@@ -1598,7 +1652,7 @@ No duplicates."""
                 question = _normalize_interview_question(item, index)
                 if question:
                     normalized.append(question)
-            normalized = _dedupe(normalized)
+            normalized = _fill_with_fallback(normalized, normalized_count)
             if len(normalized) >= normalized_count:
                 return normalized[:normalized_count]
     except Exception as first_error:
@@ -1607,7 +1661,7 @@ No duplicates."""
                 {"role": "system", "content": "You are a senior interviewer generating realistic, candidate-specific interview questions."},
                 {"role": "user", "content": compact_prompt},
             ]
-            retry_response = await call_interview_chat(retry_messages, temperature=0.5, max_tokens=1300)
+            retry_response = await call_interview_chat(retry_messages, temperature=0.35, max_tokens=600)
             retry_parsed = json.loads(_extract_json_block(retry_response))
             if isinstance(retry_parsed, list):
                 normalized = []
@@ -1615,7 +1669,7 @@ No duplicates."""
                     question = _normalize_interview_question(item, index)
                     if question:
                         normalized.append(question)
-                normalized = _dedupe(normalized)
+                normalized = _fill_with_fallback(normalized, normalized_count)
                 if len(normalized) >= normalized_count:
                     return normalized[:normalized_count]
         except Exception as retry_error:

@@ -711,12 +711,9 @@ async def start_interview(
             except Exception:
                 parsed_quiz_context = {}
 
-        roadmap_context = []
-        try:
-            if resume_text and job_description:
-                match_data = await ai_service.match_resume_to_jd(resume_text, job_description)
-                roadmap_context = _build_roadmap_context_from_match(match_data)
-        except Exception:
+        # Keep interview start fast by reusing existing roadmap signals when available.
+        roadmap_context = parsed_quiz_context.get("roadmap_context", []) if isinstance(parsed_quiz_context, dict) else []
+        if not isinstance(roadmap_context, list):
             roadmap_context = []
 
         questions_data = await ai_service.generate_interview_questions(
