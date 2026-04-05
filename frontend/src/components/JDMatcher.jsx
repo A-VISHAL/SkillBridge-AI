@@ -120,6 +120,7 @@ const ProgressBar = ({ value, label, sublabel }) => (
 export default function JDMatcher({ resumeId, jobDescription, setJobDescription }) {
   const [matchResult, setMatchResult] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [loadingProgress, setLoadingProgress] = useState(0)
 
   const handleMatch = async () => {
     if (!jobDescription.trim()) {
@@ -128,13 +129,37 @@ export default function JDMatcher({ resumeId, jobDescription, setJobDescription 
     }
 
     setLoading(true)
+    setLoadingProgress(0)
+
+    // Start progress animation
+    let progress = 0
+    const progressInterval = setInterval(() => {
+      progress += Math.random() * 15 + 5 // Random increment between 5-20
+      if (progress >= 95) {
+        progress = 95
+        clearInterval(progressInterval)
+      }
+      setLoadingProgress(Math.floor(progress))
+    }, 300)
+
     try {
       const result = await matchJD(resumeId, jobDescription)
-      setMatchResult(result)
+      
+      // Complete progress
+      clearInterval(progressInterval)
+      setLoadingProgress(100)
+      
+      // Small delay to show 100% before showing results
+      setTimeout(() => {
+        setMatchResult(result)
+        setLoading(false)
+        setLoadingProgress(0)
+      }, 600)
     } catch (err) {
-      alert(err.message)
-    } finally {
+      clearInterval(progressInterval)
       setLoading(false)
+      setLoadingProgress(0)
+      alert(err.message)
     }
   }
 
@@ -188,7 +213,61 @@ export default function JDMatcher({ resumeId, jobDescription, setJobDescription 
           )}
         </div>
 
-        {analyzed && matchResult ? (
+        {loading ? (
+          <Card style={{ display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 20, padding: 40, minHeight: 300 }} hover={false}>
+            <div style={{ position: "relative", width: 140, height: 140 }}>
+              {/* Outer spinning circle */}
+              <div style={{
+                position: "absolute",
+                inset: 0,
+                borderRadius: "50%",
+                border: "3px solid var(--gray-100)",
+                borderTopColor: "var(--gray-800)",
+                animation: "rotate 1s linear infinite",
+              }} />
+              
+              {/* Progress percentage */}
+              <div style={{
+                position: "absolute",
+                inset: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexDirection: "column",
+                gap: 4,
+              }}>
+                <div style={{ fontSize: 32, fontWeight: 800, color: "var(--gray-900)", lineHeight: 1 }}>
+                  {loadingProgress}%
+                </div>
+                <div style={{ fontSize: 11, color: "var(--gray-400)", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase" }}>
+                  Analyzing
+                </div>
+              </div>
+            </div>
+            
+            <div style={{ textAlign: "center", maxWidth: 280 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "var(--gray-700)", marginBottom: 6 }}>
+                Analyzing JD Match
+              </div>
+              <div style={{ fontSize: 13, color: "var(--gray-500)", lineHeight: 1.6 }}>
+                SkillBridge is mapping your resume against JD requirements...
+              </div>
+            </div>
+            
+            {/* Progress bar */}
+            <div style={{ width: "100%", maxWidth: 240 }}>
+              <div style={{ height: 4, background: "var(--gray-100)", borderRadius: 99, overflow: "hidden" }}>
+                <div style={{
+                  height: "100%",
+                  width: `${loadingProgress}%`,
+                  background: "linear-gradient(90deg, var(--gray-800), var(--gray-600))",
+                  borderRadius: 99,
+                  transition: "width 0.3s ease-out",
+                }} />
+              </div>
+            </div>
+          </Card>
+        ) : analyzed && matchResult ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <Card style={{ padding: "24px 22px", textAlign: "center" }}>
               <div style={{ fontSize: 12, fontWeight: 600, color: "var(--gray-400)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 16 }}>Overall Match</div>

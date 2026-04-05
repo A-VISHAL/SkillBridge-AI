@@ -76,6 +76,10 @@ const globalStyles = `
   @keyframes spin {
     to { stroke-dashoffset: 0; }
   }
+  @keyframes rotate {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
   @keyframes pulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.5; }
@@ -2127,6 +2131,7 @@ const JDMatcher = ({ resumeId, onJobMatched, isDarkMode }) => {
   const [jd, setJD] = useState("");
   const [loading, setLoading] = useState(false);
   const [loadingStage, setLoadingStage] = useState("");
+  const [loadingProgress, setLoadingProgress] = useState(0);
   const [error, setError] = useState("");
   const [matchResult, setMatchResult] = useState(null);
 
@@ -2143,8 +2148,21 @@ const JDMatcher = ({ resumeId, onJobMatched, isDarkMode }) => {
     }
 
     setLoading(true);
+    setLoadingProgress(0);
     setLoadingStage("SkillBridge is mapping your resume signals to JD requirements...");
     setError("");
+    
+    // Start progress animation
+    let progress = 0;
+    const progressInterval = setInterval(() => {
+      progress += Math.random() * 12 + 3; // Random increment between 3-15
+      if (progress >= 95) {
+        progress = 95;
+        clearInterval(progressInterval);
+      }
+      setLoadingProgress(Math.floor(progress));
+    }, 250);
+    
     try {
       const formData = new FormData();
       formData.append("resume_id", resumeId);
@@ -2161,12 +2179,23 @@ const JDMatcher = ({ resumeId, onJobMatched, isDarkMode }) => {
       }
 
       const data = await response.json();
-      setMatchResult(data);
-      // Call the callback to update parent state with job description and match result
-      if (onJobMatched) {
-        onJobMatched(jd, data);
-      }
+      
+      // Complete progress
+      clearInterval(progressInterval);
+      setLoadingProgress(100);
+      
+      // Small delay to show 100%
+      setTimeout(() => {
+        setMatchResult(data);
+        setLoading(false);
+        setLoadingProgress(0);
+        // Call the callback to update parent state with job description and match result
+        if (onJobMatched) {
+          onJobMatched(jd, data);
+        }
+      }, 400);
     } catch (e) {
+      clearInterval(progressInterval);
       console.error(e);
       const message = e?.message || "";
       if (message.includes("Resume not found")) {
@@ -2175,8 +2204,8 @@ const JDMatcher = ({ resumeId, onJobMatched, isDarkMode }) => {
         setError(message || "Could not analyze JD match with real data. Please try again.");
       }
       setMatchResult(null);
-    } finally {
       setLoading(false);
+      setLoadingProgress(0);
       setLoadingStage("");
     }
   };
@@ -2322,13 +2351,57 @@ const JDMatcher = ({ resumeId, onJobMatched, isDarkMode }) => {
         )}
 
         {!analyzed && loading && (
-          <Card style={{ display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 12, padding: 40, minHeight: 300 }} hover={false}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: "var(--gray-800)" }}>Analyzing JD Match</div>
-            <div style={{ fontSize: 12.5, color: "var(--gray-500)", textAlign: "center", maxWidth: 320 }}>
-              {loadingStage || "SkillBridge is calculating match score, focus areas, and improvement suggestions."}
+          <Card isDarkMode={isDarkMode} style={{ display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 20, padding: 40, minHeight: 300 }} hover={false}>
+            <div style={{ position: "relative", width: 140, height: 140 }}>
+              {/* Outer spinning circle */}
+              <div style={{
+                position: "absolute",
+                inset: 0,
+                borderRadius: "50%",
+                border: isDarkMode ? "3px solid rgba(91,127,196,0.2)" : "3px solid var(--gray-100)",
+                borderTopColor: isDarkMode ? "#6b93d6" : "var(--gray-800)",
+                animation: "rotate 1s linear infinite",
+              }} />
+              
+              {/* Progress percentage */}
+              <div style={{
+                position: "absolute",
+                inset: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexDirection: "column",
+                gap: 4,
+              }}>
+                <div style={{ fontSize: 36, fontWeight: 900, color: isDarkMode ? "#e8eef7" : "var(--gray-900)", lineHeight: 1 }}>
+                  {loadingProgress}%
+                </div>
+                <div style={{ fontSize: 11, color: isDarkMode ? "#8a9bb5" : "var(--gray-400)", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase" }}>
+                  Analyzing
+                </div>
+              </div>
             </div>
-            <div style={{ width: "80%", height: 6, borderRadius: 999, background: "var(--gray-100)", overflow: "hidden", marginTop: 4 }}>
-              <div style={{ width: "55%", height: "100%", borderRadius: 999, background: "var(--gray-700)", transition: "width 0.8s ease" }} />
+            
+            <div style={{ textAlign: "center", maxWidth: 300 }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: isDarkMode ? "#e8eef7" : "var(--gray-800)", marginBottom: 8 }}>
+                Analyzing JD Match
+              </div>
+              <div style={{ fontSize: 13, color: isDarkMode ? "#b4c3d9" : "var(--gray-500)", lineHeight: 1.6 }}>
+                {loadingStage || "SkillBridge is mapping your resume against JD requirements..."}
+              </div>
+            </div>
+            
+            {/* Progress bar */}
+            <div style={{ width: "100%", maxWidth: 260 }}>
+              <div style={{ height: 6, background: isDarkMode ? "rgba(91,127,196,0.2)" : "var(--gray-100)", borderRadius: 999, overflow: "hidden" }}>
+                <div style={{
+                  height: "100%",
+                  width: `${loadingProgress}%`,
+                  background: isDarkMode ? "linear-gradient(90deg, #6b93d6, #5b7fc4)" : "linear-gradient(90deg, var(--gray-800), var(--gray-600))",
+                  borderRadius: 999,
+                  transition: "width 0.3s ease-out",
+                }} />
+              </div>
             </div>
           </Card>
         )}
