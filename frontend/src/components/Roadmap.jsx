@@ -1,15 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-const Button = ({ children, active = false, onClick, disabled = false, style = {} }) => (
+const Button = ({ children, active = false, onClick, disabled = false, style = {}, isDarkMode = false }) => (
   <button
     onClick={onClick}
     disabled={disabled}
     style={{
       padding: '10px 18px',
       borderRadius: 999,
-      border: active ? '1px solid #111827' : '1px solid #d1d5db',
-      background: active ? '#111827' : '#ffffff',
-      color: active ? '#ffffff' : '#374151',
+      border: active 
+        ? (isDarkMode ? '1px solid #5b7fc4' : '1px solid #111827')
+        : (isDarkMode ? '1px solid rgba(70,100,150,0.3)' : '1px solid #d1d5db'),
+      background: active 
+        ? (isDarkMode ? '#5b7fc4' : '#111827')
+        : (isDarkMode ? 'transparent' : '#ffffff'),
+      color: active 
+        ? '#ffffff' 
+        : (isDarkMode ? '#b4c3d9' : '#374151'),
       fontWeight: 600,
       fontSize: 13,
       cursor: disabled ? 'not-allowed' : 'pointer',
@@ -23,13 +29,13 @@ const Button = ({ children, active = false, onClick, disabled = false, style = {
   </button>
 );
 
-const Card = ({ children, style = {} }) => (
+const Card = ({ children, style = {}, isDarkMode = false }) => (
   <div
     style={{
-      background: '#ffffff',
-      border: '1px solid #ececec',
+      background: isDarkMode ? '#253447' : '#ffffff',
+      border: isDarkMode ? '1px solid rgba(70,100,150,0.25)' : '1px solid #ececec',
       borderRadius: 20,
-      boxShadow: '0 10px 30px rgba(0,0,0,0.06)',
+      boxShadow: isDarkMode ? '0 8px 24px rgba(0,0,0,0.15)' : '0 10px 30px rgba(0,0,0,0.06)',
       ...style,
     }}
   >
@@ -122,7 +128,7 @@ const CelebrationPopup = ({ visible, onClose }) => {
   );
 };
 
-export default function Roadmap({ resumeId, jobDescription, onProgressChange }) {
+export default function Roadmap({ resumeId, jobDescription, onProgressChange, isDarkMode }) {
   const [durationWeeks, setDurationWeeks] = useState(null);
   const [roadmap, setRoadmap] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -342,32 +348,32 @@ export default function Roadmap({ resumeId, jobDescription, onProgressChange }) 
       `}</style>
 
       <div>
-        <h2 style={{ fontSize: 22, fontWeight: 800, color: '#111827', letterSpacing: '-0.04em' }}>Learning Roadmap</h2>
-        <p style={{ marginTop: 4, color: '#6b7280', fontSize: 13.5 }}>
+        <h2 style={{ fontSize: 22, fontWeight: 800, color: isDarkMode ? '#e8eef7' : '#111827', letterSpacing: '-0.04em' }}>Learning Roadmap</h2>
+        <p style={{ marginTop: 4, color: isDarkMode ? '#b4c3d9' : '#6b7280', fontSize: 13.5 }}>
           Your personalized learning path based on your resume and JD.
         </p>
         {generationSource ? (
-          <div style={{ marginTop: 8, fontSize: 12.5, fontWeight: 600, color: generationSource === 'model' ? '#166534' : '#92400e' }}>
+          <div style={{ marginTop: 8, fontSize: 12.5, fontWeight: 600, color: generationSource === 'model' ? (isDarkMode ? '#86efac' : '#166534') : (isDarkMode ? '#fcd34d' : '#92400e') }}>
             Source: {generationSource === 'model' ? 'Live API model' : 'Fallback plan'}
           </div>
         ) : null}
         {generationWarning ? (
-          <div style={{ marginTop: 6, fontSize: 12, color: '#b45309', maxWidth: 860 }}>
+          <div style={{ marginTop: 6, fontSize: 12, color: isDarkMode ? '#fcd34d' : '#b45309', maxWidth: 860 }}>
             Warning: {generationWarning}
           </div>
         ) : null}
       </div>
 
       {error ? (
-        <Card style={{ padding: 16, borderColor: '#fecaca', background: '#fef2f2' }}>
-          <div style={{ color: '#991b1b', fontSize: 13, fontWeight: 600 }}>{error}</div>
+        <Card isDarkMode={isDarkMode} style={{ padding: 16, borderColor: isDarkMode ? 'rgba(239,68,68,0.4)' : '#fecaca', background: isDarkMode ? 'rgba(239,68,68,0.1)' : '#fef2f2' }}>
+          <div style={{ color: isDarkMode ? '#fca5a5' : '#991b1b', fontSize: 13, fontWeight: 600 }}>{error}</div>
         </Card>
       ) : null}
 
-      <Card style={{ padding: 22 }}>
+      <Card isDarkMode={isDarkMode} style={{ padding: 22 }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: '#111827', marginBottom: 8 }}>Choose duration</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: isDarkMode ? '#e8eef7' : '#111827', marginBottom: 8 }}>Choose duration</div>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
               {[4, 8, 12].map((weeks) => (
                 <Button
@@ -377,6 +383,7 @@ export default function Roadmap({ resumeId, jobDescription, onProgressChange }) 
                     setDurationWeeks(weeks);
                     fetchRoadmap(weeks);
                   }}
+                  isDarkMode={isDarkMode}
                 >
                   {weeks} weeks
                 </Button>
@@ -385,20 +392,20 @@ export default function Roadmap({ resumeId, jobDescription, onProgressChange }) 
           </div>
 
           <div style={{ minWidth: 190, textAlign: 'right' }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#111827' }}>Overall Progress</div>
-            <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{completedTasks} of {totalTasks} tasks completed</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: isDarkMode ? '#e8eef7' : '#111827' }}>Overall Progress</div>
+            <div style={{ fontSize: 12, color: isDarkMode ? '#b4c3d9' : '#6b7280', marginTop: 2 }}>{completedTasks} of {totalTasks} tasks completed</div>
           </div>
         </div>
 
         <div style={{ marginTop: 16 }}>
-          <div style={{ height: 6, borderRadius: 999, background: '#e5e7eb', overflow: 'hidden' }}>
-            <div style={{ width: timelineWidth, height: '100%', borderRadius: 999, background: 'linear-gradient(90deg, #111827, #10b981)', transition: 'width 0.35s ease' }} />
+          <div style={{ height: 6, borderRadius: 999, background: isDarkMode ? 'rgba(91,127,196,0.2)' : '#e5e7eb', overflow: 'hidden' }}>
+            <div style={{ width: timelineWidth, height: '100%', borderRadius: 999, background: isDarkMode ? 'linear-gradient(90deg, #6b93d6, #22c55e)' : 'linear-gradient(90deg, #111827, #10b981)', transition: 'width 0.35s ease' }} />
           </div>
         </div>
       </Card>
 
       {loading ? (
-        <Card style={{ padding: 24, textAlign: 'center' }}>
+        <Card isDarkMode={isDarkMode} style={{ padding: 24, textAlign: 'center', color: isDarkMode ? '#b4c3d9' : '#6b7280' }}>
           Loading roadmap...
         </Card>
       ) : null}
@@ -416,25 +423,27 @@ export default function Roadmap({ resumeId, jobDescription, onProgressChange }) 
                     flex: '0 0 260px',
                     borderRadius: 22,
                     padding: 18,
-                    background: current ? '#111827' : '#ffffff',
-                    color: current ? '#ffffff' : '#111827',
-                    border: current ? '1px solid transparent' : '1px solid #ececec',
-                    boxShadow: '0 12px 30px rgba(0,0,0,0.08)',
+                    background: isDarkMode ? '#253447' : '#ffffff',
+                    color: isDarkMode ? '#e8eef7' : '#111827',
+                    border: isDarkMode
+                      ? (current ? '1px solid rgba(107,147,214,0.4)' : '1px solid rgba(70,100,150,0.25)')
+                      : (current ? '1px solid #d1d5db' : '1px solid #ececec'),
+                    boxShadow: isDarkMode ? '0 8px 24px rgba(0,0,0,0.15)' : '0 12px 30px rgba(0,0,0,0.08)',
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ fontSize: 11, letterSpacing: '0.08em', fontWeight: 800, color: current ? 'rgba(255,255,255,0.5)' : '#9ca3af' }}>
+                    <div style={{ fontSize: 11, letterSpacing: '0.08em', fontWeight: 800, color: isDarkMode ? (current ? '#6b93d6' : '#8a9bb5') : (current ? '#6b7280' : '#9ca3af') }}>
                       WEEK {week.week}
                     </div>
-                    {done ? <span style={{ color: '#10b981' }}><Icon check /></span> : null}
+                    {done ? <span style={{ color: isDarkMode ? '#22c55e' : '#10b981' }}><Icon check /></span> : null}
                   </div>
 
-                  <div style={{ marginTop: 12, fontSize: 15, fontWeight: 700 }}>{`Week ${week.week}`}</div>
-                  <div style={{ marginTop: 6, fontSize: 12, opacity: current ? 0.7 : 1 }}>{week.completed}/{week.total} tasks</div>
+                  <div style={{ marginTop: 12, fontSize: 15, fontWeight: 700, color: isDarkMode ? '#e8eef7' : '#111827' }}>{`Week ${week.week}`}</div>
+                  <div style={{ marginTop: 6, fontSize: 12, color: isDarkMode ? '#b4c3d9' : '#6b7280' }}>{week.completed}/{week.total} tasks</div>
 
-                  <div style={{ marginTop: 14, paddingTop: 12, borderTop: current ? '1px solid rgba(255,255,255,0.12)' : '1px solid #f3f4f6' }}>
+                  <div style={{ marginTop: 14, paddingTop: 12, borderTop: isDarkMode ? (current ? '1px solid rgba(107,147,214,0.2)' : '1px solid rgba(70,100,150,0.2)') : (current ? '1px solid #e5e7eb' : '1px solid #f3f4f6') }}>
                     {week.topics.slice(0, 3).map((topic) => (
-                      <div key={topic} style={{ fontSize: 12, marginBottom: 6, opacity: current ? 0.8 : 1 }}>
+                      <div key={topic} style={{ fontSize: 12, marginBottom: 6, color: isDarkMode ? '#b4c3d9' : '#6b7280' }}>
                         • {topic}
                       </div>
                     ))}
@@ -460,14 +469,30 @@ export default function Roadmap({ resumeId, jobDescription, onProgressChange }) 
                             fontFamily: 'inherit',
                           }}
                         >
-                          <span style={{ marginTop: 2, width: 18, height: 18, borderRadius: 5, border: `1.5px solid ${checked ? '#10b981' : current ? 'rgba(255,255,255,0.35)' : '#d1d5db'}`, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: checked ? '#10b981' : 'transparent', flex: '0 0 auto' }}>
+                          <span style={{ 
+                            marginTop: 2, 
+                            width: 18, 
+                            height: 18, 
+                            borderRadius: 5, 
+                            border: `1.5px solid ${checked ? (isDarkMode ? '#22c55e' : '#10b981') : (isDarkMode ? 'rgba(107,147,214,0.4)' : '#d1d5db')}`, 
+                            display: 'inline-flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center', 
+                            background: checked ? (isDarkMode ? '#22c55e' : '#10b981') : 'transparent', 
+                            flex: '0 0 auto' 
+                          }}>
                             {checked ? <Icon check /> : null}
                           </span>
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 12.5, lineHeight: 1.45, opacity: checked ? 0.65 : current ? 0.9 : 1, textDecoration: checked ? 'line-through' : 'none' }}>
+                            <div style={{ 
+                              fontSize: 12.5, 
+                              lineHeight: 1.45, 
+                              color: checked ? (isDarkMode ? '#8a9bb5' : '#9ca3af') : (isDarkMode ? '#e8eef7' : '#111827'), 
+                              textDecoration: checked ? 'line-through' : 'none' 
+                            }}>
                               {task.task}
                             </div>
-                            <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 6, fontSize: 11, lineHeight: 1.4, opacity: checked ? 0.55 : current ? 0.72 : 0.8 }}>
+                            <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 6, fontSize: 11, lineHeight: 1.4, color: isDarkMode ? '#8a9bb5' : '#6b7280' }}>
                               <span>{task.skill || 'Focus skill'}</span>
                               <span>•</span>
                               <span>{task.difficulty || 'Medium'}</span>
@@ -481,7 +506,7 @@ export default function Roadmap({ resumeId, jobDescription, onProgressChange }) 
                               ) : null}
                             </div>
                             {Array.isArray(task.resources) && task.resources.length > 0 ? (
-                              <div style={{ marginTop: 4, fontSize: 10.5, lineHeight: 1.45, opacity: checked ? 0.5 : current ? 0.62 : 0.7 }}>
+                              <div style={{ marginTop: 4, fontSize: 10.5, lineHeight: 1.45, color: isDarkMode ? '#8a9bb5' : '#6b7280' }}>
                                 {task.resources.slice(0, 2).join(' • ')}
                               </div>
                             ) : null}
@@ -490,7 +515,7 @@ export default function Roadmap({ resumeId, jobDescription, onProgressChange }) 
                       );
                     })}
                     {week.tasks.length > 4 ? (
-                      <div style={{ fontSize: 11, color: current ? 'rgba(255,255,255,0.5)' : '#6b7280' }}>
+                      <div style={{ fontSize: 11, color: isDarkMode ? '#8a9bb5' : '#6b7280' }}>
                         +{week.tasks.length - 4} more tasks
                       </div>
                     ) : null}
@@ -500,20 +525,29 @@ export default function Roadmap({ resumeId, jobDescription, onProgressChange }) 
             })}
           </div>
 
-          <Card style={{ padding: 20 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: '#111827', marginBottom: 14 }}>Track Your Progress</div>
+          <Card isDarkMode={isDarkMode} style={{ padding: 20 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: isDarkMode ? '#e8eef7' : '#111827', marginBottom: 14 }}>Track Your Progress</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14 }}>
               {groupedWeeks.map((week) => {
                 const percent = week.total ? Math.round((week.completed / week.total) * 100) : 0;
                 const complete = percent === 100;
                 return (
-                  <div key={week.week} style={{ padding: 14, borderRadius: 16, border: complete ? '1px solid #bbf7d0' : '1px solid #e5e7eb', background: complete ? '#f0fdf4' : '#fafafa' }}>
+                  <div key={week.week} style={{ 
+                    padding: 14, 
+                    borderRadius: 16, 
+                    border: complete 
+                      ? (isDarkMode ? '1px solid rgba(34,197,94,0.4)' : '1px solid #bbf7d0')
+                      : (isDarkMode ? '1px solid rgba(70,100,150,0.25)' : '1px solid #e5e7eb'), 
+                    background: complete 
+                      ? (isDarkMode ? 'rgba(34,197,94,0.1)' : '#f0fdf4')
+                      : (isDarkMode ? '#1e2a3a' : '#fafafa') 
+                  }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: complete ? '#166534' : '#374151' }}>Week {week.week}</span>
-                      <span style={{ fontSize: 12, fontWeight: 700, color: complete ? '#166534' : '#6b7280' }}>{week.completed}/{week.total}</span>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: complete ? (isDarkMode ? '#86efac' : '#166534') : (isDarkMode ? '#e8eef7' : '#374151') }}>Week {week.week}</span>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: complete ? (isDarkMode ? '#86efac' : '#166534') : (isDarkMode ? '#b4c3d9' : '#6b7280') }}>{week.completed}/{week.total}</span>
                     </div>
-                    <div style={{ height: 4, borderRadius: 999, background: '#e5e7eb', overflow: 'hidden' }}>
-                      <div style={{ width: `${percent}%`, height: '100%', borderRadius: 999, background: complete ? '#10b981' : '#111827', transition: 'width 0.25s ease' }} />
+                    <div style={{ height: 4, borderRadius: 999, background: isDarkMode ? 'rgba(91,127,196,0.2)' : '#e5e7eb', overflow: 'hidden' }}>
+                      <div style={{ width: `${percent}%`, height: '100%', borderRadius: 999, background: complete ? (isDarkMode ? '#22c55e' : '#10b981') : (isDarkMode ? '#6b93d6' : '#111827'), transition: 'width 0.25s ease' }} />
                     </div>
                   </div>
                 );
@@ -524,7 +558,7 @@ export default function Roadmap({ resumeId, jobDescription, onProgressChange }) 
       ) : null}
 
       {!loading && !roadmap ? (
-        <Card style={{ padding: 22, textAlign: 'center', color: '#6b7280' }}>
+        <Card isDarkMode={isDarkMode} style={{ padding: 22, textAlign: 'center', color: isDarkMode ? '#b4c3d9' : '#6b7280' }}>
           Select a duration to generate a roadmap focused on your resume and job description.
         </Card>
       ) : null}
