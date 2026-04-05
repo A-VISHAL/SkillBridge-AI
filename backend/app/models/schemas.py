@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 
@@ -90,6 +90,31 @@ class FocusArea(BaseModel):
     weight: float  # % of JD weight
     reason: str
     study_time: str  # e.g., "2-3 weeks"
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_aliases(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+
+        normalized = dict(data)
+
+        if not normalized.get("skill"):
+            normalized["skill"] = (
+                normalized.get("skill_name")
+                or normalized.get("name")
+                or ""
+            )
+
+        if not normalized.get("study_time"):
+            normalized["study_time"] = (
+                normalized.get("studyTime")
+                or normalized.get("estimated_study_time")
+                or normalized.get("time_to_study")
+                or "1-2 weeks"
+            )
+
+        return normalized
 
 class JDMatchResult(BaseModel):
     match_percentage: float = Field(..., ge=0, le=100)
