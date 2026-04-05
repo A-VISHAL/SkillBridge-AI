@@ -391,10 +391,26 @@ async def match_jd(
             job_description,
             resume.dict(),
         )
+
+        raw_focus_areas = match_data.get("focus_areas", [])
+        if isinstance(raw_focus_areas, list):
+            for item in raw_focus_areas:
+                if not isinstance(item, dict):
+                    continue
+                if "skill_name" in item and not item.get("skill"):
+                    item["skill"] = item.pop("skill_name")
+                if "studyTime" in item and not item.get("study_time"):
+                    item["study_time"] = item.pop("studyTime")
+                if "estimated_study_time" in item and not item.get("study_time"):
+                    item["study_time"] = item.pop("estimated_study_time")
+                if "dy_time" in item and not item.get("study_time"):
+                    item["study_time"] = item.pop("dy_time")
+                if "_dy_time" in item and not item.get("study_time"):
+                    item["study_time"] = item.pop("_dy_time")
         
         # Convert to structured format with alias-safe normalization.
         focus_areas: List[FocusArea] = []
-        for index, area in enumerate(match_data.get("focus_areas", [])):
+        for index, area in enumerate(raw_focus_areas if isinstance(raw_focus_areas, list) else []):
             if not isinstance(area, dict):
                 continue
 
