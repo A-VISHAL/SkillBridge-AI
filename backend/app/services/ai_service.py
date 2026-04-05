@@ -770,12 +770,59 @@ def _normalize_model_jd_payload(raw: Dict[str, Any]) -> Dict[str, Any]:
     if not isinstance(raw, dict):
         raise ValueError("JD model response must be a JSON object")
 
+    normalized_focus_areas: List[Dict[str, Any]] = []
+    incoming_focus_areas = raw.get("focus_areas", [])
+    if isinstance(incoming_focus_areas, list):
+        for index, area in enumerate(incoming_focus_areas):
+            if not isinstance(area, dict):
+                continue
+
+            skill = str(
+                area.get("skill")
+                or area.get("skill_name")
+                or area.get("name")
+                or ""
+            ).strip()
+            if not skill:
+                continue
+
+            study_time = str(
+                area.get("study_time")
+                or area.get("studyTime")
+                or area.get("estimated_study_time")
+                or "1-2 weeks"
+            ).strip() or "1-2 weeks"
+
+            priority = str(area.get("priority", "MEDIUM")).strip().upper() or "MEDIUM"
+            if priority not in {"HIGH", "MEDIUM", "LOW"}:
+                priority = "MEDIUM"
+
+            try:
+                weight = float(area.get("weight", max(8, 30 - index * 4)))
+            except Exception:
+                weight = float(max(8, 30 - index * 4))
+
+            reason = str(
+                area.get("reason")
+                or f"{skill} appears important in the JD and should be strengthened."
+            ).strip()
+
+            normalized_focus_areas.append(
+                {
+                    "skill": skill,
+                    "priority": priority,
+                    "weight": weight,
+                    "reason": reason,
+                    "study_time": study_time,
+                }
+            )
+
     return {
         "match_percentage": max(0, min(100, float(raw.get("match_percentage", 0)))),
         "hire_probability": str(raw.get("hire_probability", "Medium")),
         "matched_skills": raw.get("matched_skills", []) or [],
         "missing_skills": raw.get("missing_skills", []) or [],
-        "focus_areas": raw.get("focus_areas", []) or [],
+        "focus_areas": normalized_focus_areas,
         "interview_topics": raw.get("interview_topics", []) or [],
         "strengths": raw.get("strengths", []) or [],
         "weaknesses": raw.get("weaknesses", []) or [],

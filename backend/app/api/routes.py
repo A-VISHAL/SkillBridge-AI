@@ -392,10 +392,27 @@ async def match_jd(
             resume.dict(),
         )
         
-        # Convert to structured format
-        focus_areas = [
-            FocusArea(**area) for area in match_data.get("focus_areas", [])
-        ]
+        # Convert to structured format with alias-safe normalization.
+        focus_areas: List[FocusArea] = []
+        for index, area in enumerate(match_data.get("focus_areas", [])):
+            if not isinstance(area, dict):
+                continue
+
+            normalized_area = {
+                "skill": area.get("skill") or area.get("skill_name") or area.get("name"),
+                "priority": area.get("priority", "MEDIUM"),
+                "weight": area.get("weight", float(max(8, 30 - index * 4))),
+                "reason": area.get("reason", "Important focus area for improving JD fit."),
+                "study_time": area.get("study_time") or area.get("studyTime") or area.get("estimated_study_time") or "1-2 weeks",
+            }
+
+            if not normalized_area["skill"]:
+                continue
+
+            try:
+                focus_areas.append(FocusArea(**normalized_area))
+            except Exception:
+                continue
         
         result = JDMatchResult(
             match_percentage=match_data.get("match_percentage", 68),

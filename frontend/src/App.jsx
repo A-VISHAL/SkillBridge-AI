@@ -2948,7 +2948,6 @@ const MockInterview = ({ resumeId, resumeData, jobDescription, onInterviewProgre
             </Btn>
           </div>
           {error && <div style={{ marginTop: 12, color: "#b91c1c", fontSize: 12.5, fontWeight: 600 }}>{error}</div>}
-          {!resumeId && <div style={{ marginTop: 10, color: "#b91c1c", fontSize: 12.5 }}>Upload your resume first so the interview can use your profile.</div>}
           {resumeData?.name && <div style={{ marginTop: 10, color: "var(--gray-500)", fontSize: 12.5 }}>Interview profile: {resumeData.name}</div>}
         </div>
       )}

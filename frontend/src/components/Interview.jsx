@@ -57,15 +57,18 @@ export default function Interview({ jobDescription, resumeId }) {
   const [answer, setAnswer] = useState('')
   const [feedback, setFeedback] = useState(null)
   const [loading, setLoading] = useState(false)
-  const [messages, setMessages] = useState([
-    { role: "ai", text: "Welcome to your mock interview! I'll be playing the role of a senior engineer. Let's begin: Tell me about yourself and why you're interested in this role." },
-  ])
+  const [messages, setMessages] = useState([])
   const [input, setInput] = useState("")
   const chatRef = useRef(null)
 
   const handleStart = async (mode) => {
     if (!jobDescription) {
-      alert('Please match a JD first')
+      alert('Please match a JD first from the JD Matcher section')
+      return
+    }
+
+    if (!resumeId) {
+      alert('Please upload your resume first so the interview can use your profile')
       return
     }
 
@@ -77,7 +80,7 @@ export default function Interview({ jobDescription, resumeId }) {
       setFeedback(null)
       setMessages([{ role: "ai", text: result.questions[0].question }])
     } catch (err) {
-      alert(err.message)
+      alert(err.message || 'Failed to start interview. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -115,13 +118,19 @@ export default function Interview({ jobDescription, resumeId }) {
       </div>
 
       {!session && (
-        <div style={{ background: "var(--white)", border: "1px solid var(--gray-150)", borderRadius: "var(--radius-lg)", boxShadow: "var(--shadow-md)", padding: 24 }}>
+        <div style={{ background: "var(--white)", border: "1px solid var(--gray-150)", borderRadius: "var(--radius-lg)", boxShadow: "var(--shadow-md)", padding: 32 }}>
+          <div style={{ marginBottom: 20 }}>
+            <h3 style={{ fontSize: 16, fontWeight: 700, color: "var(--gray-900)", marginBottom: 8 }}>Select Interview Mode</h3>
+            <p style={{ fontSize: 13.5, color: "var(--gray-500)", lineHeight: 1.6 }}>
+              Questions are based on your resume, quiz history, and roadmap progress.
+            </p>
+          </div>
           <div style={{ display: 'flex', gap: '12px' }}>
             <Btn onClick={() => handleStart('Technical')} disabled={loading}>
-              Start Technical Interview
+              {loading ? 'Starting...' : 'Start Technical Interview'}
             </Btn>
             <Btn variant="outline" onClick={() => handleStart('HR')} disabled={loading}>
-              Start HR Interview
+              {loading ? 'Starting...' : 'Start HR Interview'}
             </Btn>
           </div>
         </div>
