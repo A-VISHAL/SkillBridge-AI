@@ -1604,28 +1604,7 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed, isDarkMode }) => {
   const [suggestions, setSuggestions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [loadingStage, setLoadingStage] = useState("");
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const fileInputRef = useRef(null);
-
-  useEffect(() => {
-    if (!loading) {
-      setElapsedSeconds(0);
-      return undefined;
-    }
-
-    setElapsedSeconds(0);
-    const timer = window.setInterval(() => {
-      setElapsedSeconds((seconds) => seconds + 1);
-    }, 1000);
-
-    return () => window.clearInterval(timer);
-  }, [loading]);
-
-  const formatElapsedTime = (seconds) => {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return `${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`;
-  };
 
   const uploadResumeFile = async (file) => {
     const formData = new FormData();
@@ -1683,6 +1662,7 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed, isDarkMode }) => {
       const sizeInKB = Math.round(file.size / 1024);
       setFileName(file.name);
       setFileSize(`${sizeInKB} KB`);
+      let extractedReady = false;
       
       try {
         // Upload resume
@@ -1691,6 +1671,8 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed, isDarkMode }) => {
         setResumeId(resumeId);
         setResumeData(uploadData.resume); // Store parsed resume data
         onResumeParsed?.(resumeId, uploadData.resume);
+        setUploaded(true);
+        extractedReady = true;
 
         // Analyze resume. If backend memory was reset between upload and analyze,
         // retry once by re-uploading the same file to obtain a fresh resume_id.
@@ -1706,6 +1688,7 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed, isDarkMode }) => {
             setResumeId(retriedResumeId);
             setResumeData(uploadData.resume);
             onResumeParsed?.(retriedResumeId, uploadData.resume);
+            setUploaded(true);
             setLoadingStage("Running ATS and project-fit analysis...");
             analyzeData = await analyzeResumeById(retriedResumeId);
           } else {
@@ -1759,8 +1742,6 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed, isDarkMode }) => {
           allSuggestions.push(...(sug.formatting_fixes || []));
         }
         setSuggestions(allSuggestions.slice(0, 5));
-        
-        setUploaded(true);
       } catch (error) {
         console.error('Error:', error);
         // Keep analyzer visible but show a real error state.
@@ -1768,7 +1749,7 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed, isDarkMode }) => {
         setScoreBreakdown({ formatting_score: 0, keyword_match: 0, readability_score: 0 });
         setIssues([{ type: "error", text: error?.message || "Failed to analyze resume. Please try again." }]);
         setSuggestions(["Ensure resume is in PDF or DOCX format"]);
-        setUploaded(false);
+        setUploaded(extractedReady);
       } finally {
         setLoading(false);
         setLoadingStage("");
@@ -1809,6 +1790,7 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed, isDarkMode }) => {
       setResumeId(sampleData.resume_id);
       setResumeData(sampleData.resume); // Store parsed resume data
       onResumeParsed?.(sampleData.resume_id, sampleData.resume);
+      setUploaded(true);
       
       // Analyze sample resume
       const analyzeFormData = new FormData();
@@ -1929,10 +1911,6 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed, isDarkMode }) => {
                   <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "center", marginBottom: 8 }}>
                     <div style={{ fontSize: 12.5, color: isDarkMode ? "#b4c3d9" : "var(--gray-500)", fontWeight: 500 }}>
                       Please wait a few mins. SkillBridge is evaluating ATS quality, skills, and project evidence...
-                    </div>
-                    <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 12px", borderRadius: 999, background: isDarkMode ? "rgba(91,127,196,0.15)" : "var(--gray-100)", border: isDarkMode ? "1px solid rgba(91,127,196,0.28)" : "1px solid var(--gray-200)", color: isDarkMode ? "#dbe8fb" : "var(--gray-700)", fontSize: 12, fontWeight: 700, letterSpacing: "0.03em" }}>
-                      <span>Timer</span>
-                      <span>{formatElapsedTime(elapsedSeconds)}</span>
                     </div>
                     <div style={{ fontSize: 12, color: isDarkMode ? "#8a9bb5" : "var(--gray-400)", fontWeight: 500 }}>
                       {loadingStage || "Running ATS and project-fit analysis..."}

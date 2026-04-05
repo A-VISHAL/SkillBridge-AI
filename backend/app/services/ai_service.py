@@ -2,9 +2,16 @@ import asyncio
 import httpx
 import json
 import re
+import hashlib
+import importlib
 from collections import Counter
 from typing import List, Dict, Any, Optional
 from app.core.config import settings
+
+try:
+    redis_async = importlib.import_module("redis.asyncio")
+except Exception:
+    redis_async = None
 
 
 STOPWORDS = {
@@ -53,6 +60,60 @@ ROLE_DEFAULT_SKILLS: Dict[str, List[str]] = {
     "data": ["Python", "SQL", "Machine Learning", "NLP"],
     "ai": ["Python", "Machine Learning", "NLP", "SQL"],
 }
+
+_cache_client = None
+
+
+def _cache_ttl_seconds() -> int:
+    return max(60, int(getattr(settings, "CACHE_TTL_MINUTES", 15)) * 60)
+
+
+def _stable_hash(value: Any) -> str:
+    if isinstance(value, (dict, list)):
+        text = json.dumps(value, sort_keys=True, ensure_ascii=True)
+    else:
+        text = str(value or "")
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:24]
+
+
+async def _get_cache_client():
+    global _cache_client
+
+    if redis_async is None:
+        return None
+
+    if _cache_client is not None:
+        return _cache_client
+
+    try:
+        _cache_client = redis_async.from_url(settings.REDIS_URL, encoding="utf-8", decode_responses=True)
+        return _cache_client
+    except Exception:
+        _cache_client = None
+        return None
+
+
+async def _cache_get_json(key: str) -> Optional[Any]:
+    client = await _get_cache_client()
+    if client is None:
+        return None
+    try:
+        raw = await client.get(key)
+        if not raw:
+            return None
+        return json.loads(raw)
+    except Exception:
+        return None
+
+
+async def _cache_set_json(key: str, value: Any):
+    client = await _get_cache_client()
+    if client is None:
+        return
+    try:
+        await client.setex(key, _cache_ttl_seconds(), json.dumps(value, ensure_ascii=True))
+    except Exception:
+        return
 
 
 def _normalize_space(text: str) -> str:
@@ -834,7 +895,13 @@ def _normalize_model_jd_payload(raw: Dict[str, Any]) -> Dict[str, Any]:
 async def match_resume_to_jd(resume_text: str, jd_text: str, resume_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Match resume to job description with focus areas"""
 
-    resume_context = _build_resume_context_for_jd(resume_text, resume_data, max_chars=2600)
+    resume_context = _build_resume_context_for_jd(resume_text, resume_data, max_chars=1400)
+    cache_key = f"jd_match:v2:{_stable_hash(resume_context)}:{_stable_hash(jd_text[:1800])}"
+    cached_payload = await _cache_get_json(cache_key)
+    if isinstance(cached_payload, dict):
+        cached_payload["source"] = cached_payload.get("source", "model")
+        cached_payload["cached"] = True
+        return cached_payload
 
     prompt = f"""Analyze this resume against the job description and provide STRICT JSON:
 
@@ -860,6 +927,8 @@ Job Description:
 {jd_text[:1800]}
 
 Return JSON with keys: match_percentage, hire_probability, matched_skills, missing_skills, focus_areas, interview_topics, strengths, weaknesses, suggestions"""
+
+    prompt += "\nRules: Return ONLY JSON. No markdown. Max 5 focus_areas and max 5 suggestions. Keep strengths/weaknesses concise."
     
     messages = [
         {"role": "system", "content": "You are an expert technical recruiter and career coach."},
@@ -867,18 +936,22 @@ Return JSON with keys: match_percentage, hire_probability, matched_skills, missi
     ]
     
     try:
-        response = await call_jd_chat(messages, temperature=0.2, max_tokens=2600)
+        response = await call_jd_chat(messages, temperature=0.15, max_tokens=700)
     except Exception as e:
         should_fallback = _allow_rate_limit_fallback(e)
         if isinstance(e, AIServiceError) and e.code in {"auth", "config", "network", "http_error", "parse"}:
             should_fallback = True
         if not should_fallback:
             raise
-        return _build_jd_match_fallback(resume_text, jd_text, resume_data, str(e))
+        fallback_payload = _build_jd_match_fallback(resume_text, jd_text, resume_data, str(e))
+        await _cache_set_json(cache_key, fallback_payload)
+        return fallback_payload
 
     try:
         parsed = json.loads(_extract_json_block(response))
-        return _normalize_model_jd_payload(parsed)
+        normalized = _normalize_model_jd_payload(parsed)
+        await _cache_set_json(cache_key, normalized)
+        return normalized
     except Exception as e:
         raise ValueError(f"Failed to parse AI JD match response: {str(e)}")
 
@@ -891,6 +964,12 @@ async def generate_roadmap(
     jd_analysis: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Generate a detailed weekly roadmap from resume and JD, with complete week coverage."""
+
+    cache_key = f"roadmap:v2:{_stable_hash(resume_text[:1600])}:{_stable_hash(jd_text[:1200])}:{_stable_hash(skill_gaps[:8])}"
+    cached_payload = await _cache_get_json(cache_key)
+    if isinstance(cached_payload, dict):
+        cached_payload["cached"] = True
+        return cached_payload
 
     def _unique_items(items: List[str]) -> List[str]:
         output: List[str] = []
@@ -1118,7 +1197,8 @@ Rules:
 4) Task content must be specific and tied to resume/JD gaps.
 5) Every week must contain different tasks with concrete deliverables.
 6) Do not output generic tasks like "practice" without a specific artifact.
-7) Focus on generating practical tasks, not broad advice."""
+7) Focus on generating practical tasks, not broad advice.
+8) Return ONLY strict JSON. No markdown. Be concise."""
 
     compact_prompt = f"""Create a 12-week roadmap in STRICT JSON.
 
@@ -1157,10 +1237,11 @@ Rules:
 
     try:
         # Primary model attempt.
-        response = await call_roadmap_chat(messages, temperature=0.6, max_tokens=2200)
+        response = await call_roadmap_chat(messages, temperature=0.45, max_tokens=1000)
         parsed = json.loads(_extract_json_block(response))
         normalized = _normalize_payload(parsed)
         normalized["source"] = "model"
+        await _cache_set_json(cache_key, normalized)
         return normalized
     except Exception as first_error:
         # Retry once with a compact prompt and lower token budget.
@@ -1172,17 +1253,19 @@ Rules:
                 },
                 {"role": "user", "content": compact_prompt},
             ]
-            retry_response = await call_roadmap_chat(retry_messages, temperature=0.5, max_tokens=1200)
+            retry_response = await call_roadmap_chat(retry_messages, temperature=0.35, max_tokens=650)
             retry_parsed = json.loads(_extract_json_block(retry_response))
             normalized = _normalize_payload(retry_parsed)
             normalized["source"] = "model"
             normalized["retry_used"] = True
+            await _cache_set_json(cache_key, normalized)
             return normalized
         except Exception as retry_error:
             print(f"Error generating roadmap from AI: {str(first_error)} | Retry failed: {str(retry_error)}")
             normalized = _normalize_payload({})
             normalized["source"] = "roadmap_fallback"
             normalized["warning"] = str(retry_error)
+            await _cache_set_json(cache_key, normalized)
             return normalized
 
 async def generate_quiz_questions(
@@ -1195,6 +1278,11 @@ async def generate_quiz_questions(
     roadmap_context: Optional[List[Dict[str, Any]]] = None,
 ) -> List[Dict]:
     """Generate quiz questions based on resume, JD, and followed roadmap context."""
+
+    cache_key = f"quiz:v2:{_stable_hash(topic)}:{_stable_hash(difficulty)}:{_stable_hash(domain)}:{int(count or 10)}:{_stable_hash(resume_text[:1200])}:{_stable_hash(jd_text[:1200])}:{_stable_hash(roadmap_context[:8])}"
+    cached_payload = await _cache_get_json(cache_key)
+    if isinstance(cached_payload, list) and cached_payload:
+        return cached_payload
 
     roadmap_context = roadmap_context or []
     roadmap_snippets = []
@@ -1318,7 +1406,7 @@ Target JD context:
 {jd_text[:900]}
 
 Roadmap context (followed/planned):
-{chr(10).join(roadmap_snippets[:10]) if roadmap_snippets else 'No roadmap context provided'}
+{chr(10).join(roadmap_snippets[:6]) if roadmap_snippets else 'No roadmap context provided'}
 
 Rules:
 1) Questions must be practical and aligned to resume gaps + JD requirements.
@@ -1328,6 +1416,7 @@ Rules:
 5) Keep question text crisp and interview-relevant.
 6) Questions must be different for different resume/JD/roadmap inputs.
 7) Mark exactly one option as correct and keep correct_answer consistent with that option.
+8) Return ONLY JSON array. No extra text.
 
 Return ONLY JSON array. For each object use keys:
 - id
@@ -1361,7 +1450,7 @@ Return JSON array only."""
     ]
 
     try:
-        response = await call_quiz_chat(messages, temperature=0.7, max_tokens=2200)
+        response = await call_quiz_chat(messages, temperature=0.45, max_tokens=900)
         parsed = json.loads(_extract_json_block(response))
         if isinstance(parsed, list):
             normalized_questions: List[Dict[str, Any]] = []
@@ -1372,14 +1461,16 @@ Return JSON array only."""
 
             normalized_questions = _dedupe_questions(normalized_questions)
             if len(normalized_questions) >= normalized_count:
-                return normalized_questions[:normalized_count]
+                output = normalized_questions[:normalized_count]
+                await _cache_set_json(cache_key, output)
+                return output
     except Exception as first_error:
         try:
             retry_messages = [
                 {"role": "system", "content": "You are an expert technical interviewer creating highly relevant adaptive quizzes."},
                 {"role": "user", "content": compact_prompt},
             ]
-            retry_response = await call_quiz_chat(retry_messages, temperature=0.6, max_tokens=1400)
+            retry_response = await call_quiz_chat(retry_messages, temperature=0.35, max_tokens=600)
             retry_parsed = json.loads(_extract_json_block(retry_response))
             if isinstance(retry_parsed, list):
                 normalized_questions = []
@@ -1389,7 +1480,9 @@ Return JSON array only."""
                         normalized_questions.append(normalized)
                 normalized_questions = _dedupe_questions(normalized_questions)
                 if len(normalized_questions) >= normalized_count:
-                    return normalized_questions[:normalized_count]
+                    output = normalized_questions[:normalized_count]
+                    await _cache_set_json(cache_key, output)
+                    return output
         except Exception as retry_error:
             raise AIServiceError("quiz_generation", f"Quiz generation failed: {str(first_error)} | Retry failed: {str(retry_error)}") from retry_error
 
@@ -1442,6 +1535,11 @@ async def generate_interview_questions(
     roadmap_context: Optional[List[Dict[str, Any]]] = None,
 ) -> List[Dict]:
     """Generate interview questions based on resume, quiz, roadmap, and JD context."""
+
+    cache_key = f"interview:v2:{_stable_hash(mode)}:{int(count or 5)}:{_stable_hash(jd_text[:1200])}:{_stable_hash(resume_text[:1400])}:{_stable_hash(quiz_context or {})}:{_stable_hash(roadmap_context or [])}"
+    cached_payload = await _cache_get_json(cache_key)
+    if isinstance(cached_payload, list) and cached_payload:
+        return cached_payload
 
     quiz_context = quiz_context or {}
     roadmap_context = roadmap_context or []
@@ -1608,10 +1706,10 @@ async def generate_interview_questions(
 
 Mode: {mode_label}
 Job Description:
-{(jd_text or "")[:1100]}
+{(jd_text or "")[:800]}
 
 Resume Extract:
-{(resume_text or "")[:1400]}
+{(resume_text or "")[:1000]}
 
 Project Highlights:
 {json.dumps(project_focus[:4], ensure_ascii=True)}
@@ -1644,7 +1742,7 @@ No duplicates."""
     ]
 
     try:
-        response = await call_interview_chat(messages, temperature=0.5, max_tokens=900)
+        response = await call_interview_chat(messages, temperature=0.35, max_tokens=550)
         parsed = json.loads(_extract_json_block(response))
         if isinstance(parsed, list):
             normalized = []
@@ -1654,14 +1752,16 @@ No duplicates."""
                     normalized.append(question)
             normalized = _fill_with_fallback(normalized, normalized_count)
             if len(normalized) >= normalized_count:
-                return normalized[:normalized_count]
+                output = normalized[:normalized_count]
+                await _cache_set_json(cache_key, output)
+                return output
     except Exception as first_error:
         try:
             retry_messages = [
                 {"role": "system", "content": "You are a senior interviewer generating realistic, candidate-specific interview questions."},
                 {"role": "user", "content": compact_prompt},
             ]
-            retry_response = await call_interview_chat(retry_messages, temperature=0.35, max_tokens=600)
+            retry_response = await call_interview_chat(retry_messages, temperature=0.25, max_tokens=380)
             retry_parsed = json.loads(_extract_json_block(retry_response))
             if isinstance(retry_parsed, list):
                 normalized = []
@@ -1671,7 +1771,9 @@ No duplicates."""
                         normalized.append(question)
                 normalized = _fill_with_fallback(normalized, normalized_count)
                 if len(normalized) >= normalized_count:
-                    return normalized[:normalized_count]
+                    output = normalized[:normalized_count]
+                    await _cache_set_json(cache_key, output)
+                    return output
         except Exception as retry_error:
             raise AIServiceError("interview_generation", f"Interview generation failed: {str(first_error)} | Retry failed: {str(retry_error)}") from retry_error
 
@@ -2176,6 +2278,12 @@ async def calculate_ats_score(
 ) -> Dict[str, Any]:
     """Model-first ATS scoring. Falls back to rule engine only on provider rate limits."""
 
+    cache_key = f"ats_score:v2:{_stable_hash(resume_text[:1800])}:{_stable_hash(target_role)}:{_stable_hash(job_description[:1200])}"
+    cached_payload = await _cache_get_json(cache_key)
+    if isinstance(cached_payload, dict):
+        cached_payload["cached"] = True
+        return cached_payload
+
     fallback = _calculate_ats_score_rule_based(
         resume_text=resume_text,
         target_role=target_role,
@@ -2186,7 +2294,7 @@ async def calculate_ats_score(
     resume_context = _build_resume_context_for_ats(
         resume_text=resume_text,
         resume_data=resume_data,
-        max_chars=3200,
+        max_chars=1600,
     )
 
     prompt = (
@@ -2210,16 +2318,18 @@ async def calculate_ats_score(
     ]
 
     try:
-        response_text = await call_ats_chat(messages, temperature=0.2, max_tokens=2200)
+        response_text = await call_ats_chat(messages, temperature=0.15, max_tokens=900)
         payload = json.loads(_extract_json_block(response_text))
-        return _normalize_model_ats_payload(payload, fallback)
+        normalized = _normalize_model_ats_payload(payload, fallback)
+        await _cache_set_json(cache_key, normalized)
+        return normalized
     except Exception as first_error:
         # Retry once with an even shorter context for model gateways that reject large/noisy payloads.
         try:
             short_context = _build_resume_context_for_ats(
                 resume_text=resume_text,
                 resume_data=resume_data,
-                max_chars=1400,
+                max_chars=900,
             )
             retry_prompt = (
                 "Return STRICT JSON only with keys: ats_score, score_breakdown, analysis, missing_keywords, matched_keywords, matched_skills, missing_skills, suggestions, final_verdict.\n"
@@ -2234,9 +2344,11 @@ async def calculate_ats_score(
                 },
                 {"role": "user", "content": retry_prompt},
             ]
-            retry_text = await call_ats_chat(retry_messages, temperature=0.1, max_tokens=1600)
+            retry_text = await call_ats_chat(retry_messages, temperature=0.1, max_tokens=600)
             retry_payload = json.loads(_extract_json_block(retry_text))
-            return _normalize_model_ats_payload(retry_payload, fallback)
+            normalized = _normalize_model_ats_payload(retry_payload, fallback)
+            await _cache_set_json(cache_key, normalized)
+            return normalized
         except Exception:
             e = first_error
 
@@ -2248,5 +2360,6 @@ async def calculate_ats_score(
             fallback_with_reason = dict(fallback)
             fallback_with_reason["source"] = "rule_engine_model_unavailable"
             fallback_with_reason["fallback_reason"] = str(e)
+            await _cache_set_json(cache_key, fallback_with_reason)
             return fallback_with_reason
         raise
