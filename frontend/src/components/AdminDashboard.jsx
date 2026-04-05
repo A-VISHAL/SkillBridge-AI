@@ -155,13 +155,7 @@ export function AdminDashboard({ onLogout }) {
   const totalStudents = students.length;
   const averageAts = totalStudents ? students.reduce((sum, student) => sum + Number(student.ats_score || 0), 0) / totalStudents : 0;
   const placementReadiness = totalStudents ? Math.round((eligibilityCounts.eligible / totalStudents) * 100) : 0;
-  const liveJobs = useMemo(() => {
-    return (jobs || []).filter((job) => {
-      const parsed = job.parsed_data || {};
-      const hasRealFields = Boolean(job.title && job.title !== 'Target Role') || Boolean(job.company) || Boolean(job.location);
-      return parsed.source === 'job_recommendation' || hasRealFields;
-    });
-  }, [jobs]);
+  const liveJobs = useMemo(() => jobs || [], [jobs]);
 
   const activeJobs = liveJobs.length;
 
@@ -249,7 +243,10 @@ export function AdminDashboard({ onLogout }) {
         company: jobForm.company.trim(),
         location: jobForm.location.trim(),
         raw_text: [jobForm.title, jobForm.company, jobForm.location].filter(Boolean).join(' • '),
-        parsed_data: {},
+        parsed_data: {
+          source: 'admin_job',
+          created_by: 'admin',
+        },
       };
 
       let saveError = null;
@@ -1138,7 +1135,7 @@ export function AdminDashboard({ onLogout }) {
                 <SectionShell title="Job management" subtitle="Add, edit, and monitor company job postings.">
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
                     <div style={{ color: '#8a9bb5', fontSize: 13 }}>
-                      Showing live jobs from Supabase. Placeholder Target Role rows are hidden.
+                      Showing every job row stored in Supabase.
                     </div>
                     <button onClick={() => setShowJobModal(true)} style={{ border: 'none', borderRadius: 999, padding: '12px 16px', background: 'linear-gradient(135deg, #8b5cf6, #22d3ee)', color: 'white', fontWeight: 800, cursor: 'pointer' }}>Add job</button>
                   </div>
@@ -1160,6 +1157,7 @@ export function AdminDashboard({ onLogout }) {
                           const title = job.title || parsed.title || 'Recommended job';
                           const company = job.company || parsed.company || '-';
                           const location = job.location || parsed.location || '-';
+                          const source = parsed.source || 'job_descriptions';
                           return (
                           <tr key={job.id} style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
                             <td style={td}>{title}</td>
@@ -1171,6 +1169,7 @@ export function AdminDashboard({ onLogout }) {
                                 <button onClick={() => handleEditJob(job)} style={tableButton}>Edit</button>
                                 <button onClick={() => handleDeleteJob(job)} style={tableButton}>Delete</button>
                               </div>
+                              <div style={{ marginTop: 8, fontSize: 11, color: '#8a9bb5' }}>{source}</div>
                             </td>
                           </tr>
                           );

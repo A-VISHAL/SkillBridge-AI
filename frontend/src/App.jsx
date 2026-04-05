@@ -2127,13 +2127,22 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed, isDarkMode }) => {
 }
 
 // ─── JD Matcher ───────────────────────────────────────────────────────────────
-const JDMatcher = ({ resumeId, onJobMatched, isDarkMode }) => {
-  const [jd, setJD] = useState("");
+const JDMatcher = ({ resumeId, initialJobDescription, initialMatchResult, onJobMatched, isDarkMode }) => {
+  const [jd, setJD] = useState(initialJobDescription || "");
   const [loading, setLoading] = useState(false);
   const [loadingStage, setLoadingStage] = useState("");
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [error, setError] = useState("");
-  const [matchResult, setMatchResult] = useState(null);
+  const [matchResult, setMatchResult] = useState(initialMatchResult || null);
+
+  useEffect(() => {
+    setJD(initialJobDescription || "");
+    setMatchResult(initialMatchResult || null);
+    setError("");
+    setLoading(false);
+    setLoadingProgress(0);
+    setLoadingStage("");
+  }, [initialJobDescription, initialMatchResult, resumeId]);
 
   const analyzeMatch = async () => {
     if (!resumeId) {
@@ -2282,42 +2291,42 @@ const JDMatcher = ({ resumeId, onJobMatched, isDarkMode }) => {
               </div>
             </Card>
 
-            <Card style={{ padding: 20 }}>
-              <div style={{ fontSize: 13, fontWeight: 650, color: "var(--gray-900)", marginBottom: 14 }}>Missing Skills</div>
+            <Card isDarkMode={isDarkMode} style={{ padding: 20 }}>
+              <div style={{ fontSize: 13, fontWeight: 650, color: isDarkMode ? "#edf3ff" : "var(--gray-900)", marginBottom: 14 }}>Missing Skills</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                 {missingSkills.length === 0 && (
-                  <span style={{ fontSize: 12.5, color: "var(--gray-500)" }}>No missing skills detected.</span>
+                  <span style={{ fontSize: 12.5, color: isDarkMode ? "#b4c3d9" : "var(--gray-500)" }}>No missing skills detected.</span>
                 )}
                 {missingSkills.map(skill => (
                   <span key={skill} style={{
                     padding: "5px 12px", borderRadius: 99,
-                    background: "var(--gray-100)", fontSize: 12,
-                    color: "var(--gray-600)", fontWeight: 500,
-                    border: "1px solid var(--gray-200)",
+                    background: isDarkMode ? "rgba(143,176,227,0.12)" : "var(--gray-100)", fontSize: 12,
+                    color: isDarkMode ? "#dbe8fb" : "var(--gray-600)", fontWeight: 500,
+                    border: isDarkMode ? "1px solid rgba(122,147,193,0.35)" : "1px solid var(--gray-200)",
                   }}>{skill}</span>
                 ))}
               </div>
 
               <div style={{ marginTop: 18, display: "flex", flexDirection: "column", gap: 10 }}>
-                <ProgressBar value={Math.max(0, Math.min(100, overallMatch))} label="Overall technical match" sublabel={`${overallMatch}%`}/>
-                <ProgressBar value={Math.max(0, 100 - Math.min(100, missingSkills.length * 8))} label="Skill coverage" sublabel={`${Math.max(0, 100 - Math.min(100, missingSkills.length * 8))}%`}/>
+                <ProgressBar value={Math.max(0, Math.min(100, overallMatch))} label="Overall technical match" sublabel={`${overallMatch}%`} isDarkMode={isDarkMode}/>
+                <ProgressBar value={Math.max(0, 100 - Math.min(100, missingSkills.length * 8))} label="Skill coverage" sublabel={`${Math.max(0, 100 - Math.min(100, missingSkills.length * 8))}%`} isDarkMode={isDarkMode}/>
               </div>
 
               {(strengths.length > 0 || weaknesses.length > 0) && (
                 <div style={{ marginTop: 18, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                   <div>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: "#166534", marginBottom: 8 }}>Strengths</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: isDarkMode ? "#86efac" : "#166534", marginBottom: 8 }}>Strengths</div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                       {strengths.slice(0, 3).map((s, i) => (
-                        <span key={i} style={{ fontSize: 12, color: "var(--gray-600)" }}>• {s}</span>
+                        <span key={i} style={{ fontSize: 12, color: isDarkMode ? "#c7d7ef" : "var(--gray-600)" }}>• {s}</span>
                       ))}
                     </div>
                   </div>
                   <div>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: "#b45309", marginBottom: 8 }}>Weaknesses</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: isDarkMode ? "#fdba74" : "#b45309", marginBottom: 8 }}>Weaknesses</div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                       {weaknesses.slice(0, 3).map((w, i) => (
-                        <span key={i} style={{ fontSize: 12, color: "var(--gray-600)" }}>• {w}</span>
+                        <span key={i} style={{ fontSize: 12, color: isDarkMode ? "#c7d7ef" : "var(--gray-600)" }}>• {w}</span>
                       ))}
                     </div>
                   </div>
@@ -2326,10 +2335,10 @@ const JDMatcher = ({ resumeId, onJobMatched, isDarkMode }) => {
 
               {suggestions.length > 0 && (
                 <div style={{ marginTop: 16 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: "#1d4ed8", marginBottom: 8 }}>Suggestions</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: isDarkMode ? "#93c5fd" : "#1d4ed8", marginBottom: 8 }}>Suggestions</div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                     {suggestions.slice(0, 4).map((item, i) => (
-                      <span key={i} style={{ fontSize: 12, color: "var(--gray-600)" }}>• {item}</span>
+                      <span key={i} style={{ fontSize: 12, color: isDarkMode ? "#c7d7ef" : "var(--gray-600)" }}>• {item}</span>
                     ))}
                   </div>
                 </div>
@@ -2339,13 +2348,13 @@ const JDMatcher = ({ resumeId, onJobMatched, isDarkMode }) => {
         )}
 
         {!analyzed && !loading && (
-          <Card style={{ display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 14, padding: 40, minHeight: 300 }} hover={false}>
-            <div style={{ width: 56, height: 56, borderRadius: 16, background: "var(--gray-100)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Icon name="match" size={24} color="var(--gray-400)"/>
+          <Card isDarkMode={isDarkMode} style={{ display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 14, padding: 40, minHeight: 300 }} hover={false}>
+            <div style={{ width: 56, height: 56, borderRadius: 16, background: isDarkMode ? "rgba(91,127,196,0.15)" : "var(--gray-100)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Icon name="match" size={24} color={isDarkMode ? "#6b93d6" : "var(--gray-400)"}/>
             </div>
             <div style={{ textAlign: "center" }}>
-              <div style={{ fontSize: 14, fontWeight: 600, color: "var(--gray-700)", marginBottom: 6 }}>Awaiting analysis</div>
-              <div style={{ fontSize: 13, color: "var(--gray-400)" }}>Paste a JD and click Analyze to see your match</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: isDarkMode ? "#e8eef7" : "var(--gray-700)", marginBottom: 6 }}>Awaiting analysis</div>
+              <div style={{ fontSize: 13, color: isDarkMode ? "#b4c3d9" : "var(--gray-400)" }}>Paste a JD and click Analyze to see your match</div>
             </div>
           </Card>
         )}
@@ -2426,6 +2435,14 @@ const Quiz = ({ resumeId, resumeData, jobDescription, onQuizComplete, isDarkMode
   const [showCongrats, setShowCongrats] = useState(false);
 
   const passingPercentage = 80;
+  const darkText = isDarkMode ? "#e8eef7" : "var(--gray-900)";
+  const mutedText = isDarkMode ? "#b4c3d9" : "var(--gray-500)";
+  const softText = isDarkMode ? "#c7d7ef" : "var(--gray-600)";
+  const panelBg = isDarkMode ? "#1f2d41" : "var(--white)";
+  const surfaceBg = isDarkMode ? "#24354c" : "var(--gray-50)";
+  const surfaceBorder = isDarkMode ? "1px solid rgba(122,147,193,0.35)" : "1px solid var(--gray-150)";
+  const selectedBg = isDarkMode ? "#8fb0e3" : "var(--gray-900)";
+  const selectedText = isDarkMode ? "#0f1a29" : "var(--white)";
 
   const getOptionText = (opt) => (typeof opt === "string" ? opt : opt?.text || "");
 
@@ -2563,20 +2580,20 @@ const Quiz = ({ resumeId, resumeData, jobDescription, onQuizComplete, isDarkMode
             style={{
               width: "min(520px, 100%)",
               borderRadius: 24,
-              border: "1px solid var(--gray-200)",
-              background: "var(--white)",
+              border: isDarkMode ? "1px solid rgba(122,147,193,0.35)" : "1px solid var(--gray-200)",
+              background: panelBg,
               boxShadow: "0 22px 64px rgba(0,0,0,0.22)",
               padding: 28,
               textAlign: "center",
             }}
           >
-            <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.12em", color: "var(--gray-500)", textTransform: "uppercase", marginBottom: 8 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.12em", color: mutedText, textTransform: "uppercase", marginBottom: 8 }}>
               Quiz Completed
             </div>
             <div style={{ fontSize: 34, fontWeight: 800, color: "#166534", letterSpacing: "-0.03em", marginBottom: 8 }}>
               Congratulations
             </div>
-            <div style={{ fontSize: 14, color: "var(--gray-600)", lineHeight: 1.7, marginBottom: 18 }}>
+            <div style={{ fontSize: 14, color: softText, lineHeight: 1.7, marginBottom: 18 }}>
               You passed the {domain} assessment with a score of <strong>{score}%</strong>.
             </div>
             <div style={{ display: "flex", gap: 10 }}>
@@ -2593,67 +2610,67 @@ const Quiz = ({ resumeId, resumeData, jobDescription, onQuizComplete, isDarkMode
 
       <div>
         <div style={{ marginBottom: 18 }}>
-          <h2 style={{ fontSize: 22, fontWeight: 700, color: "var(--gray-900)", letterSpacing: "-0.04em" }}>Adaptive Quiz</h2>
-          <p style={{ fontSize: 13.5, color: "var(--gray-500)", marginTop: 4 }}>
+          <h2 style={{ fontSize: 22, fontWeight: 700, color: darkText, letterSpacing: "-0.04em" }}>Adaptive Quiz</h2>
+          <p style={{ fontSize: 13.5, color: mutedText, marginTop: 4 }}>
             Resume + JD + roadmap-based quizzes by section and difficulty.
           </p>
         </div>
 
-        <Card style={{ padding: 18, marginBottom: 14 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: "var(--gray-500)", marginBottom: 8 }}>Select Section</div>
+        <Card style={{ padding: 18, marginBottom: 14 }} isDarkMode={isDarkMode}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: mutedText, marginBottom: 8 }}>Select Section</div>
           <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
             {["Coding DSA", "Development"].map((d) => (
-              <Btn key={d} variant={domain === d ? "primary" : "secondary"} onClick={() => setDomain(d)}>
+              <Btn key={d} variant={domain === d ? "primary" : "secondary"} onClick={() => setDomain(d)} style={isDarkMode ? (domain === d ? { background: selectedBg, color: selectedText } : { background: "rgba(143,176,227,0.14)", color: "#dbe8fb", border: "1px solid rgba(122,147,193,0.35)" }) : {}}>
                 {d}
               </Btn>
             ))}
           </div>
-          <div style={{ fontSize: 12, fontWeight: 700, color: "var(--gray-500)", marginBottom: 8 }}>Difficulty</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: mutedText, marginBottom: 8 }}>Difficulty</div>
           <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
             {["Easy", "Hard", "Advanced"].map((d) => (
-              <Btn key={d} variant={difficulty === d ? "primary" : "secondary"} onClick={() => setDifficulty(d)}>
+              <Btn key={d} variant={difficulty === d ? "primary" : "secondary"} onClick={() => setDifficulty(d)} style={isDarkMode ? (difficulty === d ? { background: selectedBg, color: selectedText } : { background: "rgba(143,176,227,0.14)", color: "#dbe8fb", border: "1px solid rgba(122,147,193,0.35)" }) : {}}>
                 {d}
               </Btn>
             ))}
           </div>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <Badge>10 questions per section</Badge>
-            <Badge variant="warning">Pass: {passingPercentage}%</Badge>
+            <Badge style={isDarkMode ? { background: "rgba(122,147,193,0.18)", color: "#d7e4f7", border: "1px solid rgba(122,147,193,0.35)" } : {}}>10 questions per section</Badge>
+            <Badge variant="warning" style={isDarkMode ? { background: "rgba(250,204,21,0.14)", color: "#fcd34d", border: "1px solid rgba(250,204,21,0.32)" } : {}}>Pass: {passingPercentage}%</Badge>
           </div>
           <div style={{ marginTop: 14 }}>
-            <Btn variant="primary" onClick={startQuizGeneration} disabled={loading} style={{ width: "100%", justifyContent: "center" }}>
+            <Btn variant="primary" onClick={startQuizGeneration} disabled={loading} style={{ width: "100%", justifyContent: "center", ...(isDarkMode ? { background: selectedBg, color: selectedText } : {}) }}>
               {loading ? "Generating quiz..." : "Generate Quiz"}
             </Btn>
           </div>
-          {error && <div style={{ marginTop: 10, color: "#b91c1c", fontSize: 12.5, fontWeight: 600 }}>{error}</div>}
+          {error && <div style={{ marginTop: 10, color: isDarkMode ? "#fca5a5" : "#b91c1c", fontSize: 12.5, fontWeight: 600 }}>{error}</div>}
         </Card>
 
         {phase === "rules" && (
-          <Card style={{ padding: 18 }}>
-            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 10, color: "var(--gray-900)" }}>Rules & Regulations</div>
+          <Card style={{ padding: 18 }} isDarkMode={isDarkMode}>
+            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 10, color: darkText }}>Rules & Regulations</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {rules.map((rule, i) => (
-                <div key={i} style={{ fontSize: 13.5, color: "var(--gray-700)", lineHeight: 1.6 }}>• {rule}</div>
+                <div key={i} style={{ fontSize: 13.5, color: softText, lineHeight: 1.6 }}>• {rule}</div>
               ))}
             </div>
             <div style={{ marginTop: 16, display: "flex", gap: 10 }}>
-              <Btn variant="secondary" onClick={() => setPhase("setup")} style={{ flex: 1, justifyContent: "center" }}>Back</Btn>
-              <Btn variant="primary" onClick={() => setPhase("quiz")} style={{ flex: 2, justifyContent: "center" }}>Start Test</Btn>
+              <Btn variant="secondary" onClick={() => setPhase("setup")} style={{ flex: 1, justifyContent: "center", ...(isDarkMode ? { background: "rgba(143,176,227,0.14)", color: "#dbe8fb", border: "1px solid rgba(122,147,193,0.35)" } : {}) }}>Back</Btn>
+              <Btn variant="primary" onClick={() => setPhase("quiz")} style={{ flex: 2, justifyContent: "center", ...(isDarkMode ? { background: selectedBg, color: selectedText } : {}) }}>Start Test</Btn>
             </div>
           </Card>
         )}
 
         {phase === "quiz" && current && (
           <>
-            <Card style={{ padding: 18, marginBottom: 12 }}>
+            <Card style={{ padding: 18, marginBottom: 12 }} isDarkMode={isDarkMode}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                <Badge>{domain}</Badge>
-                <Badge>Question {index + 1} / {questions.length}</Badge>
+                <Badge style={isDarkMode ? { background: "rgba(122,147,193,0.18)", color: "#d7e4f7", border: "1px solid rgba(122,147,193,0.35)" } : {}}>{domain}</Badge>
+                <Badge style={isDarkMode ? { background: "rgba(122,147,193,0.18)", color: "#d7e4f7", border: "1px solid rgba(122,147,193,0.35)" } : {}}>Question {index + 1} / {questions.length}</Badge>
               </div>
-              <div style={{ height: 4, background: "var(--gray-100)", borderRadius: 99, marginBottom: 14 }}>
-                <div style={{ width: `${progressPct}%`, height: "100%", borderRadius: 99, background: "var(--gray-800)" }}/>
+              <div style={{ height: 4, background: isDarkMode ? "rgba(122,147,193,0.25)" : "var(--gray-100)", borderRadius: 99, marginBottom: 14 }}>
+                <div style={{ width: `${progressPct}%`, height: "100%", borderRadius: 99, background: isDarkMode ? "#8fb0e3" : "var(--gray-800)" }}/>
               </div>
-              <p style={{ fontSize: 17, fontWeight: 600, color: "var(--gray-900)", lineHeight: 1.55 }}>{current.question}</p>
+              <p style={{ fontSize: 17, fontWeight: 600, color: darkText, lineHeight: 1.55 }}>{current.question}</p>
             </Card>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -2666,14 +2683,14 @@ const Quiz = ({ resumeId, resumeData, jobDescription, onQuizComplete, isDarkMode
                     onClick={() => setAnswers((prev) => ({ ...prev, [index]: label }))}
                     style={{
                       display: "flex", alignItems: "center", gap: 12,
-                      borderRadius: 12, border: `1.5px solid ${chosen ? "var(--gray-900)" : "var(--gray-200)"}`,
-                      background: chosen ? "var(--gray-900)" : "var(--white)",
-                      color: chosen ? "var(--white)" : "var(--gray-700)",
+                      borderRadius: 12, border: `1.5px solid ${chosen ? selectedBg : (isDarkMode ? "rgba(122,147,193,0.45)" : "var(--gray-200)")}`,
+                      background: chosen ? selectedBg : (isDarkMode ? surfaceBg : "var(--white)"),
+                      color: chosen ? selectedText : (isDarkMode ? "#e5eefc" : "var(--gray-700)"),
                       padding: "13px 16px", cursor: "pointer", textAlign: "left", fontFamily: "inherit",
                       fontSize: 14,
                     }}
                   >
-                    <span style={{ width: 24, height: 24, borderRadius: 7, background: chosen ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.06)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700 }}>
+                    <span style={{ width: 24, height: 24, borderRadius: 7, background: chosen ? (isDarkMode ? "rgba(12,20,34,0.2)" : "rgba(255,255,255,0.2)") : (isDarkMode ? "rgba(10,18,32,0.35)" : "rgba(0,0,0,0.06)"), display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700 }}>
                       {String.fromCharCode(65 + i)}
                     </span>
                     {label}
@@ -2683,15 +2700,15 @@ const Quiz = ({ resumeId, resumeData, jobDescription, onQuizComplete, isDarkMode
             </div>
 
             <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
-              <Btn variant="secondary" onClick={() => setIndex((p) => Math.max(0, p - 1))} style={{ flex: 1, justifyContent: "center" }}>
+              <Btn variant="secondary" onClick={() => setIndex((p) => Math.max(0, p - 1))} style={{ flex: 1, justifyContent: "center", ...(isDarkMode ? { background: "rgba(143,176,227,0.14)", color: "#dbe8fb", border: "1px solid rgba(122,147,193,0.35)" } : {}) }}>
                 Previous
               </Btn>
               {index < questions.length - 1 ? (
-                <Btn variant="primary" onClick={() => setIndex((p) => Math.min(questions.length - 1, p + 1))} style={{ flex: 2, justifyContent: "center" }}>
+                <Btn variant="primary" onClick={() => setIndex((p) => Math.min(questions.length - 1, p + 1))} style={{ flex: 2, justifyContent: "center", ...(isDarkMode ? { background: selectedBg, color: selectedText } : {}) }}>
                   Next Question
                 </Btn>
               ) : (
-                <Btn variant="primary" onClick={submitQuiz} style={{ flex: 2, justifyContent: "center" }}>
+                <Btn variant="primary" onClick={submitQuiz} style={{ flex: 2, justifyContent: "center", ...(isDarkMode ? { background: selectedBg, color: selectedText } : {}) }}>
                   Submit Test
                 </Btn>
               )}
@@ -2700,38 +2717,38 @@ const Quiz = ({ resumeId, resumeData, jobDescription, onQuizComplete, isDarkMode
         )}
 
         {phase === "result" && (
-          <Card style={{ padding: 20 }}>
-            <div style={{ fontSize: 18, fontWeight: 700, color: "var(--gray-900)", marginBottom: 8 }}>Quiz Result</div>
-            <div style={{ fontSize: 13, color: "var(--gray-500)", marginBottom: 14 }}>{domain} • {difficulty} • {questions.length} questions</div>
+          <Card style={{ padding: 20 }} isDarkMode={isDarkMode}>
+            <div style={{ fontSize: 18, fontWeight: 700, color: darkText, marginBottom: 8 }}>Quiz Result</div>
+            <div style={{ fontSize: 13, color: mutedText, marginBottom: 14 }}>{domain} • {difficulty} • {questions.length} questions</div>
             <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 12 }}>
               <div style={{ fontSize: 36, fontWeight: 800, color: score >= passingPercentage ? "#166534" : "#b91c1c" }}>{score}%</div>
-              <Badge variant={score >= passingPercentage ? "success" : "error"}>{score >= passingPercentage ? "PASS" : "FAIL"}</Badge>
+              <Badge variant={score >= passingPercentage ? "success" : "error"} style={isDarkMode ? { borderColor: "transparent" } : {}}>{score >= passingPercentage ? "PASS" : "FAIL"}</Badge>
             </div>
-            <div style={{ fontSize: 13.5, color: "var(--gray-700)", lineHeight: 1.6, marginBottom: 16 }}>
+            <div style={{ fontSize: 13.5, color: softText, lineHeight: 1.6, marginBottom: 16 }}>
               Passing criteria is <strong>{passingPercentage}%</strong>. {score >= passingPercentage ? "You cleared this section." : "Review study materials and retry."}
             </div>
             <div style={{ display: "flex", gap: 10 }}>
-              <Btn variant="secondary" onClick={() => setPhase("setup")} style={{ flex: 1, justifyContent: "center" }}>Back to Setup</Btn>
-              <Btn variant="primary" onClick={startQuizGeneration} style={{ flex: 2, justifyContent: "center" }}>Retake Quiz</Btn>
+              <Btn variant="secondary" onClick={() => setPhase("setup")} style={{ flex: 1, justifyContent: "center", ...(isDarkMode ? { background: "rgba(143,176,227,0.14)", color: "#dbe8fb", border: "1px solid rgba(122,147,193,0.35)" } : {}) }}>Back to Setup</Btn>
+              <Btn variant="primary" onClick={startQuizGeneration} style={{ flex: 2, justifyContent: "center", ...(isDarkMode ? { background: selectedBg, color: selectedText } : {}) }}>Retake Quiz</Btn>
             </div>
           </Card>
         )}
       </div>
 
       <div>
-        <Card style={{ padding: 18 }}>
-          <div style={{ fontSize: 15, fontWeight: 700, color: "var(--gray-900)", marginBottom: 10 }}>Study Material</div>
+        <Card style={{ padding: 18 }} isDarkMode={isDarkMode}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: darkText, marginBottom: 10 }}>Study Material</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {studyMaterials.length === 0 && (
-              <div style={{ fontSize: 13, color: "var(--gray-500)", lineHeight: 1.6 }}>
+              <div style={{ fontSize: 13, color: mutedText, lineHeight: 1.6 }}>
                 Generate a quiz to load week-wise study materials based on resume, JD, and roadmap.
               </div>
             )}
             {studyMaterials.map((item, i) => (
-              <div key={i} style={{ border: "1px solid var(--gray-150)", borderRadius: 12, padding: 12, background: "var(--gray-50)" }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "var(--gray-500)", letterSpacing: "0.06em", marginBottom: 6 }}>WEEK {item.week}</div>
-                <div style={{ fontSize: 13.5, fontWeight: 650, color: "var(--gray-900)", marginBottom: 6 }}>{item.title}</div>
-                <div style={{ fontSize: 12.5, color: "var(--gray-600)", lineHeight: 1.55, marginBottom: 8 }}>{item.what_to_study}</div>
+              <div key={i} style={{ border: surfaceBorder, borderRadius: 12, padding: 12, background: surfaceBg }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: mutedText, letterSpacing: "0.06em", marginBottom: 6 }}>WEEK {item.week}</div>
+                <div style={{ fontSize: 13.5, fontWeight: 650, color: darkText, marginBottom: 6 }}>{item.title}</div>
+                <div style={{ fontSize: 12.5, color: softText, lineHeight: 1.55, marginBottom: 8 }}>{item.what_to_study}</div>
                 {Array.isArray(item.resources) && item.resources.length > 0 && (
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                     {item.resources.slice(0, 3).map((resource, rIndex) => {
@@ -2740,7 +2757,7 @@ const Quiz = ({ resumeId, resumeData, jobDescription, onQuizComplete, isDarkMode
 
                       if (!resourceUrl) {
                         return (
-                          <div key={rIndex} style={{ fontSize: 11.5, color: "var(--gray-500)", lineHeight: 1.5 }}>
+                          <div key={rIndex} style={{ fontSize: 11.5, color: mutedText, lineHeight: 1.5 }}>
                             {resourceLabel}
                           </div>
                         );
@@ -2755,7 +2772,7 @@ const Quiz = ({ resumeId, resumeData, jobDescription, onQuizComplete, isDarkMode
                           style={{
                             fontSize: 12,
                             fontWeight: 600,
-                            color: "#1d4ed8",
+                            color: isDarkMode ? "#9ec4ff" : "#1d4ed8",
                             textDecoration: "none",
                             lineHeight: 1.5,
                           }}
@@ -2790,6 +2807,15 @@ const MockInterview = ({ resumeId, resumeData, jobDescription, onInterviewProgre
   const [currentIndex, setCurrentIndex] = useState(0);
   const [completed, setCompleted] = useState(false);
   const chatRef = useRef(null);
+
+  const textColor = isDarkMode ? "#e8eef7" : "var(--gray-900)";
+  const mutedColor = isDarkMode ? "#b4c3d9" : "var(--gray-500)";
+  const softColor = isDarkMode ? "#c7d7ef" : "var(--gray-600)";
+  const panelBg = isDarkMode ? "#1f2d41" : "var(--white)";
+  const panelBorder = isDarkMode ? "1px solid rgba(122,147,193,0.35)" : "1px solid var(--gray-150)";
+  const surfaceBg = isDarkMode ? "#24354c" : "var(--gray-50)";
+  const accentBg = isDarkMode ? "#8fb0e3" : "var(--gray-900)";
+  const accentText = isDarkMode ? "#0f1a29" : "var(--white)";
 
   const loadQuizContext = () => {
     if (typeof window === "undefined") return {};
@@ -2993,35 +3019,35 @@ const MockInterview = ({ resumeId, resumeData, jobDescription, onInterviewProgre
     <div style={{ padding: 28, animation: "fadeIn 0.4s ease", height: "calc(100vh - 60px)", display: "flex", flexDirection: "column" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18, flexShrink: 0 }}>
         <div>
-          <h2 style={{ fontSize: 20, fontWeight: 700, color: "var(--gray-900)", letterSpacing: "-0.04em", marginBottom: 4 }}>Mock Interview</h2>
-          <p style={{ fontSize: 13.5, color: "var(--gray-500)" }}>Questions are based on your resume, quiz history, and roadmap progress.</p>
+          <h2 style={{ fontSize: 20, fontWeight: 700, color: textColor, letterSpacing: "-0.04em", marginBottom: 4 }}>Mock Interview</h2>
+          <p style={{ fontSize: 13.5, color: mutedColor }}>Questions are based on your resume, quiz history, and roadmap progress.</p>
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           {generationSource && (
-            <Badge>{generationSource === "model" ? "Source: Live API model" : "Source: Fallback"}</Badge>
+            <Badge style={isDarkMode ? { background: "rgba(122,147,193,0.18)", color: "#d7e4f7", border: "1px solid rgba(122,147,193,0.35)" } : {}}>{generationSource === "model" ? "Source: Live API model" : "Source: Fallback"}</Badge>
           )}
           <div style={{ textAlign: "right" }}>
-            <div style={{ fontSize: 20, fontWeight: 700, color: "var(--gray-900)", letterSpacing: "-0.04em" }}>{score}</div>
-            <div style={{ fontSize: 11, color: "var(--gray-400)", fontWeight: 500 }}>Interview score</div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: textColor, letterSpacing: "-0.04em" }}>{score}</div>
+            <div style={{ fontSize: 11, color: mutedColor, fontWeight: 500 }}>Interview score</div>
           </div>
-          <div style={{ width: 1, background: "var(--gray-150)", height: 28 }}/>
-          <Btn variant="outline" style={{ padding: "8px 16px", fontSize: 13 }} icon={<Icon name="mic" size={14}/>}>Voice mode</Btn>
+          <div style={{ width: 1, background: isDarkMode ? "rgba(122,147,193,0.35)" : "var(--gray-150)", height: 28 }}/>
+          <Btn variant="outline" style={{ padding: "8px 16px", fontSize: 13, ...(isDarkMode ? { background: "rgba(143,176,227,0.12)", color: "#dbe8fb", border: "1px solid rgba(122,147,193,0.35)" } : {}) }} icon={<Icon name="mic" size={14}/>}>Voice mode</Btn>
         </div>
       </div>
 
       {!session && (
-        <div style={{ background: "var(--white)", border: "1px solid var(--gray-150)", borderRadius: "var(--radius-lg)", boxShadow: "var(--shadow-md)", padding: 24, marginBottom: 16 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: "var(--gray-500)", marginBottom: 12 }}>Select Interview Mode</div>
+        <div style={{ background: panelBg, border: panelBorder, borderRadius: "var(--radius-lg)", boxShadow: isDarkMode ? "0 14px 36px rgba(0,0,0,0.22)" : "var(--shadow-md)", padding: 24, marginBottom: 16 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: mutedColor, marginBottom: 12 }}>Select Interview Mode</div>
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-            <Btn onClick={() => startInterview("Technical")} disabled={loading}>
+            <Btn onClick={() => startInterview("Technical")} disabled={loading} style={isDarkMode ? { background: accentBg, color: accentText } : {}}>
               Start Technical Interview
             </Btn>
-            <Btn variant="outline" onClick={() => startInterview("HR")} disabled={loading}>
+            <Btn variant="outline" onClick={() => startInterview("HR")} disabled={loading} style={isDarkMode ? { background: "rgba(143,176,227,0.12)", color: "#dbe8fb", border: "1px solid rgba(122,147,193,0.35)" } : {}}>
               Start HR Interview
             </Btn>
           </div>
-          {error && <div style={{ marginTop: 12, color: "#b91c1c", fontSize: 12.5, fontWeight: 600 }}>{error}</div>}
-          {resumeData?.name && <div style={{ marginTop: 10, color: "var(--gray-500)", fontSize: 12.5 }}>Interview profile: {resumeData.name}</div>}
+          {error && <div style={{ marginTop: 12, color: isDarkMode ? "#fca5a5" : "#b91c1c", fontSize: 12.5, fontWeight: 600 }}>{error}</div>}
+          {resumeData?.name && <div style={{ marginTop: 10, color: mutedColor, fontSize: 12.5 }}>Interview profile: {resumeData.name}</div>}
         </div>
       )}
 
@@ -3039,45 +3065,45 @@ const MockInterview = ({ resumeId, resumeData, jobDescription, onInterviewProgre
                 alignSelf: msg.role === "user" ? "flex-end" : "flex-start",
               }}>
                 {msg.role === "ai" && (
-                  <div style={{ width: 32, height: 32, borderRadius: "50%", background: "var(--gray-900)", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <div style={{ width: 32, height: 32, borderRadius: "50%", background: isDarkMode ? "#8fb0e3" : "var(--gray-900)", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
                     <Icon name="brain" size={14} color="white"/>
                   </div>
                 )}
                 <div style={{
                   padding: "13px 16px", borderRadius: msg.role === "ai" ? "4px 16px 16px 16px" : "16px 4px 16px 16px",
-                  background: msg.role === "ai" ? "var(--white)" : "var(--gray-900)",
-                  color: msg.role === "ai" ? "var(--gray-800)" : "var(--white)",
-                  border: msg.role === "ai" ? "1px solid var(--gray-150)" : "none",
-                  boxShadow: "var(--shadow-sm)",
+                  background: msg.role === "ai" ? panelBg : accentBg,
+                  color: msg.role === "ai" ? (isDarkMode ? "#edf3ff" : "var(--gray-800)") : accentText,
+                  border: msg.role === "ai" ? panelBorder : "none",
+                  boxShadow: isDarkMode ? "0 8px 24px rgba(0,0,0,0.16)" : "var(--shadow-sm)",
                   fontSize: 13.5, lineHeight: 1.65, maxWidth: 560,
                 }}>
                   {msg.text}
                 </div>
               </div>
             ))}
-            {loading && <div style={{ color: "var(--gray-500)", fontSize: 12.5 }}>Starting interview...</div>}
-            {submitting && <div style={{ color: "var(--gray-500)", fontSize: 12.5 }}>Scoring answer...</div>}
+            {loading && <div style={{ color: mutedColor, fontSize: 12.5 }}>Starting interview...</div>}
+            {submitting && <div style={{ color: mutedColor, fontSize: 12.5 }}>Scoring answer...</div>}
           </div>
 
           <div style={{
             display: "flex", gap: 10, padding: "14px 0 0",
-            borderTop: "1px solid var(--gray-150)", flexShrink: 0,
+            borderTop: isDarkMode ? "1px solid rgba(122,147,193,0.25)" : "1px solid var(--gray-150)", flexShrink: 0,
           }}>
-            <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 10, background: "var(--gray-50)", border: "1px solid var(--gray-200)", borderRadius: 99, padding: "10px 18px" }}>
+            <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 10, background: surfaceBg, border: isDarkMode ? "1px solid rgba(122,147,193,0.35)" : "1px solid var(--gray-200)", borderRadius: 99, padding: "10px 18px" }}>
               <input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleSend()}
                 placeholder={completed ? "Interview complete" : "Type your answer..."}
                 disabled={completed || submitting}
-                style={{ flex: 1, border: "none", background: "transparent", fontSize: 13.5, color: "var(--gray-700)", outline: "none", fontFamily: "inherit" }}
+                style={{ flex: 1, border: "none", background: "transparent", fontSize: 13.5, color: isDarkMode ? "#e5eefc" : "var(--gray-700)", outline: "none", fontFamily: "inherit" }}
               />
             </div>
-            <Btn variant="primary" onClick={handleSend} disabled={completed || submitting} style={{ borderRadius: "50%", width: 44, height: 44, padding: 0 }} icon={<Icon name="send" size={16}/>}></Btn>
+            <Btn variant="primary" onClick={handleSend} disabled={completed || submitting} style={{ borderRadius: "50%", width: 44, height: 44, padding: 0, ...(isDarkMode ? { background: accentBg, color: accentText } : {}) }} icon={<Icon name="send" size={16}/>}></Btn>
           </div>
 
-          {error && <div style={{ marginTop: 12, color: "#b91c1c", fontSize: 12.5, fontWeight: 600 }}>{error}</div>}
-          {completed && <div style={{ marginTop: 10, color: "var(--gray-500)", fontSize: 12.5 }}>You can restart the interview to generate a new session.</div>}
+          {error && <div style={{ marginTop: 12, color: isDarkMode ? "#fca5a5" : "#b91c1c", fontSize: 12.5, fontWeight: 600 }}>{error}</div>}
+          {completed && <div style={{ marginTop: 10, color: mutedColor, fontSize: 12.5 }}>You can restart the interview to generate a new session.</div>}
         </>
       )}
     </div>
@@ -3238,6 +3264,16 @@ const JobFinder = ({ resumeId, resumeData, onJobsUpdated, isDarkMode }) => {
     { id: "saved", label: "Saved" },
   ];
 
+  const textColor = isDarkMode ? "#e8eef7" : "var(--gray-900)";
+  const mutedColor = isDarkMode ? "#b4c3d9" : "var(--gray-500)";
+  const softColor = isDarkMode ? "#c7d7ef" : "var(--gray-600)";
+  const panelBg = isDarkMode ? "#1f2d41" : "var(--white)";
+  const panelBorder = isDarkMode ? "1px solid rgba(122,147,193,0.35)" : "1px solid var(--gray-150)";
+  const surfaceBg = isDarkMode ? "#24354c" : "var(--gray-50)";
+  const surfaceBorder = isDarkMode ? "1px solid rgba(122,147,193,0.3)" : "1px solid var(--gray-150)";
+  const accentBg = isDarkMode ? "#8fb0e3" : "var(--gray-900)";
+  const accentText = isDarkMode ? "#0f1a29" : "var(--white)";
+
   return (
     <div style={{ padding: 28, animation: "fadeIn 0.4s ease" }}>
       <div style={{
@@ -3248,24 +3284,24 @@ const JobFinder = ({ resumeId, resumeData, onJobsUpdated, isDarkMode }) => {
         alignItems: "start",
       }}>
         <div>
-          <h2 style={{ fontSize: 20, fontWeight: 700, color: "var(--gray-900)", letterSpacing: "-0.04em", marginBottom: 4 }}>Job Finder</h2>
-          <p style={{ fontSize: 13.5, color: "var(--gray-500)" }}>
+          <h2 style={{ fontSize: 20, fontWeight: 700, color: textColor, letterSpacing: "-0.04em", marginBottom: 4 }}>Job Finder</h2>
+          <p style={{ fontSize: 13.5, color: mutedColor }}>
             {loading ? "Finding jobs from your extracted resume data..." : `${filteredJobs.length} curated roles matched to your profile.`}
           </p>
           <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
-            <Badge variant="default">Role: {role || "Software Engineer"}</Badge>
-            <Badge variant="default">Location: {location}</Badge>
-            <Badge variant="default">Saved: {Object.values(savedJobs).filter(Boolean).length}</Badge>
+            <Badge variant="default" style={isDarkMode ? { background: "rgba(122,147,193,0.18)", color: "#d7e4f7", border: "1px solid rgba(122,147,193,0.35)" } : {}}>Role: {role || "Software Engineer"}</Badge>
+            <Badge variant="default" style={isDarkMode ? { background: "rgba(122,147,193,0.18)", color: "#d7e4f7", border: "1px solid rgba(122,147,193,0.35)" } : {}}>Location: {location}</Badge>
+            <Badge variant="default" style={isDarkMode ? { background: "rgba(122,147,193,0.18)", color: "#d7e4f7", border: "1px solid rgba(122,147,193,0.35)" } : {}}>Saved: {Object.values(savedJobs).filter(Boolean).length}</Badge>
           </div>
         </div>
         <div style={{ display: "grid", gap: 10 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--gray-50)", border: "1px solid var(--gray-200)", borderRadius: 99, padding: "8px 14px" }}>
-            <Icon name="search" size={14} color="var(--gray-400)"/>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, background: surfaceBg, border: isDarkMode ? "1px solid rgba(122,147,193,0.35)" : "1px solid var(--gray-200)", borderRadius: 99, padding: "8px 14px" }}>
+            <Icon name="search" size={14} color={isDarkMode ? "#9db2d3" : "var(--gray-400)"}/>
             <input
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
               placeholder="Filter jobs..."
-              style={{ border: "none", background: "transparent", fontSize: 13, color: "var(--gray-600)", outline: "none", fontFamily: "inherit", width: 170 }}
+              style={{ border: "none", background: "transparent", fontSize: 13, color: isDarkMode ? "#e5eefc" : "var(--gray-600)", outline: "none", fontFamily: "inherit", width: 170 }}
             />
           </div>
           <div style={{ display: "flex", gap: 8 }}>
@@ -3274,10 +3310,10 @@ const JobFinder = ({ resumeId, resumeData, onJobsUpdated, isDarkMode }) => {
               onChange={(e) => setRole(e.target.value)}
               placeholder="Target role"
               style={{
-                border: "1px solid var(--gray-200)",
-                background: "var(--white)",
+                border: isDarkMode ? "1px solid rgba(122,147,193,0.35)" : "1px solid var(--gray-200)",
+                background: panelBg,
                 fontSize: 12.5,
-                color: "var(--gray-700)",
+                color: isDarkMode ? "#e5eefc" : "var(--gray-700)",
                 outline: "none",
                 fontFamily: "inherit",
                 borderRadius: 99,
@@ -3290,10 +3326,10 @@ const JobFinder = ({ resumeId, resumeData, onJobsUpdated, isDarkMode }) => {
               onChange={(e) => setLocation(e.target.value)}
               placeholder="Location"
               style={{
-                border: "1px solid var(--gray-200)",
-                background: "var(--white)",
+                border: isDarkMode ? "1px solid rgba(122,147,193,0.35)" : "1px solid var(--gray-200)",
+                background: panelBg,
                 fontSize: 12.5,
-                color: "var(--gray-700)",
+                color: isDarkMode ? "#e5eefc" : "var(--gray-700)",
                 outline: "none",
                 fontFamily: "inherit",
                 borderRadius: 99,
@@ -3301,7 +3337,7 @@ const JobFinder = ({ resumeId, resumeData, onJobsUpdated, isDarkMode }) => {
                 width: 120,
               }}
             />
-            <Btn variant="secondary" onClick={fetchJobs} style={{ padding: "8px 14px", fontSize: 13 }}>Refresh</Btn>
+            <Btn variant="secondary" onClick={fetchJobs} style={{ padding: "8px 14px", fontSize: 13, ...(isDarkMode ? { background: "rgba(143,176,227,0.12)", color: "#dbe8fb", border: "1px solid rgba(122,147,193,0.35)" } : {}) }}>Refresh</Btn>
           </div>
         </div>
       </div>
@@ -3312,9 +3348,9 @@ const JobFinder = ({ resumeId, resumeData, onJobsUpdated, isDarkMode }) => {
             key={chip.id}
             onClick={() => setActiveChip(chip.id)}
             style={{
-              border: activeChip === chip.id ? "1px solid var(--gray-700)" : "1px solid var(--gray-200)",
-              background: activeChip === chip.id ? "var(--gray-900)" : "var(--white)",
-              color: activeChip === chip.id ? "var(--white)" : "var(--gray-700)",
+              border: activeChip === chip.id ? (isDarkMode ? "1px solid rgba(143,176,227,0.55)" : "1px solid var(--gray-700)") : (isDarkMode ? "1px solid rgba(122,147,193,0.28)" : "1px solid var(--gray-200)"),
+              background: activeChip === chip.id ? (isDarkMode ? accentBg : "var(--gray-900)") : (isDarkMode ? "rgba(143,176,227,0.12)" : "var(--white)"),
+              color: activeChip === chip.id ? accentText : (isDarkMode ? "#dbe8fb" : "var(--gray-700)"),
               borderRadius: 99,
               padding: "6px 12px",
               fontSize: 12,
@@ -3329,25 +3365,25 @@ const JobFinder = ({ resumeId, resumeData, onJobsUpdated, isDarkMode }) => {
       </div>
 
       {error && (
-        <Card style={{ marginBottom: 14, padding: "14px 16px", border: "1px solid #fde68a", background: "#fffbeb" }}>
-          <div style={{ fontSize: 13, color: "#92400e", fontWeight: 600 }}>{error}</div>
+        <Card isDarkMode={isDarkMode} style={{ marginBottom: 14, padding: "14px 16px", border: isDarkMode ? "1px solid rgba(250,204,21,0.3)" : "1px solid #fde68a", background: isDarkMode ? "rgba(250,204,21,0.08)" : "#fffbeb" }}>
+          <div style={{ fontSize: 13, color: isDarkMode ? "#fcd34d" : "#92400e", fontWeight: 600 }}>{error}</div>
         </Card>
       )}
 
       {loading && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 14 }}>
           {Array.from({ length: 6 }).map((_, idx) => (
-            <Card key={idx} style={{ padding: "20px 22px" }}>
+            <Card key={idx} isDarkMode={isDarkMode} style={{ padding: "20px 22px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14 }}>
-                <div style={{ width: 40, height: 40, borderRadius: 12, background: "linear-gradient(90deg, var(--gray-100), var(--gray-150), var(--gray-100))", backgroundSize: "250% 100%", animation: "shimmer 1.8s infinite" }}/>
-                <div style={{ width: 72, height: 20, borderRadius: 99, background: "linear-gradient(90deg, var(--gray-100), var(--gray-150), var(--gray-100))", backgroundSize: "250% 100%", animation: "shimmer 1.8s infinite" }}/>
+                <div style={{ width: 40, height: 40, borderRadius: 12, background: isDarkMode ? "linear-gradient(90deg, rgba(122,147,193,0.14), rgba(122,147,193,0.24), rgba(122,147,193,0.14))" : "linear-gradient(90deg, var(--gray-100), var(--gray-150), var(--gray-100))", backgroundSize: "250% 100%", animation: "shimmer 1.8s infinite" }}/>
+                <div style={{ width: 72, height: 20, borderRadius: 99, background: isDarkMode ? "linear-gradient(90deg, rgba(122,147,193,0.14), rgba(122,147,193,0.24), rgba(122,147,193,0.14))" : "linear-gradient(90deg, var(--gray-100), var(--gray-150), var(--gray-100))", backgroundSize: "250% 100%", animation: "shimmer 1.8s infinite" }}/>
               </div>
-              <div style={{ width: "75%", height: 14, borderRadius: 6, marginBottom: 8, background: "linear-gradient(90deg, var(--gray-100), var(--gray-150), var(--gray-100))", backgroundSize: "250% 100%", animation: "shimmer 1.8s infinite" }}/>
-              <div style={{ width: "45%", height: 12, borderRadius: 6, marginBottom: 14, background: "linear-gradient(90deg, var(--gray-100), var(--gray-150), var(--gray-100))", backgroundSize: "250% 100%", animation: "shimmer 1.8s infinite" }}/>
-              <div style={{ width: "100%", height: 4, borderRadius: 99, marginBottom: 14, background: "linear-gradient(90deg, var(--gray-100), var(--gray-150), var(--gray-100))", backgroundSize: "250% 100%", animation: "shimmer 1.8s infinite" }}/>
+              <div style={{ width: "75%", height: 14, borderRadius: 6, marginBottom: 8, background: isDarkMode ? "linear-gradient(90deg, rgba(122,147,193,0.14), rgba(122,147,193,0.24), rgba(122,147,193,0.14))" : "linear-gradient(90deg, var(--gray-100), var(--gray-150), var(--gray-100))", backgroundSize: "250% 100%", animation: "shimmer 1.8s infinite" }}/>
+              <div style={{ width: "45%", height: 12, borderRadius: 6, marginBottom: 14, background: isDarkMode ? "linear-gradient(90deg, rgba(122,147,193,0.14), rgba(122,147,193,0.24), rgba(122,147,193,0.14))" : "linear-gradient(90deg, var(--gray-100), var(--gray-150), var(--gray-100))", backgroundSize: "250% 100%", animation: "shimmer 1.8s infinite" }}/>
+              <div style={{ width: "100%", height: 4, borderRadius: 99, marginBottom: 14, background: isDarkMode ? "linear-gradient(90deg, rgba(122,147,193,0.14), rgba(122,147,193,0.24), rgba(122,147,193,0.14))" : "linear-gradient(90deg, var(--gray-100), var(--gray-150), var(--gray-100))", backgroundSize: "250% 100%", animation: "shimmer 1.8s infinite" }}/>
               <div style={{ display: "flex", gap: 8 }}>
-                <div style={{ flex: 2, height: 34, borderRadius: 99, background: "linear-gradient(90deg, var(--gray-100), var(--gray-150), var(--gray-100))", backgroundSize: "250% 100%", animation: "shimmer 1.8s infinite" }}/>
-                <div style={{ flex: 1, height: 34, borderRadius: 99, background: "linear-gradient(90deg, var(--gray-100), var(--gray-150), var(--gray-100))", backgroundSize: "250% 100%", animation: "shimmer 1.8s infinite" }}/>
+                <div style={{ flex: 2, height: 34, borderRadius: 99, background: isDarkMode ? "linear-gradient(90deg, rgba(122,147,193,0.14), rgba(122,147,193,0.24), rgba(122,147,193,0.14))" : "linear-gradient(90deg, var(--gray-100), var(--gray-150), var(--gray-100))", backgroundSize: "250% 100%", animation: "shimmer 1.8s infinite" }}/>
+                <div style={{ flex: 1, height: 34, borderRadius: 99, background: isDarkMode ? "linear-gradient(90deg, rgba(122,147,193,0.14), rgba(122,147,193,0.24), rgba(122,147,193,0.14))" : "linear-gradient(90deg, var(--gray-100), var(--gray-150), var(--gray-100))", backgroundSize: "250% 100%", animation: "shimmer 1.8s infinite" }}/>
               </div>
             </Card>
           ))}
@@ -3355,8 +3391,8 @@ const JobFinder = ({ resumeId, resumeData, onJobsUpdated, isDarkMode }) => {
       )}
 
       {!loading && !error && filteredJobs.length === 0 && (
-        <Card style={{ marginBottom: 14, padding: "18px 20px" }}>
-          <div style={{ fontSize: 13.5, color: "var(--gray-600)" }}>
+        <Card isDarkMode={isDarkMode} style={{ marginBottom: 14, padding: "18px 20px" }}>
+          <div style={{ fontSize: 13.5, color: isDarkMode ? "#c7d7ef" : "var(--gray-600)" }}>
             No matching jobs found yet. Try clicking Refresh after uploading your latest resume.
           </div>
         </Card>
@@ -3370,7 +3406,7 @@ const JobFinder = ({ resumeId, resumeData, onJobsUpdated, isDarkMode }) => {
           const skills = (job.required_skills || []).slice(0, 4);
           const isSaved = Boolean(savedJobs[job.id]);
           return (
-          <Card key={i} style={{ padding: "20px 22px", overflow: "hidden", position: "relative" }}>
+          <Card key={i} isDarkMode={isDarkMode} style={{ padding: "20px 22px", overflow: "hidden", position: "relative" }}>
             <div style={{
               position: "absolute",
               right: -40,
@@ -3382,25 +3418,25 @@ const JobFinder = ({ resumeId, resumeData, onJobsUpdated, isDarkMode }) => {
               pointerEvents: "none",
             }}/>
             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 14 }}>
-              <div style={{ width: 40, height: 40, borderRadius: 12, background: "var(--gray-100)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700, color: "var(--gray-700)" }}>
+              <div style={{ width: 40, height: 40, borderRadius: 12, background: isDarkMode ? "rgba(122,147,193,0.16)" : "var(--gray-100)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700, color: isDarkMode ? "#dbe8fb" : "var(--gray-700)" }}>
                 {company[0]}
               </div>
-              <Badge variant={match >= 85 ? "success" : "default"}>
+              <Badge variant={match >= 85 ? "success" : "default"} style={isDarkMode ? { background: match >= 70 ? "rgba(16,185,129,0.14)" : "rgba(122,147,193,0.18)", color: match >= 70 ? "#6ee7b7" : "#d7e4f7", border: match >= 70 ? "1px solid rgba(16,185,129,0.28)" : "1px solid rgba(122,147,193,0.35)" } : {}}>
                 {match}% match
               </Badge>
             </div>
-            <div style={{ fontSize: 15, fontWeight: 650, color: "var(--gray-900)", marginBottom: 4, letterSpacing: "-0.02em" }}>{job.title || "Role"}</div>
-            <div style={{ fontSize: 13, color: "var(--gray-500)", marginBottom: 4 }}>{company}</div>
-            <div style={{ fontSize: 12, color: "var(--gray-400)", marginBottom: 16, display: "flex", gap: 8 }}>
+            <div style={{ fontSize: 15, fontWeight: 650, color: isDarkMode ? "#edf3ff" : "var(--gray-900)", marginBottom: 4, letterSpacing: "-0.02em" }}>{job.title || "Role"}</div>
+            <div style={{ fontSize: 13, color: isDarkMode ? "#b4c3d9" : "var(--gray-500)", marginBottom: 4 }}>{company}</div>
+            <div style={{ fontSize: 12, color: isDarkMode ? "#9db2d3" : "var(--gray-400)", marginBottom: 16, display: "flex", gap: 8 }}>
               <span>📍 {job.location || "India"}</span>
               <span>· {job.source || "Job Board"}</span>
             </div>
             {job.salary && (
-              <div style={{ fontSize: 12, color: "var(--gray-500)", marginBottom: 10, fontWeight: 600 }}>
+              <div style={{ fontSize: 12, color: isDarkMode ? "#c7d7ef" : "var(--gray-500)", marginBottom: 10, fontWeight: 600 }}>
                 Salary: {job.salary}
               </div>
             )}
-            <div style={{ height: 3, background: "var(--gray-100)", borderRadius: 99, marginBottom: 14 }}>
+            <div style={{ height: 3, background: isDarkMode ? "rgba(122,147,193,0.25)" : "var(--gray-100)", borderRadius: 99, marginBottom: 14 }}>
               <div style={{
                 height: "100%",
                 borderRadius: 99,
@@ -3416,9 +3452,9 @@ const JobFinder = ({ resumeId, resumeData, onJobsUpdated, isDarkMode }) => {
                     fontSize: 11.5,
                     padding: "4px 8px",
                     borderRadius: 99,
-                    border: "1px solid var(--gray-200)",
-                    background: "var(--gray-50)",
-                    color: "var(--gray-600)",
+                    border: isDarkMode ? "1px solid rgba(122,147,193,0.28)" : "1px solid var(--gray-200)",
+                    background: isDarkMode ? "rgba(143,176,227,0.12)" : "var(--gray-50)",
+                    color: isDarkMode ? "#dbe8fb" : "var(--gray-600)",
                     fontWeight: 600,
                   }}>
                     {skill}
@@ -3430,7 +3466,7 @@ const JobFinder = ({ resumeId, resumeData, onJobsUpdated, isDarkMode }) => {
               <Btn
                 variant="primary"
                 onClick={() => job.apply_link && window.open(job.apply_link, "_blank", "noopener,noreferrer")}
-                style={{ flex: 2, justifyContent: "center", padding: "8px", fontSize: 13 }}
+                style={{ flex: 2, justifyContent: "center", padding: "8px", fontSize: 13, ...(isDarkMode ? { background: accentBg, color: accentText } : {}) }}
               >
                 Apply now
               </Btn>
@@ -3440,7 +3476,7 @@ const JobFinder = ({ resumeId, resumeData, onJobsUpdated, isDarkMode }) => {
                   toggleSave(job.id);
                   navigator.clipboard?.writeText(job.apply_link || "");
                 }}
-                style={{ flex: 1, justifyContent: "center", padding: "8px", fontSize: 13 }}
+                style={{ flex: 1, justifyContent: "center", padding: "8px", fontSize: 13, ...(isDarkMode ? (isSaved ? { background: accentBg, color: accentText } : { background: "rgba(143,176,227,0.12)", color: "#dbe8fb", border: "1px solid rgba(122,147,193,0.35)" }) : {}) }}
               >
                 {isSaved ? "Saved" : "Save"}
               </Btn>
@@ -3534,7 +3570,7 @@ const Dashboard = ({ onLogout }) => {
     },
     matcher: {
       title: "JD Matcher",
-      render: () => <JDMatcher resumeId={resumeContext.resumeId} onJobMatched={handleJobDescriptionMatched} isDarkMode={isDarkMode}/>,
+      render: () => <JDMatcher resumeId={resumeContext.resumeId} initialJobDescription={resumeContext.jobDescription} initialMatchResult={resumeContext.matchResult} onJobMatched={handleJobDescriptionMatched} isDarkMode={isDarkMode}/>,
       resetOnResumeChange: true,
     },
     roadmap: {

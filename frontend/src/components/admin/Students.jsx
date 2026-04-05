@@ -197,6 +197,9 @@ export function useAdminData() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'resumes' }, () => {
         loadData();
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'job_descriptions' }, () => {
+        loadData();
+      })
       .subscribe();
 
     return () => {
