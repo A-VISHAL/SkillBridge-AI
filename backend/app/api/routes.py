@@ -9,17 +9,47 @@ from datetime import datetime
 from urllib.parse import quote_plus
 
 from app.core.config import settings
-from app.models.schemas import *
-from app.services import parser, ai_service, job_service
+from app.models.schemas import (
+    AIDecision,
+    ATSAnalysis,
+    BulletImprovement,
+    CareerRoadmap,
+    FocusArea,
+    InterviewAnswer,
+    InterviewFeedback,
+    InterviewQuestion,
+    InterviewSession,
+    JDMatchResult,
+    JobListing,
+    JobSearchPreferences,
+    ParsedResume,
+    QuizAnswer,
+    QuizPerformance,
+    QuizQuestion,
+    QuizResult,
+    RoadmapTask,
+    ResumeAnalysisResult,
+    ResumeProblem,
+    SkillGap,
+)
+from app.services import ai_service, job_service, parser
 from app.services.supabase_service import supabase_service
-
 router = APIRouter()
-
-# In-memory storage for demo
 resume_store = {}
 progress_store = {}
 interview_sessions = {}
 interview_session_contexts = {}
+
+
+def _supabase_enabled() -> bool:
+    """Safely resolve Supabase availability across import styles."""
+    enabled_attr = getattr(supabase_service, "enabled", False)
+    if callable(enabled_attr):
+        try:
+            return bool(enabled_attr())
+        except Exception:
+            return False
+    return bool(enabled_attr)
 
 
 def _get_resume_or_404(resume_id: str) -> ParsedResume:
@@ -32,7 +62,7 @@ def _get_resume_or_404(resume_id: str) -> ParsedResume:
         resume_store[resume_id] = sample
         return sample
 
-    if supabase_service.enabled:
+    if _supabase_enabled():
         ok, row, err = supabase_service.get_resume(resume_id)
         if ok and row:
             parsed_data = row.get("parsed_data") or {}
@@ -119,6 +149,167 @@ def _build_quiz_context_fast(resume_text: str, job_description: str) -> List[dic
         })
 
     return tasks
+
+
+def _build_fast_roadmap_match_data(resume_text: str, job_description: str, resume_data: Optional[dict] = None) -> dict:
+    """Build a fast local roadmap match payload without an extra AI request."""
+    combined_text = f"{resume_text or ''} {job_description or ''}".lower()
+    skill_bank = [
+        "Python", "Java", "JavaScript", "TypeScript", "React", "Node.js", "SQL", "PostgreSQL",
+        "MongoDB", "Docker", "Kubernetes", "AWS", "GCP", "Azure", "System Design",
+        "Microservices", "REST API", "Testing", "MLOps", "Machine Learning", "AI",
+    ]
+
+    def _has_skill(skill: str) -> bool:
+        aliases = [skill.lower()]
+        if skill == "Node.js":
+            aliases.extend(["node", "nodejs"])
+        if skill == "REST API":
+            aliases.extend(["rest", "restful", "api"])
+        if skill == "System Design":
+            aliases.extend(["system design", "distributed systems", "architecture"])
+        if skill == "Machine Learning":
+            aliases.extend(["ml", "machine learning"])
+        return any(re.search(rf"(?<!\\w){re.escape(alias)}(?!\\w)", combined_text) for alias in aliases)
+
+    resume_skills: List[str] = []
+    if isinstance(resume_data, dict):
+        for skill in resume_data.get("skills", []):
+            if isinstance(skill, dict):
+                name = str(skill.get("name", "")).strip()
+                if name:
+                    resume_skills.append(name)
+
+    matched_skills = []
+    for skill in skill_bank:
+        if _has_skill(skill) or skill in resume_skills:
+            matched_skills.append(skill)
+
+    missing_skills = [skill for skill in skill_bank if skill not in matched_skills]
+    if not missing_skills:
+        missing_skills = ["System Design", "REST API", "Testing", "Docker"]
+
+    focus_skills = missing_skills[:5]
+    focus_areas = []
+    for index, skill in enumerate(focus_skills):
+        focus_areas.append({
+            "skill": skill,
+            "priority": "HIGH" if index < 2 else "MEDIUM",
+            "weight": float(max(8, 28 - index * 4)),
+            "reason": f"{skill} is underrepresented in the resume compared with the JD.",
+            "study_time": "1 week" if index < 2 else "1-2 weeks",
+        })
+
+    match_ratio = len(matched_skills) / max(1, len(skill_bank))
+    match_percentage = round(max(20.0, min(90.0, 30.0 + match_ratio * 55.0)), 1)
+
+    strengths = [f"Resume already shows {', '.join(matched_skills[:3])}"] if matched_skills else ["Resume parsed successfully"]
+    weaknesses = [f"Missing or weak coverage for {', '.join(missing_skills[:4])}", "Roadmap should focus on the highest-priority missing skills"]
+
+    return {
+        "match_percentage": match_percentage,
+        "hire_probability": "High" if match_percentage >= 80 else "Medium" if match_percentage >= 60 else "Low",
+        "matched_skills": matched_skills[:10],
+        "missing_skills": missing_skills[:10],
+        "focus_areas": focus_areas,
+        "interview_topics": focus_skills[:4],
+        "strengths": strengths,
+        "weaknesses": weaknesses,
+        "suggestions": [
+            f"Build one practical project around {focus_skills[0]}.",
+            "Rewrite one resume bullet with a measurable outcome.",
+            "Practice explaining architecture and trade-offs in under 60 seconds.",
+        ],
+        "source": "fast_roadmap_match",
+    }
+
+
+def _build_fast_roadmap_match_data(resume_text: str, job_description: str, resume_data: Optional[dict] = None) -> dict:
+    """Fast local JD-match approximation for roadmap generation.
+
+    This avoids an extra AI call before roadmap generation and keeps the
+    roadmap endpoint responsive under load.
+    """
+    combined_text = f"{resume_text or ''} {job_description or ''}".lower()
+    skill_bank = [
+        "Python", "Java", "JavaScript", "TypeScript", "React", "Node.js", "SQL", "PostgreSQL",
+        "MongoDB", "Docker", "Kubernetes", "AWS", "GCP", "Azure", "System Design",
+        "Microservices", "REST API", "Testing", "MLOps", "Machine Learning", "AI",
+    ]
+
+    def _has_skill(skill: str) -> bool:
+        aliases = [skill.lower()]
+        if skill == "Node.js":
+            aliases.extend(["node", "nodejs"])
+        if skill == "REST API":
+            aliases.extend(["rest", "restful", "api"])
+        if skill == "System Design":
+            aliases.extend(["system design", "distributed systems", "architecture"])
+        if skill == "Machine Learning":
+            aliases.extend(["ml", "machine learning"])
+        return any(re.search(rf"(?<!\\w){re.escape(alias)}(?!\\w)", combined_text) for alias in aliases)
+
+    resume_skills = []
+    if isinstance(resume_data, dict):
+        for skill in resume_data.get("skills", []):
+            if isinstance(skill, dict):
+                name = str(skill.get("name", "")).strip()
+                if name:
+                    resume_skills.append(name)
+
+    matched_skills = []
+    for skill in skill_bank:
+        if _has_skill(skill) or skill in resume_skills:
+            matched_skills.append(skill)
+
+    missing_skills = [skill for skill in skill_bank if skill not in matched_skills]
+    if not missing_skills:
+        missing_skills = ["System Design", "REST API", "Testing", "Docker"]
+
+    focus_skills = missing_skills[:5]
+    focus_areas = []
+    for index, skill in enumerate(focus_skills):
+        focus_areas.append({
+            "skill": skill,
+            "priority": "HIGH" if index < 2 else "MEDIUM",
+            "weight": float(max(8, 28 - index * 4)),
+            "reason": f"{skill} is underrepresented in the resume compared with the JD.",
+            "study_time": "1 week" if index < 2 else "1-2 weeks",
+        })
+
+    total = len(skill_bank)
+    match_ratio = len(matched_skills) / max(1, total)
+    match_percentage = round(max(20.0, min(90.0, 30.0 + match_ratio * 55.0)), 1)
+
+    strengths = []
+    if matched_skills:
+        strengths.append(f"Resume already shows {', '.join(matched_skills[:3])}")
+    if any(skill in matched_skills for skill in ["React", "Python", "JavaScript", "Java"]):
+        strengths.append("Core development skills are present")
+
+    weaknesses = []
+    if missing_skills:
+        weaknesses.append(f"Missing or weak coverage for {', '.join(missing_skills[:4])}")
+    weaknesses.append("Roadmap should focus on the highest-priority missing skills")
+
+    suggestions = [
+        f"Build one practical project around {focus_skills[0]}.",
+        "Rewrite one resume bullet with a measurable outcome.",
+        "Practice explaining architecture and trade-offs in under 60 seconds.",
+    ]
+
+    return {
+        "match_percentage": match_percentage,
+        "hire_probability": "High" if match_percentage >= 80 else "Medium" if match_percentage >= 60 else "Low",
+        "matched_skills": matched_skills[:10],
+        "missing_skills": missing_skills[:10],
+        "focus_areas": focus_areas,
+        "interview_topics": focus_skills[:4],
+        "strengths": strengths or ["Resume parsed successfully"],
+        "weaknesses": weaknesses,
+        "suggestions": suggestions,
+        "source": "fast_roadmap_match",
+    }
 
 
 def _to_clickable_resource(resource: str, topic: str = "") -> Optional[dict]:
@@ -278,7 +469,7 @@ async def upload_resume(file: UploadFile = File(...)):
         resume_store[file_id] = parsed_resume
 
         # Persist to Supabase (best-effort, non-blocking for user flow)
-        if supabase_service.enabled:
+        if _supabase_enabled():
             ok, err = supabase_service.save_resume(
                 resume_id=file_id,
                 filename=file.filename,
@@ -496,7 +687,7 @@ async def match_jd(
         )
 
         # Persist JD + match details to Supabase (best-effort)
-        if supabase_service.enabled:
+        if _supabase_enabled():
             job_description_id = str(uuid.uuid4())
             jd_ok, jd_err = supabase_service.save_job_description(
                 job_description_id=job_description_id,
@@ -562,16 +753,10 @@ async def generate_roadmap(
     """Generate personalized learning roadmap"""
     try:
         resume = _get_resume_or_404(resume_id)
-        
-        # Get missing skills from JD match
-        try:
-            match_data = await ai_service.match_resume_to_jd(resume.raw_text, job_description, resume.dict())
-            missing_skills = match_data.get("missing_skills", [])
-        except Exception as match_error:
-            # Fallback: use generic skill gaps if match fails
-            match_data = {}
-            missing_skills = ["System Design", "Advanced Architecture", "Leadership"]
-            print(f"Warning: JD match failed, using default skills: {str(match_error)}")
+
+        # Use a fast local match approximation to avoid an extra slow AI call.
+        match_data = _build_fast_roadmap_match_data(resume.raw_text, job_description, resume.dict())
+        missing_skills = match_data.get("missing_skills", [])
         
         # Generate roadmap (with built-in fallback)
         roadmap_data = await ai_service.generate_roadmap(
@@ -593,7 +778,7 @@ async def generate_roadmap(
         )
 
         # Persist roadmap + tasks to Supabase (best-effort)
-        if supabase_service.enabled:
+        if _supabase_enabled():
             job_description_id = str(uuid.uuid4())
             jd_ok, jd_err = supabase_service.save_job_description(
                 job_description_id=job_description_id,
@@ -835,7 +1020,7 @@ async def start_interview(
         }
 
         # Persist interview session + generated questions to Supabase (best-effort)
-        if supabase_service.enabled:
+        if _supabase_enabled():
             job_description_id = None
             if job_description:
                 generated_id = str(uuid.uuid4())
@@ -1047,7 +1232,7 @@ async def search_jobs(
         
         jobs = await job_service.find_matching_jobs(resume, preferences)
 
-        if supabase_service.enabled:
+        if _supabase_enabled():
             for job in jobs:
                 job_description_id = str(uuid.uuid4())
                 job_payload = {

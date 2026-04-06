@@ -16,7 +16,10 @@ class SupabaseService:
             create_client = getattr(supabase_module, "create_client", None)
             if create_client is None:
                 return
-            self._client = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY)
+            self._client = create_client(
+                settings.SUPABASE_URL,
+                settings.SUPABASE_SERVICE_ROLE_KEY
+            )
         except Exception:
             self._client = None
 
@@ -24,7 +27,11 @@ class SupabaseService:
     def enabled(self) -> bool:
         return self._client is not None
 
-    def _insert(self, table: str, payload: Dict[str, Any]) -> Tuple[bool, Optional[List[Dict[str, Any]]], str]:
+    def _insert(
+        self,
+        table: str,
+        payload: Dict[str, Any]
+    ) -> Tuple[bool, Optional[List[Dict[str, Any]]], str]:
         if not self._client:
             return False, None, "Supabase is not configured"
 
@@ -35,7 +42,11 @@ class SupabaseService:
         except Exception as exc:
             return False, None, str(exc)
 
-    def _insert_many(self, table: str, payload: List[Dict[str, Any]]) -> Tuple[bool, str]:
+    def _insert_many(
+        self,
+        table: str,
+        payload: List[Dict[str, Any]]
+    ) -> Tuple[bool, str]:
         if not payload:
             return True, ""
         if not self._client:
@@ -47,7 +58,10 @@ class SupabaseService:
         except Exception as exc:
             return False, str(exc)
 
-    def get_resume(self, resume_id: str) -> Tuple[bool, Optional[Dict[str, Any]], str]:
+    def get_resume(
+        self,
+        resume_id: str
+    ) -> Tuple[bool, Optional[Dict[str, Any]], str]:
         if not self._client:
             return False, None, "Supabase is not configured"
 
@@ -63,8 +77,7 @@ class SupabaseService:
             rows = getattr(response, "data", None) or []
             if not rows:
                 return False, None, "Resume not found"
-            row = rows[0]
-            return True, row, ""
+            return True, rows[0], ""
         except Exception as exc:
             return False, None, str(exc)
 
@@ -77,7 +90,7 @@ class SupabaseService:
         parsed_data: Dict[str, Any],
         user_id: Optional[str] = None,
     ) -> Tuple[bool, str]:
-        payload: Dict[str, Any] = {
+        payload = {
             "id": resume_id,
             "user_id": user_id,
             "filename": filename,
@@ -98,7 +111,7 @@ class SupabaseService:
         location: str = "",
         parsed_data: Optional[Dict[str, Any]] = None,
     ) -> Tuple[bool, str]:
-        payload: Dict[str, Any] = {
+        payload = {
             "id": job_description_id,
             "user_id": user_id,
             "title": title or "Target Role",
@@ -145,16 +158,17 @@ class SupabaseService:
             "duration_weeks": roadmap_data.get("duration_weeks", 12),
             "daily_hours": roadmap_data.get("daily_hours", 2),
             "milestones": roadmap_data.get("milestones", []),
-            "completion_criteria": roadmap_data.get("completion_criteria", "Complete all tasks"),
+            "completion_criteria": roadmap_data.get(
+                "completion_criteria", "Complete all tasks"
+            ),
         }
 
         ok, _, err = self._insert("roadmaps", roadmap_payload)
         if not ok:
             return False, err
 
-        task_rows: List[Dict[str, Any]] = []
-        for task in roadmap_data.get("tasks", []):
-            task_rows.append({
+        task_rows = [
+            {
                 "roadmap_id": roadmap_id,
                 "week": task.get("week", 1),
                 "task": task.get("task", ""),
@@ -164,7 +178,9 @@ class SupabaseService:
                 "resources": task.get("resources", []),
                 "priority": task.get("priority", "HIGH"),
                 "milestone": task.get("milestone", False),
-            })
+            }
+            for task in roadmap_data.get("tasks", [])
+        ]
 
         return self._insert_many("roadmap_tasks", task_rows)
 
@@ -192,19 +208,27 @@ class SupabaseService:
         if not ok:
             return False, err
 
-        question_rows: List[Dict[str, Any]] = []
-        for index, question in enumerate(questions):
-            question_rows.append({
+        question_rows = [
+            {
                 "interview_session_id": session_id,
-                "question_order": index + 1,
-                "type": question.get("type", "Technical"),
-                "difficulty": question.get("difficulty", "Medium"),
-                "question": question.get("question", ""),
-                "expected_keywords": question.get("expected_keywords", []),
-                "evaluation_criteria": question.get("evaluation_criteria", []),
-            })
+                "question_order": i + 1,
+                "type": q.get("type", "Technical"),
+                "difficulty": q.get("difficulty", "Medium"),
+                "question": q.get("question", ""),
+                "expected_keywords": q.get("expected_keywords", []),
+                "evaluation_criteria": q.get("evaluation_criteria", []),
+            }
+            for i, q in enumerate(questions)
+        ]
 
         return self._insert_many("interview_questions", question_rows)
 
 
 supabase_service = SupabaseService()
+
+
+def __getattr__(name: str) -> Any:
+    """Proxy module attribute access to the singleton for backward compatibility."""
+    if hasattr(supabase_service, name):
+        return getattr(supabase_service, name)
+    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")

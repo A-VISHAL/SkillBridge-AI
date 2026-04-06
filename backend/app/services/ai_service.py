@@ -1301,7 +1301,7 @@ async def generate_roadmap(
 ) -> Dict[str, Any]:
     """Generate a detailed weekly roadmap from resume and JD, with complete week coverage."""
 
-    cache_key = f"roadmap:v2:{_stable_hash(resume_text[:1600])}:{_stable_hash(jd_text[:1200])}:{_stable_hash(skill_gaps[:8])}"
+    cache_key = f"roadmap:v3:{_stable_hash(resume_text[:900])}:{_stable_hash(jd_text[:800])}:{_stable_hash(skill_gaps[:6])}"
     cached_payload = await _cache_get_json(cache_key)
     if isinstance(cached_payload, dict):
         cached_payload["cached"] = True
@@ -1494,7 +1494,7 @@ async def generate_roadmap(
             "completion_criteria": completion_criteria,
         }
 
-    resume_context = _build_resume_context_for_jd(resume_text, resume_data, max_chars=1000)
+    resume_context = _build_resume_context_for_jd(resume_text, resume_data, max_chars=700)
     jd_analysis_summary = ""
     if isinstance(jd_analysis, dict):
         jd_analysis_summary = json.dumps({
@@ -1514,10 +1514,10 @@ JD Analysis Summary:
 {jd_analysis_summary or 'Not provided'}
 
 Job Description:
-{jd_text[:1000]}
+{jd_text[:800]}
 
 Missing skills:
-{', '.join(skill_gaps[:6])}
+{', '.join(skill_gaps[:5])}
 
 Return valid JSON with keys:
 - duration_weeks
@@ -1529,26 +1529,26 @@ Return valid JSON with keys:
 Rules:
 1) Include ALL weeks 1..12.
 2) At least 3 unique tasks per week.
-3) No repeated task text.
-4) Task content must be specific and tied to resume/JD gaps.
-5) Every week must contain different tasks with concrete deliverables.
-6) Do not output generic tasks like "practice" without a specific artifact.
-7) Focus on generating practical tasks, not broad advice.
+3) Keep each task under 18 words.
+4) No repeated task text.
+5) Task content must be specific and tied to resume/JD gaps.
+6) Every week must contain different tasks with concrete deliverables.
+7) Do not output generic tasks like "practice" without a specific artifact.
 8) Return ONLY strict JSON. No markdown. Be concise."""
 
     compact_prompt = f"""Create a 12-week roadmap in STRICT JSON.
 
 Resume context:
-{resume_context[:1000]}
+{resume_context[:650]}
 
 JD summary:
-{jd_analysis_summary[:700] if jd_analysis_summary else 'Not provided'}
+{jd_analysis_summary[:500] if jd_analysis_summary else 'Not provided'}
 
 Job description:
-{jd_text[:1100]}
+{jd_text[:700]}
 
 Missing skills:
-{', '.join(skill_gaps[:6])}
+{', '.join(skill_gaps[:5])}
 
 Return JSON keys only:
 - duration_weeks
@@ -1561,7 +1561,8 @@ Rules:
 1) Weeks 1..12 must exist.
 2) At least 3 unique tasks per week.
 3) No repeated task text.
-4) Each task must include a concrete deliverable tied to JD requirements."""
+4) Each task must include a concrete deliverable tied to JD requirements.
+5) Keep wording concise and specific."""
 
     messages = [
         {
@@ -1573,7 +1574,7 @@ Rules:
 
     try:
         # Primary model attempt.
-        response = await call_roadmap_chat(messages, temperature=0.25, max_tokens=520)
+        response = await call_roadmap_chat(messages, temperature=0.18, max_tokens=320)
         parsed = json.loads(_extract_json_block(response))
         normalized = _normalize_payload(parsed)
         normalized["source"] = "model"
@@ -1589,7 +1590,7 @@ Rules:
                 },
                 {"role": "user", "content": compact_prompt},
             ]
-            retry_response = await call_roadmap_chat(retry_messages, temperature=0.2, max_tokens=380)
+            retry_response = await call_roadmap_chat(retry_messages, temperature=0.12, max_tokens=220)
             retry_parsed = json.loads(_extract_json_block(retry_response))
             normalized = _normalize_payload(retry_parsed)
             normalized["source"] = "model"

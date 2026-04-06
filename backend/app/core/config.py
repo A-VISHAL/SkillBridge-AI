@@ -74,7 +74,7 @@ class Settings:
         "OXLO_CHAT_ENDPOINT",
         default="https://api.oxlo.ai/v1/chat/completions",
     )
-    ROADMAP_MODEL: str = _get_env("ROADMAP_MODEL", "OXLO_ROADMAP_MODEL", default="gpt-oss-20b")
+    ROADMAP_MODEL: str = _get_env("ROADMAP_MODEL", "OXLO_ROADMAP_MODEL", default="deepseek-r1-8b")
 
     # Quiz-specific model routing
     QUIZ_API_KEY: str = _normalize_api_key(
