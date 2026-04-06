@@ -499,19 +499,29 @@ async def call_model_chat(
     header_variants = [
         {
             "Authorization": f"Bearer {api_key}",
+            "x-api-key": api_key,
             "Content-Type": "application/json",
+            "Accept": "application/json",
         },
         {
             "x-api-key": api_key,
             "Content-Type": "application/json",
+            "Accept": "application/json",
+        },
+        {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
         },
         {
             "api-key": api_key,
             "Content-Type": "application/json",
+            "Accept": "application/json",
         },
         {
             "X-API-Key": api_key,
             "Content-Type": "application/json",
+            "Accept": "application/json",
         },
     ]
     payload = {
@@ -890,6 +900,308 @@ def _normalize_model_jd_payload(raw: Dict[str, Any]) -> Dict[str, Any]:
         "weaknesses": raw.get("weaknesses", []) or [],
         "suggestions": raw.get("suggestions", []) or [],
     }
+
+
+def _build_quiz_fallback_questions(
+    topic: str,
+    difficulty: str,
+    count: int,
+    domain: str,
+    resume_text: str,
+    jd_text: str,
+    roadmap_context: Optional[List[Dict[str, Any]]],
+    reason: str,
+) -> List[Dict[str, Any]]:
+    def _ordered_unique(values: List[str]) -> List[str]:
+        ordered: List[str] = []
+        seen = set()
+        for value in values:
+            cleaned = str(value).strip()
+            lowered = cleaned.lower()
+            if cleaned and lowered not in seen:
+                ordered.append(cleaned)
+                seen.add(lowered)
+        return ordered
+
+    domain_lower = (domain or "").lower()
+    resume_skills = _extract_skills(resume_text)
+    jd_skills = _extract_skills(jd_text)
+    roadmap_skills: List[str] = []
+    for item in roadmap_context or []:
+        if isinstance(item, dict):
+            skill = str(item.get("skill", "")).strip()
+            if skill:
+                roadmap_skills.append(skill)
+
+    skill_pool = _ordered_unique(resume_skills + jd_skills + roadmap_skills)
+
+    if domain_lower.startswith("coding"):
+        topic_pool = [
+            "Arrays and Hashing",
+            "Strings and Pattern Matching",
+            "Two Pointers",
+            "Stacks and Queues",
+            "Linked Lists",
+            "Trees and BSTs",
+            "Graphs",
+            "Recursion",
+            "Dynamic Programming",
+            "Time Complexity",
+        ]
+        question_bank = {
+            "Arrays and Hashing": (
+                "Which approach is most efficient for checking whether a list contains duplicate values?",
+                [
+                    "Sort the list and compare adjacent elements",
+                    "Use a hash set to track seen values",
+                    "Use nested loops for every pair",
+                    "Convert the list to a string and search it",
+                ],
+                1,
+            ),
+            "Strings and Pattern Matching": (
+                "Which technique is usually best for finding a short pattern inside a longer string in linear time?",
+                [
+                    "Brute-force comparison at every position",
+                    "A sliding window with a hash table only",
+                    "A linear-time pattern matching algorithm",
+                    "Sorting the characters of both strings",
+                ],
+                2,
+            ),
+            "Two Pointers": (
+                "When is the two-pointer technique most useful?",
+                [
+                    "When the problem involves two sorted or partially ordered scans",
+                    "Only when recursion is required",
+                    "Only for graph traversal problems",
+                    "Only when dynamic programming tables are needed",
+                ],
+                0,
+            ),
+            "Stacks and Queues": (
+                "Which data structure is best for evaluating nested expressions with matching delimiters?",
+                ["Queue", "Stack", "Heap", "Trie"],
+                1,
+            ),
+            "Trees and BSTs": (
+                "What traversal is typically used to visit a binary search tree in sorted order?",
+                ["Pre-order traversal", "Level-order traversal", "In-order traversal", "Post-order traversal"],
+                2,
+            ),
+            "Graphs": (
+                "Which search strategy is commonly used for shortest paths in an unweighted graph?",
+                ["Depth-first search", "Breadth-first search", "Binary search", "Topological sort"],
+                1,
+            ),
+            "Recursion": (
+                "What is the main requirement for a recursive solution to terminate correctly?",
+                ["A base case", "A global variable", "Sorting the input first", "A queue of pending calls"],
+                0,
+            ),
+            "Dynamic Programming": (
+                "What problem pattern usually benefits from dynamic programming?",
+                [
+                    "Independent subproblems with repeated overlap",
+                    "Only one-time random access lookups",
+                    "Problems that never reuse intermediate results",
+                    "Only sorting problems",
+                ],
+                0,
+            ),
+            "Time Complexity": (
+                "What is the big-O time complexity of scanning an array once?",
+                ["O(1)", "O(log n)", "O(n)", "O(n log n)"],
+                2,
+            ),
+        }
+    else:
+        topic_pool = [
+            "REST APIs",
+            "React State",
+            "SQL Queries",
+            "Authentication",
+            "Caching",
+            "Testing",
+            "Deployment",
+            "Debugging",
+            "Performance",
+            "Security",
+        ]
+        question_bank = {
+            "REST APIs": (
+                "Which HTTP method should be used to update an existing resource when the client sends the full replacement payload?",
+                ["GET", "POST", "PUT", "TRACE"],
+                2,
+            ),
+            "React State": (
+                "What is the safest way to update state that depends on the previous state value in React?",
+                [
+                    "Read the state variable directly and set it later",
+                    "Use the functional state updater form",
+                    "Mutate the state object in place",
+                    "Store the value in a module-level variable",
+                ],
+                1,
+            ),
+            "SQL Queries": (
+                "Which SQL clause filters rows after aggregation has already happened?",
+                ["WHERE", "ORDER BY", "HAVING", "GROUP BY"],
+                2,
+            ),
+            "Authentication": (
+                "What is the main purpose of an access token in an application?",
+                [
+                    "Encrypting all database rows automatically",
+                    "Proving the caller is allowed to access a resource",
+                    "Storing UI preferences in local storage",
+                    "Replacing the need for HTTPS",
+                ],
+                1,
+            ),
+            "Caching": (
+                "Why is caching commonly used in web applications?",
+                [
+                    "To increase repeated read performance and reduce backend load",
+                    "To make every request slower but more secure",
+                    "To eliminate the need for API responses",
+                    "To force all users onto the same page",
+                ],
+                0,
+            ),
+            "Testing": (
+                "What is the primary goal of a unit test?",
+                [
+                    "Verify one small piece of behavior in isolation",
+                    "Deploy code automatically to production",
+                    "Replace integration tests completely",
+                    "Measure CPU usage under load",
+                ],
+                0,
+            ),
+            "Deployment": (
+                "What is the usual purpose of a CI pipeline?",
+                [
+                    "Run code only on a developer's laptop",
+                    "Automate build, test, and validation steps",
+                    "Prevent all merges forever",
+                    "Store database backups only",
+                ],
+                1,
+            ),
+            "Debugging": (
+                "What is the best first step when a feature fails in production?",
+                [
+                    "Guess the issue and patch randomly",
+                    "Collect the error signal and reproduce the failure",
+                    "Delete the feature entirely",
+                    "Ignore logs because they are noisy",
+                ],
+                1,
+            ),
+            "Performance": (
+                "What is a common way to reduce frontend re-render cost?",
+                [
+                    "Increase state updates in every child component",
+                    "Avoid unnecessary renders and expensive recalculations",
+                    "Reload the page after every click",
+                    "Store every value in local storage",
+                ],
+                1,
+            ),
+            "Security": (
+                "Which practice helps protect sensitive data in transit?",
+                ["HTTP", "TLS/HTTPS", "FTP", "Local storage"],
+                1,
+            ),
+        }
+
+    chosen_topics = _ordered_unique([topic] + skill_pool + topic_pool)
+    fallback_topics: List[str] = []
+    for item in chosen_topics:
+        if item in question_bank and item not in fallback_topics:
+            fallback_topics.append(item)
+        if len(fallback_topics) >= max(10, int(count or 10)):
+            break
+    for item in topic_pool:
+        if item not in fallback_topics:
+            fallback_topics.append(item)
+        if len(fallback_topics) >= max(10, int(count or 10)):
+            break
+
+    total = max(10, int(count or 10))
+    if (difficulty or "").lower() in {"medium", "adaptive"}:
+        easy_count = max(1, total // 3)
+        hard_count = max(1, total // 3)
+        difficulty_plan = ["Easy"] * easy_count + ["Hard"] * hard_count + ["Advanced"] * max(1, total - easy_count - hard_count)
+    else:
+        difficulty_plan = [difficulty.title() if difficulty else "Easy"] * total
+
+    questions: List[Dict[str, Any]] = []
+    for index in range(total):
+        topic_name = fallback_topics[index % len(fallback_topics)]
+        question_text, options, correct_index = question_bank.get(topic_name, question_bank[fallback_topics[0]])
+
+        if skill_pool:
+            skill_focus = skill_pool[index % len(skill_pool)]
+            if skill_focus.lower() not in topic_name.lower() and index % 2 == 0:
+                if domain_lower.startswith("coding"):
+                    question_text = f"Which concept best supports {skill_focus} work in a coding interview?"
+                    options = [
+                        f"Use {skill_focus} to improve correctness and runtime characteristics",
+                        f"Avoid {skill_focus} because it is never useful",
+                        f"Replace {skill_focus} with manual repetition",
+                        f"Use {skill_focus} only after ignoring edge cases",
+                    ]
+                    correct_index = 0
+                else:
+                    question_text = f"Which practice most directly strengthens {skill_focus} in a product implementation?"
+                    options = [
+                        f"Add concrete usage of {skill_focus} to a real feature and measure the result",
+                        f"Mention {skill_focus} only in a header without implementation",
+                        f"Remove {skill_focus} from the stack entirely",
+                        f"Use {skill_focus} only in comments and not in code",
+                    ]
+                    correct_index = 0
+
+        questions.append({
+            "id": f"quiz-fallback-{index + 1}",
+            "topic": topic_name,
+            "difficulty": difficulty_plan[index] if index < len(difficulty_plan) else (difficulty.title() if difficulty else "Easy"),
+            "question_type": "MCQ",
+            "question": question_text,
+            "options": [
+                {"text": option, "is_correct": option_index == correct_index}
+                for option_index, option in enumerate(options[:4])
+            ],
+            "correct_answer": options[correct_index],
+            "explanation": f"Fallback quiz generated because the live model was unavailable ({reason}). The correct answer is the option that best matches {topic_name.lower()}.",
+        })
+
+    return questions[:total]
+
+
+def build_quiz_fallback_questions(
+    topic: str,
+    difficulty: str,
+    count: int,
+    domain: str,
+    resume_text: str,
+    jd_text: str,
+    roadmap_context: Optional[List[Dict[str, Any]]] = None,
+    reason: str = "Model unavailable",
+) -> List[Dict[str, Any]]:
+    """Public wrapper used by API routes to guarantee quiz output on hard failures."""
+    return _build_quiz_fallback_questions(
+        topic=topic,
+        difficulty=difficulty,
+        count=count,
+        domain=domain,
+        resume_text=resume_text,
+        jd_text=jd_text,
+        roadmap_context=roadmap_context or [],
+        reason=reason,
+    )
 
 
 async def match_resume_to_jd(resume_text: str, jd_text: str, resume_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -1276,19 +1588,23 @@ async def generate_quiz_questions(
     resume_text: str = "",
     jd_text: str = "",
     roadmap_context: Optional[List[Dict[str, Any]]] = None,
+    generation_meta: Optional[Dict[str, Any]] = None,
 ) -> List[Dict]:
     """Generate quiz questions based on resume, JD, and followed roadmap context."""
 
+    roadmap_context = roadmap_context or []
     cache_key = f"quiz:v2:{_stable_hash(topic)}:{_stable_hash(difficulty)}:{_stable_hash(domain)}:{int(count or 10)}:{_stable_hash(resume_text[:1200])}:{_stable_hash(jd_text[:1200])}:{_stable_hash(roadmap_context[:8])}"
     cached_payload = await _cache_get_json(cache_key)
     if isinstance(cached_payload, list) and cached_payload:
+        if isinstance(generation_meta, dict):
+            generation_meta["source"] = "cache"
+            generation_meta["warning"] = None
         return cached_payload
 
-    roadmap_context = roadmap_context or []
     roadmap_snippets = []
-    for task in roadmap_context[:12]:
+    for task in roadmap_context[:8]:
         week = task.get("week", "?")
-        task_text = str(task.get("task", "")).strip()
+        task_text = str(task.get("task", "")).strip()[:120]
         skill = str(task.get("skill", "")).strip()
         if task_text:
             roadmap_snippets.append(f"Week {week}: {task_text} ({skill})")
@@ -1339,7 +1655,6 @@ async def generate_quiz_questions(
                         if not correct_answer:
                             correct_answer = option_text
 
-        # Require exactly one correct option and unique options.
         if flagged_correct != 1:
             return None
 
@@ -1373,7 +1688,7 @@ async def generate_quiz_questions(
             question_text,
             cleaned_options[:4],
             correct_index,
-            str(item.get("explanation", "Review the underlying concept and compare each option." )).strip(),
+            str(item.get("explanation", "Review the underlying concept and compare each option.")).strip(),
             model_difficulty,
         )
 
@@ -1400,13 +1715,13 @@ Focus area:
 {domain_prompt}
 
 Candidate resume context:
-{resume_text[:900]}
+{resume_text[:350]}
 
 Target JD context:
-{jd_text[:900]}
+{jd_text[:350]}
 
 Roadmap context (followed/planned):
-{chr(10).join(roadmap_snippets[:6]) if roadmap_snippets else 'No roadmap context provided'}
+{chr(10).join(roadmap_snippets[:4]) if roadmap_snippets else 'No roadmap context provided'}
 
 Rules:
 1) Questions must be practical and aligned to resume gaps + JD requirements.
@@ -1416,7 +1731,8 @@ Rules:
 5) Keep question text crisp and interview-relevant.
 6) Questions must be different for different resume/JD/roadmap inputs.
 7) Mark exactly one option as correct and keep correct_answer consistent with that option.
-8) Return ONLY JSON array. No extra text.
+8) Keep each explanation to one short sentence.
+9) Return ONLY JSON array. No extra text.
 
 Return ONLY JSON array. For each object use keys:
 - id
@@ -1434,9 +1750,9 @@ Return ONLY JSON array. For each object use keys:
 Context:
 - Domain: {domain}
 - Difficulty policy: {difficulty_instruction}
-- Resume: {resume_text[:500]}
-- JD: {jd_text[:500]}
-- Roadmap: {chr(10).join(roadmap_snippets[:6]) if roadmap_snippets else 'No roadmap'}
+- Resume: {resume_text[:280]}
+- JD: {jd_text[:280]}
+- Roadmap: {chr(10).join(roadmap_snippets[:3]) if roadmap_snippets else 'No roadmap'}
 
 Each question object must include:
 id, topic, difficulty, question_type, question, options(4 with exactly one is_correct=true), correct_answer, explanation.
@@ -1449,8 +1765,24 @@ Return JSON array only."""
         {"role": "user", "content": prompt},
     ]
 
+    def _build_and_cache_fallback(reason: str) -> List[Dict[str, Any]]:
+        fallback_questions = _build_quiz_fallback_questions(
+            topic=topic,
+            difficulty=difficulty,
+            count=normalized_count,
+            domain=domain,
+            resume_text=resume_text,
+            jd_text=jd_text,
+            roadmap_context=roadmap_context,
+            reason=reason,
+        )
+        if isinstance(generation_meta, dict):
+            generation_meta["source"] = "quiz_fallback"
+            generation_meta["warning"] = reason
+        return fallback_questions
+
     try:
-        response = await call_quiz_chat(messages, temperature=0.45, max_tokens=900)
+        response = await call_quiz_chat(messages, temperature=0.3, max_tokens=420)
         parsed = json.loads(_extract_json_block(response))
         if isinstance(parsed, list):
             normalized_questions: List[Dict[str, Any]] = []
@@ -1463,14 +1795,23 @@ Return JSON array only."""
             if len(normalized_questions) >= normalized_count:
                 output = normalized_questions[:normalized_count]
                 await _cache_set_json(cache_key, output)
+                if isinstance(generation_meta, dict):
+                    generation_meta["source"] = "model"
+                    generation_meta["warning"] = None
                 return output
     except Exception as first_error:
+        if isinstance(first_error, AIServiceError) and first_error.code in {"auth", "config", "network", "http_error", "parse"}:
+            fallback_reason = f"Primary model call failed without retry: {str(first_error)}"
+            fallback_questions = _build_and_cache_fallback(fallback_reason)
+            await _cache_set_json(cache_key, fallback_questions)
+            return fallback_questions
+
         try:
             retry_messages = [
                 {"role": "system", "content": "You are an expert technical interviewer creating highly relevant adaptive quizzes."},
                 {"role": "user", "content": compact_prompt},
             ]
-            retry_response = await call_quiz_chat(retry_messages, temperature=0.35, max_tokens=600)
+            retry_response = await call_quiz_chat(retry_messages, temperature=0.2, max_tokens=320)
             retry_parsed = json.loads(_extract_json_block(retry_response))
             if isinstance(retry_parsed, list):
                 normalized_questions = []
@@ -1482,11 +1823,20 @@ Return JSON array only."""
                 if len(normalized_questions) >= normalized_count:
                     output = normalized_questions[:normalized_count]
                     await _cache_set_json(cache_key, output)
+                    if isinstance(generation_meta, dict):
+                        generation_meta["source"] = "model"
+                        generation_meta["warning"] = None
                     return output
         except Exception as retry_error:
-            raise AIServiceError("quiz_generation", f"Quiz generation failed: {str(first_error)} | Retry failed: {str(retry_error)}") from retry_error
+            fallback_reason = f"{str(first_error)} | Retry failed: {str(retry_error)}"
+            fallback_questions = _build_and_cache_fallback(fallback_reason)
+            await _cache_set_json(cache_key, fallback_questions)
+            return fallback_questions
 
-    raise AIServiceError("quiz_generation", "Quiz generation returned insufficient unique validated questions from model")
+    fallback_reason = "Quiz generation returned insufficient unique validated questions from model"
+    fallback_questions = _build_and_cache_fallback(fallback_reason)
+    await _cache_set_json(cache_key, fallback_questions)
+    return fallback_questions
 
 
 async def evaluate_quiz_answer(question: str, correct_answer: str, user_answer: str) -> Dict:
@@ -1533,12 +1883,16 @@ async def generate_interview_questions(
     resume_data: Optional[Dict[str, Any]] = None,
     quiz_context: Optional[Dict[str, Any]] = None,
     roadmap_context: Optional[List[Dict[str, Any]]] = None,
+    generation_meta: Optional[Dict[str, Any]] = None,
 ) -> List[Dict]:
     """Generate interview questions based on resume, quiz, roadmap, and JD context."""
 
     cache_key = f"interview:v2:{_stable_hash(mode)}:{int(count or 5)}:{_stable_hash(jd_text[:1200])}:{_stable_hash(resume_text[:1400])}:{_stable_hash(quiz_context or {})}:{_stable_hash(roadmap_context or [])}"
     cached_payload = await _cache_get_json(cache_key)
     if isinstance(cached_payload, list) and cached_payload:
+        if isinstance(generation_meta, dict):
+            generation_meta["source"] = "cache"
+            generation_meta["warning"] = None
         return cached_payload
 
     quiz_context = quiz_context or {}
@@ -1677,10 +2031,15 @@ async def generate_interview_questions(
         seen_questions = {" ".join(str(item.get("question", "")).strip().lower().split()) for item in normalized}
 
         fallback_index = 0
-        while len(normalized) < target_count and fallback_index < len(fallback_pool):
-            template = fallback_pool[fallback_index]
+        max_attempts = max(target_count * 3, len(fallback_pool) * 2)
+        attempts = 0
+        while len(normalized) < target_count and attempts < max_attempts:
+            template = fallback_pool[fallback_index % len(fallback_pool)]
             fallback_index += 1
+            attempts += 1
             question_text = template["question"]
+            if fallback_index > len(fallback_pool):
+                question_text = f"{template['question']} Follow-up {fallback_index - len(fallback_pool)}: include one concrete project example and metric."
             key = " ".join(question_text.strip().lower().split())
             if not key or key in seen_questions:
                 continue
@@ -1741,6 +2100,13 @@ No duplicates."""
         {"role": "user", "content": prompt},
     ]
 
+    def _finalize_fallback(reason: str) -> List[Dict[str, Any]]:
+        fallback_output = _fill_with_fallback([], normalized_count)
+        if isinstance(generation_meta, dict):
+            generation_meta["source"] = "interview_fallback"
+            generation_meta["warning"] = reason
+        return fallback_output
+
     try:
         response = await call_interview_chat(messages, temperature=0.35, max_tokens=550)
         parsed = json.loads(_extract_json_block(response))
@@ -1754,8 +2120,16 @@ No duplicates."""
             if len(normalized) >= normalized_count:
                 output = normalized[:normalized_count]
                 await _cache_set_json(cache_key, output)
+                if isinstance(generation_meta, dict):
+                    generation_meta["source"] = "model"
+                    generation_meta["warning"] = None
                 return output
     except Exception as first_error:
+        if isinstance(first_error, AIServiceError) and first_error.code in {"auth", "config", "network", "http_error", "parse"}:
+            output = _finalize_fallback(f"Primary model call failed without retry: {str(first_error)}")
+            await _cache_set_json(cache_key, output)
+            return output
+
         try:
             retry_messages = [
                 {"role": "system", "content": "You are a senior interviewer generating realistic, candidate-specific interview questions."},
@@ -1773,11 +2147,18 @@ No duplicates."""
                 if len(normalized) >= normalized_count:
                     output = normalized[:normalized_count]
                     await _cache_set_json(cache_key, output)
+                    if isinstance(generation_meta, dict):
+                        generation_meta["source"] = "model"
+                        generation_meta["warning"] = None
                     return output
         except Exception as retry_error:
-            raise AIServiceError("interview_generation", f"Interview generation failed: {str(first_error)} | Retry failed: {str(retry_error)}") from retry_error
+            output = _finalize_fallback(f"{str(first_error)} | Retry failed: {str(retry_error)}")
+            await _cache_set_json(cache_key, output)
+            return output
 
-    raise AIServiceError("interview_generation", "Interview generation returned insufficient validated questions")
+    output = _finalize_fallback("Interview generation returned insufficient validated questions")
+    await _cache_set_json(cache_key, output)
+    return output
 
 async def evaluate_interview_answer(
     question: str,
@@ -2294,7 +2675,7 @@ async def calculate_ats_score(
     resume_context = _build_resume_context_for_ats(
         resume_text=resume_text,
         resume_data=resume_data,
-        max_chars=1600,
+        max_chars=900,
     )
 
     prompt = (
@@ -2305,7 +2686,7 @@ async def calculate_ats_score(
         "analysis includes: strengths (array), weaknesses (array), red_flags (array).\\n"
         "suggestions includes: improve_keywords (array), add_projects (array), enhance_experience (array), formatting_fixes (array).\\n"
         f"Target role: {target_role or 'Software Engineer'}\\n"
-        f"Job description: {(job_description or '')[:1500]}\\n"
+        f"Job description: {(job_description or '')[:700]}\\n"
         f"Resume text: {resume_context}"
     )
 
@@ -2318,7 +2699,7 @@ async def calculate_ats_score(
     ]
 
     try:
-        response_text = await call_ats_chat(messages, temperature=0.15, max_tokens=900)
+        response_text = await call_ats_chat(messages, temperature=0.1, max_tokens=420)
         payload = json.loads(_extract_json_block(response_text))
         normalized = _normalize_model_ats_payload(payload, fallback)
         await _cache_set_json(cache_key, normalized)
@@ -2329,12 +2710,12 @@ async def calculate_ats_score(
             short_context = _build_resume_context_for_ats(
                 resume_text=resume_text,
                 resume_data=resume_data,
-                max_chars=900,
+                max_chars=600,
             )
             retry_prompt = (
                 "Return STRICT JSON only with keys: ats_score, score_breakdown, analysis, missing_keywords, matched_keywords, matched_skills, missing_skills, suggestions, final_verdict.\n"
                 f"Target role: {target_role or 'Software Engineer'}\n"
-                f"Job description: {(job_description or '')[:900]}\n"
+                f"Job description: {(job_description or '')[:500]}\n"
                 f"Resume text: {short_context}"
             )
             retry_messages = [
@@ -2344,7 +2725,7 @@ async def calculate_ats_score(
                 },
                 {"role": "user", "content": retry_prompt},
             ]
-            retry_text = await call_ats_chat(retry_messages, temperature=0.1, max_tokens=600)
+            retry_text = await call_ats_chat(retry_messages, temperature=0.05, max_tokens=300)
             retry_payload = json.loads(_extract_json_block(retry_text))
             normalized = _normalize_model_ats_payload(retry_payload, fallback)
             await _cache_set_json(cache_key, normalized)

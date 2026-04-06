@@ -1655,101 +1655,120 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed, isDarkMode }) => {
     return await analyzeResponse.json();
   };
 
+  const applyAnalyzeResult = ({ analyzeData, parsedResume, parsedResumeId, source }) => {
+    setResumeId(parsedResumeId);
+    setResumeData(parsedResume);
+    onResumeParsed?.(parsedResumeId, parsedResume);
+
+    const nextAtsScore = analyzeData.ats_analysis?.score || 0;
+    const nextBreakdown = {
+      formatting_score: analyzeData.ats_analysis?.formatting_score || 0,
+      keyword_match: Math.round((analyzeData.ats_analysis?.keyword_match || 0) * 100),
+      readability_score: analyzeData.ats_analysis?.readability_score || 0
+    };
+
+    setAtsScore(nextAtsScore);
+    setScoreBreakdown(nextBreakdown);
+    onResumeAnalyzed?.({
+      atsScore: nextAtsScore,
+      scoreBreakdown: nextBreakdown,
+      analyzedAt: new Date().toISOString(),
+      source,
+    });
+
+    const problemIssues = (analyzeData.problems || []).map(p => ({
+      type: p.severity === 'high' ? 'error' : p.severity === 'medium' ? 'warning' : 'info',
+      text: p.issue
+    }));
+    if (analyzeData.ats_model_warning) {
+      problemIssues.push({
+        type: 'warning',
+        text: `ATS model unavailable: ${analyzeData.ats_model_warning}`,
+      });
+    }
+    if (analyzeData.bullet_improvement_warning) {
+      problemIssues.push({
+        type: 'warning',
+        text: `Bullet improvement model unavailable: ${analyzeData.bullet_improvement_warning}`,
+      });
+    }
+    setIssues(problemIssues);
+
+    const allSuggestions = [];
+    if (analyzeData.detailed_ats_analysis?.suggestions) {
+      const sug = analyzeData.detailed_ats_analysis.suggestions;
+      allSuggestions.push(...(sug.improve_keywords || []));
+      allSuggestions.push(...(sug.enhance_experience || []));
+      allSuggestions.push(...(sug.formatting_fixes || []));
+    }
+    setSuggestions(allSuggestions.slice(0, 5));
+    setUploaded(true);
+  };
+
   const handleFileSelect = async (file) => {
     if (file) {
       setLoading(true);
       setLoadingStage("Uploading resume to SkillBridge...");
+      setUploaded(false);
+      setResumeData(null);
+      setAtsScore(0);
+      setScoreBreakdown({ formatting_score: 0, keyword_match: 0, readability_score: 0 });
+      setIssues([]);
+      setSuggestions([]);
+
       const sizeInKB = Math.round(file.size / 1024);
       setFileName(file.name);
       setFileSize(`${sizeInKB} KB`);
-      let extractedReady = false;
+      let extractedResume = null;
+      let extractedResumeId = null;
       
       try {
         // Upload resume
         let uploadData = await uploadResumeFile(file);
-        const resumeId = uploadData.resume_id;
-        setResumeId(resumeId);
-        setResumeData(uploadData.resume); // Store parsed resume data
-        onResumeParsed?.(resumeId, uploadData.resume);
-        setUploaded(true);
-        extractedReady = true;
+        extractedResumeId = uploadData.resume_id;
+        extractedResume = uploadData.resume;
 
         // Analyze resume. If backend memory was reset between upload and analyze,
         // retry once by re-uploading the same file to obtain a fresh resume_id.
         setLoadingStage("Running ATS and project-fit analysis...");
         let analyzeData;
         try {
-          analyzeData = await analyzeResumeById(resumeId);
+          analyzeData = await analyzeResumeById(extractedResumeId);
         } catch (analysisError) {
           if (analysisError?.status === 404) {
             setLoadingStage("Refreshing resume context and retrying analysis...");
             uploadData = await uploadResumeFile(file);
-            const retriedResumeId = uploadData.resume_id;
-            setResumeId(retriedResumeId);
-            setResumeData(uploadData.resume);
-            onResumeParsed?.(retriedResumeId, uploadData.resume);
-            setUploaded(true);
+            extractedResumeId = uploadData.resume_id;
+            extractedResume = uploadData.resume;
             setLoadingStage("Running ATS and project-fit analysis...");
-            analyzeData = await analyzeResumeById(retriedResumeId);
+            analyzeData = await analyzeResumeById(extractedResumeId);
           } else {
             throw analysisError;
           }
         }
 
         setLoadingStage("Generating project-ready improvement suggestions...");
-        
-        // Update state with real data
-        const nextAtsScore = analyzeData.ats_analysis?.score || 0;
-        const nextBreakdown = {
-          formatting_score: analyzeData.ats_analysis?.formatting_score || 0,
-          keyword_match: Math.round((analyzeData.ats_analysis?.keyword_match || 0) * 100),
-          readability_score: analyzeData.ats_analysis?.readability_score || 0
-        };
-        setAtsScore(nextAtsScore);
-        setScoreBreakdown(nextBreakdown);
-        onResumeAnalyzed?.({
-          atsScore: nextAtsScore,
-          scoreBreakdown: nextBreakdown,
-          analyzedAt: new Date().toISOString(),
+        applyAnalyzeResult({
+          analyzeData,
+          parsedResume: extractedResume,
+          parsedResumeId: extractedResumeId,
           source: "upload",
         });
-        
-        // Set issues from problems
-        const problemIssues = (analyzeData.problems || []).map(p => ({
-          type: p.severity === 'high' ? 'error' : p.severity === 'medium' ? 'warning' : 'info',
-          text: p.issue
-        }));
-        if (analyzeData.ats_model_warning) {
-          problemIssues.push({
-            type: 'warning',
-            text: `ATS model unavailable: ${analyzeData.ats_model_warning}`,
-          });
-        }
-        if (analyzeData.bullet_improvement_warning) {
-          problemIssues.push({
-            type: 'warning',
-            text: `Bullet improvement model unavailable: ${analyzeData.bullet_improvement_warning}`,
-          });
-        }
-        setIssues(problemIssues);
-        
-        // Set suggestions
-        const allSuggestions = [];
-        if (analyzeData.detailed_ats_analysis?.suggestions) {
-          const sug = analyzeData.detailed_ats_analysis.suggestions;
-          allSuggestions.push(...(sug.improve_keywords || []));
-          allSuggestions.push(...(sug.enhance_experience || []));
-          allSuggestions.push(...(sug.formatting_fixes || []));
-        }
-        setSuggestions(allSuggestions.slice(0, 5));
       } catch (error) {
         console.error('Error:', error);
-        // Keep analyzer visible but show a real error state.
-        setAtsScore(0);
-        setScoreBreakdown({ formatting_score: 0, keyword_match: 0, readability_score: 0 });
-        setIssues([{ type: "error", text: error?.message || "Failed to analyze resume. Please try again." }]);
-        setSuggestions(["Ensure resume is in PDF or DOCX format"]);
-        setUploaded(extractedReady);
+        if (extractedResume && extractedResumeId) {
+          setResumeId(extractedResumeId);
+          setResumeData(extractedResume);
+          onResumeParsed?.(extractedResumeId, extractedResume);
+          setAtsScore(0);
+          setScoreBreakdown({ formatting_score: 0, keyword_match: 0, readability_score: 0 });
+          setIssues([{ type: "error", text: error?.message || "Failed to analyze resume. Please try again." }]);
+          setSuggestions(["Ensure resume is in PDF or DOCX format"]);
+          setUploaded(true);
+        } else {
+          setUploaded(false);
+          setIssues([{ type: "error", text: error?.message || "Failed to upload resume. Please try again." }]);
+        }
       } finally {
         setLoading(false);
         setLoadingStage("");
@@ -1780,6 +1799,15 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed, isDarkMode }) => {
   const handleSampleResume = async () => {
     setLoading(true);
     setLoadingStage("Loading sample resume profile...");
+    setUploaded(false);
+    setResumeData(null);
+    setAtsScore(0);
+    setScoreBreakdown({ formatting_score: 0, keyword_match: 0, readability_score: 0 });
+    setIssues([]);
+    setSuggestions([]);
+
+    let parsedResume = null;
+    let parsedResumeId = null;
     try {
       // Get sample resume
       const sampleResponse = await fetch('/api/resume/sample');
@@ -1787,14 +1815,12 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed, isDarkMode }) => {
       
       setFileName("Sample_Resume.pdf");
       setFileSize("245 KB");
-      setResumeId(sampleData.resume_id);
-      setResumeData(sampleData.resume); // Store parsed resume data
-      onResumeParsed?.(sampleData.resume_id, sampleData.resume);
-      setUploaded(true);
+      parsedResumeId = sampleData.resume_id;
+      parsedResume = sampleData.resume;
       
       // Analyze sample resume
       const analyzeFormData = new FormData();
-      analyzeFormData.append('resume_id', sampleData.resume_id);
+      analyzeFormData.append('resume_id', parsedResumeId);
       analyzeFormData.append('target_role', 'Software Engineer');
       setLoadingStage("Running ATS and project-fit analysis...");
       
@@ -1816,74 +1842,74 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed, isDarkMode }) => {
       
       const analyzeData = await analyzeResponse.json();
       setLoadingStage("Generating project-ready improvement suggestions...");
-      
-      // Update state with real data
-      const nextAtsScore = analyzeData.ats_analysis?.score || 0;
-      const nextBreakdown = {
-        formatting_score: analyzeData.ats_analysis?.formatting_score || 0,
-        keyword_match: Math.round((analyzeData.ats_analysis?.keyword_match || 0) * 100),
-        readability_score: analyzeData.ats_analysis?.readability_score || 0
-      };
-      setAtsScore(nextAtsScore);
-      setScoreBreakdown(nextBreakdown);
-      onResumeAnalyzed?.({
-        atsScore: nextAtsScore,
-        scoreBreakdown: nextBreakdown,
-        analyzedAt: new Date().toISOString(),
+
+      applyAnalyzeResult({
+        analyzeData,
+        parsedResume,
+        parsedResumeId,
         source: "sample",
       });
-      
-      const problemIssues = (analyzeData.problems || []).map(p => ({
-        type: p.severity === 'high' ? 'error' : p.severity === 'medium' ? 'warning' : 'info',
-        text: p.issue
-      }));
-      if (analyzeData.ats_model_warning) {
-        problemIssues.push({
-          type: 'warning',
-          text: `ATS model unavailable: ${analyzeData.ats_model_warning}`,
-        });
-      }
-      if (analyzeData.bullet_improvement_warning) {
-        problemIssues.push({
-          type: 'warning',
-          text: `Bullet improvement model unavailable: ${analyzeData.bullet_improvement_warning}`,
-        });
-      }
-      setIssues(problemIssues);
-      
-      const allSuggestions = [];
-      if (analyzeData.detailed_ats_analysis?.suggestions) {
-        const sug = analyzeData.detailed_ats_analysis.suggestions;
-        allSuggestions.push(...(sug.improve_keywords || []));
-        allSuggestions.push(...(sug.enhance_experience || []));
-        allSuggestions.push(...(sug.formatting_fixes || []));
-      }
-      setSuggestions(allSuggestions.slice(0, 5));
-      
-      setUploaded(true);
     } catch (error) {
       console.error('Error:', error);
       setFileName("Sample_Resume.pdf");
       setFileSize("245 KB");
-      setAtsScore(0);
-      setScoreBreakdown({ formatting_score: 0, keyword_match: 0, readability_score: 0 });
-      setIssues([{ type: "error", text: "Failed to load sample resume" }]);
-      setSuggestions([]);
-      setUploaded(true);
+      if (parsedResume && parsedResumeId) {
+        setResumeId(parsedResumeId);
+        setResumeData(parsedResume);
+        onResumeParsed?.(parsedResumeId, parsedResume);
+        setAtsScore(0);
+        setScoreBreakdown({ formatting_score: 0, keyword_match: 0, readability_score: 0 });
+        setIssues([{ type: "error", text: "Failed to load sample resume analysis" }]);
+        setSuggestions([]);
+        setUploaded(true);
+      } else {
+        setUploaded(false);
+        setIssues([{ type: "error", text: "Failed to load sample resume" }]);
+      }
     } finally {
       setLoading(false);
       setLoadingStage("");
     }
   };
 
+  const handleResetResume = () => {
+    setUploaded(false);
+    setFileName("");
+    setFileSize("");
+    setResumeId(null);
+    setResumeData(null);
+    setAtsScore(0);
+    setScoreBreakdown({ formatting_score: 0, keyword_match: 0, readability_score: 0 });
+    setIssues([]);
+    setSuggestions([]);
+  };
+
+  const candidateName = resumeData?.name || fileName?.replace(/\.[^.]+$/, "") || "Candidate";
+  const topSkills = (resumeData?.skills || []).slice(0, 8).map((skill) => (typeof skill === "string" ? skill : skill.name));
+  const experienceCount = resumeData?.experiences?.length || 0;
+  const educationCount = resumeData?.education?.length || 0;
+  const projectCount = resumeData?.projects?.length || 0;
+  const scoreItems = [
+    { label: "Formatting", val: scoreBreakdown.formatting_score, accent: isDarkMode ? "#8db2ff" : "#111827" },
+    { label: "Keywords", val: scoreBreakdown.keyword_match, accent: "#10b981" },
+    { label: "Impact", val: scoreBreakdown.readability_score, accent: "#f59e0b" },
+  ];
+  const scoreStatus = atsScore >= 80 ? "Strong match" : atsScore >= 60 ? "Needs polish" : "Rework recommended";
+  const scoreStatusVariant = atsScore >= 80 ? "success" : atsScore >= 60 ? "warning" : "error";
+  const intakeHighlights = [
+    { label: "Skills mapped", value: topSkills.length, hint: "Core strengths captured" },
+    { label: "Projects found", value: projectCount, hint: "Proof-of-work detected" },
+    { label: "Experience blocks", value: experienceCount, hint: "Career timeline parsed" },
+  ];
+
   return (
     <div style={{ padding: 28, display: "flex", flexDirection: "column", gap: 22, animation: "fadeIn 0.4s ease" }}>
       <div>
         <h2 style={{ fontSize: 20, fontWeight: 700, color: isDarkMode ? "#e8eef7" : "var(--gray-900)", letterSpacing: "-0.04em", marginBottom: 4 }}>Resume Analyzer</h2>
-        <p style={{ fontSize: 13.5, color: isDarkMode ? "#b4c3d9" : "var(--gray-500)" }}>Upload your resume for AI-powered ATS analysis and improvement suggestions.</p>
+        <p style={{ fontSize: 13.5, color: isDarkMode ? "#b4c3d9" : "var(--gray-500)", maxWidth: 760 }}>Turn a raw resume into a role-ready profile with ATS scoring, extracted career signals, and project-focused improvement guidance.</p>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 280px", gap: 18, alignItems: "start" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.5fr) minmax(280px, 0.82fr)", gap: 18, alignItems: "start" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
           {/* Upload */}
           {!uploaded ? (
@@ -1894,30 +1920,44 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed, isDarkMode }) => {
                 onDrop={handleDrop}
                 style={{
                   border: `2px dashed ${dragging ? (isDarkMode ? "#6b93d6" : "var(--gray-600)") : (isDarkMode ? "rgba(91,127,196,0.4)" : "var(--gray-200)")}`,
-                  borderRadius: "var(--radius-lg)", padding: "48px 32px",
+                  borderRadius: 28, padding: "40px 32px",
                   textAlign: "center", cursor: loading ? "wait" : "pointer",
-                  background: dragging ? (isDarkMode ? "rgba(91,127,196,0.1)" : "var(--gray-50)") : "transparent",
+                  background: isDarkMode ? "linear-gradient(145deg, rgba(37,52,71,0.96), rgba(27,37,51,0.92))" : "linear-gradient(145deg, rgba(255,255,255,0.96), rgba(246,248,251,0.96))",
+                  boxShadow: isDarkMode ? "0 18px 42px rgba(0,0,0,0.22)" : "0 24px 56px rgba(15,23,42,0.08)",
+                  position: "relative",
+                  overflow: "hidden",
                   transition: "all var(--transition)",
                   opacity: loading ? 0.6 : 1,
                   pointerEvents: loading ? "none" : "auto",
                 }}>
+                <div style={{ position: "absolute", inset: 0, background: isDarkMode ? "radial-gradient(circle at top right, rgba(107,147,214,0.18), transparent 42%), radial-gradient(circle at bottom left, rgba(34,197,94,0.12), transparent 38%)" : "radial-gradient(circle at top right, rgba(17,24,39,0.08), transparent 38%), radial-gradient(circle at bottom left, rgba(16,185,129,0.08), transparent 34%)", pointerEvents: "none" }}/>
+                <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 12px", borderRadius: 999, marginBottom: 18, background: isDarkMode ? "rgba(143,176,227,0.12)" : "rgba(17,24,39,0.05)", border: isDarkMode ? "1px solid rgba(122,147,193,0.25)" : "1px solid rgba(17,24,39,0.08)", fontSize: 11.5, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: isDarkMode ? "#cfe0ff" : "#374151", position: "relative" }}>
+                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: loading ? "#f59e0b" : "#10b981", boxShadow: loading ? "0 0 0 6px rgba(245,158,11,0.16)" : "0 0 0 6px rgba(16,185,129,0.12)" }}/>
+                  Career Intelligence Pipeline
+                </div>
                 <div style={{ width: 48, height: 48, borderRadius: 14, background: isDarkMode ? "rgba(91,127,196,0.15)" : "var(--gray-100)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
                   <Icon name="upload" size={22} color={isDarkMode ? "#6b93d6" : "var(--gray-500)"}/>
                 </div>
-                <div style={{ fontSize: 15, fontWeight: 600, color: isDarkMode ? "#e8eef7" : "var(--gray-800)", marginBottom: 6 }}>
-                  {loading ? "Processing resume..." : "Drop your resume here"}
+                <div style={{ fontSize: "clamp(24px, 3vw, 32px)", lineHeight: 1.05, fontWeight: 800, letterSpacing: "-0.05em", color: isDarkMode ? "#f5f9ff" : "#111827", marginBottom: 10, maxWidth: 620, marginLeft: "auto", marginRight: "auto", position: "relative" }}>
+                  {loading ? "Processing resume..." : "Drop your resume into the workspace"}
+                </div>
+                <div style={{ margin: "0 auto 14px", maxWidth: 620, fontSize: 13.5, lineHeight: 1.7, color: isDarkMode ? "#b4c3d9" : "#6b7280", position: "relative" }}>
+                  We extract your experience, surface weak signals, and translate the resume into actionable career fixes that connect with the rest of SkillBridge.
                 </div>
                 {loading && (
                   <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "center", marginBottom: 8 }}>
                     <div style={{ fontSize: 12.5, color: isDarkMode ? "#b4c3d9" : "var(--gray-500)", fontWeight: 500 }}>
                       Please wait a few mins. SkillBridge is evaluating ATS quality, skills, and project evidence...
                     </div>
-                    <div style={{ fontSize: 12, color: isDarkMode ? "#8a9bb5" : "var(--gray-400)", fontWeight: 500 }}>
+                    <div style={{ fontSize: 12, color: isDarkMode ? "#8a9bb5" : "var(--gray-400)", fontWeight: 600, letterSpacing: "0.02em" }}>
                       {loadingStage || "Running ATS and project-fit analysis..."}
+                    </div>
+                    <div style={{ width: "min(420px, 100%)", height: 6, borderRadius: 999, background: isDarkMode ? "rgba(122,147,193,0.18)" : "rgba(17,24,39,0.08)", overflow: "hidden" }}>
+                      <div style={{ width: "65%", height: "100%", borderRadius: 999, background: isDarkMode ? "linear-gradient(90deg, #6b93d6, #22c55e)" : "linear-gradient(90deg, #111827, #10b981)", animation: "shimmer 1.8s linear infinite" }}/>
                     </div>
                   </div>
                 )}
-                <div style={{ fontSize: 13, color: isDarkMode ? "#8a9bb5" : "var(--gray-400)", marginBottom: 20 }}>PDF, DOCX supported · Max 5MB</div>
+                <div style={{ fontSize: 13, color: isDarkMode ? "#8a9bb5" : "var(--gray-400)", marginBottom: 20, position: "relative" }}>PDF, DOCX supported | Max 5MB</div>
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -1925,25 +1965,39 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed, isDarkMode }) => {
                   onChange={handleFileInputChange}
                   style={{ display: "none" }}
                 />
-                <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
-                  <Btn variant="secondary" onClick={handleBrowseClick} style={{ padding: "8px 20px", fontSize: 13, background: isDarkMode ? "#253447" : undefined, color: isDarkMode ? "#e8eef7" : undefined, borderColor: isDarkMode ? "rgba(91,127,196,0.3)" : undefined }}>Browse files</Btn>
-                  <Btn variant="ghost" onClick={handleSampleResume} style={{ padding: "8px 20px", fontSize: 13, color: isDarkMode ? "#b4c3d9" : undefined }}>Use sample resume</Btn>
+                <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap", position: "relative" }}>
+                  <Btn variant="secondary" onClick={handleBrowseClick} style={{ padding: "10px 22px", fontSize: 13, background: isDarkMode ? "#253447" : undefined, color: isDarkMode ? "#e8eef7" : undefined, borderColor: isDarkMode ? "rgba(91,127,196,0.3)" : undefined }}>Browse files</Btn>
+                  <Btn variant="ghost" onClick={handleSampleResume} style={{ padding: "10px 22px", fontSize: 13, color: isDarkMode ? "#b4c3d9" : undefined }}>Use sample resume</Btn>
                 </div>
               </div>
             </div>
           ) : (
             <div>
-              <Card isDarkMode={isDarkMode} style={{ padding: "16px 20px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                  <div style={{ width: 40, height: 40, borderRadius: 11, background: isDarkMode ? "rgba(91,127,196,0.15)" : "var(--gray-100)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <Icon name="resume" size={18} color={isDarkMode ? "#6b93d6" : "var(--gray-600)"}/>
+              <Card isDarkMode={isDarkMode} style={{ padding: "22px 24px", overflow: "hidden", position: "relative" }}>
+                <div style={{ position: "absolute", top: -80, right: -20, width: 220, height: 220, borderRadius: "50%", background: isDarkMode ? "radial-gradient(circle, rgba(107,147,214,0.22), transparent 72%)" : "radial-gradient(circle, rgba(17,24,39,0.08), transparent 72%)", pointerEvents: "none" }}/>
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 14, position: "relative" }}>
+                  <div style={{ width: 50, height: 50, borderRadius: 16, background: isDarkMode ? "rgba(91,127,196,0.15)" : "var(--gray-100)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <Icon name="resume" size={20} color={isDarkMode ? "#8db2ff" : "var(--gray-700)"}/>
                   </div>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: isDarkMode ? "#e8eef7" : "var(--gray-900)" }}>{fileName}</div>
-                    <div style={{ fontSize: 12, color: isDarkMode ? "#8a9bb5" : "var(--gray-400)" }}>Uploaded · {fileSize}</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
+                      <div style={{ fontSize: "clamp(20px, 2.6vw, 28px)", fontWeight: 800, letterSpacing: "-0.05em", color: isDarkMode ? "#f5f9ff" : "#111827" }}>{candidateName}</div>
+                      <Badge variant="success">Analysis ready</Badge>
+                    </div>
+                    <div style={{ fontSize: 13.5, color: isDarkMode ? "#b4c3d9" : "var(--gray-500)", marginBottom: 14 }}>
+                      {fileName} | {fileSize} | Resume intelligence mapped into SkillBridge
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10 }}>
+                      {intakeHighlights.map((item) => (
+                        <div key={item.label} style={{ padding: "14px 14px 12px", borderRadius: 16, background: isDarkMode ? "rgba(18,26,38,0.52)" : "rgba(249,250,251,0.95)", border: isDarkMode ? "1px solid rgba(122,147,193,0.18)" : "1px solid rgba(17,24,39,0.05)" }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: isDarkMode ? "#8a9bb5" : "#9ca3af", marginBottom: 8 }}>{item.label}</div>
+                          <div style={{ fontSize: 26, fontWeight: 800, lineHeight: 1, letterSpacing: "-0.04em", color: isDarkMode ? "#f5f9ff" : "#111827" }}>{item.value}</div>
+                          <div style={{ marginTop: 8, fontSize: 12, color: isDarkMode ? "#b4c3d9" : "#6b7280" }}>{item.hint}</div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                  <Badge variant="success">Analyzed</Badge>
-                  <button onClick={() => setUploaded(false)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
+                  <button onClick={handleResetResume} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
                     <Icon name="x" size={16} color={isDarkMode ? "#8a9bb5" : "var(--gray-400)"}/>
                   </button>
                 </div>
@@ -1952,11 +2006,15 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed, isDarkMode }) => {
               {/* Extracted Information */}
               {resumeData && (
                 <div style={{ marginTop: 14 }}>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: isDarkMode ? "#e8eef7" : "var(--gray-900)", marginBottom: 14 }}>Extracted Information</div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: isDarkMode ? "#e8eef7" : "var(--gray-900)", marginBottom: 14 }}>Extracted intelligence</div>
                   
                   {/* Personal Info Card */}
                   {(resumeData.name || resumeData.email || resumeData.phone) && (
                     <Card isDarkMode={isDarkMode} style={{ marginBottom: 12, padding: 20 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", marginBottom: 12, flexWrap: "wrap" }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: isDarkMode ? "#8a9bb5" : "#9ca3af" }}>Identity layer</div>
+                        <div style={{ fontSize: 12.5, color: isDarkMode ? "#b4c3d9" : "#6b7280" }}>Core contact fields detected</div>
+                      </div>
                       {resumeData.name && <div style={{ fontSize: 17, fontWeight: 700, color: isDarkMode ? "#e8eef7" : "var(--gray-900)", marginBottom: 12 }}>{resumeData.name}</div>}
                       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                         {resumeData.email && (
@@ -1978,7 +2036,10 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed, isDarkMode }) => {
                   {/* Skills Card */}
                   {resumeData.skills && resumeData.skills.length > 0 && (
                     <Card isDarkMode={isDarkMode} style={{ marginBottom: 12, padding: 20 }}>
-                      <div style={{ fontSize: 14, fontWeight: 650, color: isDarkMode ? "#e8eef7" : "var(--gray-900)", marginBottom: 12 }}>Skills</div>
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", marginBottom: 12, flexWrap: "wrap" }}>
+                        <div style={{ fontSize: 14, fontWeight: 650, color: isDarkMode ? "#e8eef7" : "var(--gray-900)" }}>Skills graph</div>
+                        <div style={{ fontSize: 12.5, color: isDarkMode ? "#8a9bb5" : "#6b7280" }}>{resumeData.skills.length} strengths extracted</div>
+                      </div>
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
                         {resumeData.skills.map((skill, i) => (
                           <span key={i} style={{
@@ -1995,7 +2056,10 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed, isDarkMode }) => {
                   {/* Experience Card */}
                   {resumeData.experiences && resumeData.experiences.length > 0 && (
                     <Card isDarkMode={isDarkMode} style={{ marginBottom: 12, padding: 20 }}>
-                      <div style={{ fontSize: 14, fontWeight: 650, color: isDarkMode ? "#e8eef7" : "var(--gray-900)", marginBottom: 14 }}>Experience</div>
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", marginBottom: 14, flexWrap: "wrap" }}>
+                        <div style={{ fontSize: 14, fontWeight: 650, color: isDarkMode ? "#e8eef7" : "var(--gray-900)" }}>Experience timeline</div>
+                        <div style={{ fontSize: 12.5, color: isDarkMode ? "#8a9bb5" : "#6b7280" }}>{experienceCount} role blocks</div>
+                      </div>
                       {resumeData.experiences.map((exp, i) => (
                         <div key={i} style={{ 
                           marginBottom: i < resumeData.experiences.length - 1 ? 16 : 0,
@@ -2021,7 +2085,10 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed, isDarkMode }) => {
                   {/* Education Card */}
                   {resumeData.education && resumeData.education.length > 0 && (
                     <Card isDarkMode={isDarkMode} style={{ marginBottom: 12, padding: 20 }}>
-                      <div style={{ fontSize: 14, fontWeight: 650, color: isDarkMode ? "#e8eef7" : "var(--gray-900)", marginBottom: 14 }}>Education</div>
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", marginBottom: 14, flexWrap: "wrap" }}>
+                        <div style={{ fontSize: 14, fontWeight: 650, color: isDarkMode ? "#e8eef7" : "var(--gray-900)" }}>Education</div>
+                        <div style={{ fontSize: 12.5, color: isDarkMode ? "#8a9bb5" : "#6b7280" }}>{educationCount} entries parsed</div>
+                      </div>
                       {resumeData.education.map((edu, i) => (
                         <div key={i} style={{ 
                           marginBottom: i < resumeData.education.length - 1 ? 14 : 0,
@@ -2043,7 +2110,10 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed, isDarkMode }) => {
                   {/* Projects Card */}
                   {resumeData.projects && resumeData.projects.length > 0 && (
                     <Card isDarkMode={isDarkMode} style={{ marginBottom: 12, padding: 20 }}>
-                      <div style={{ fontSize: 14, fontWeight: 650, color: isDarkMode ? "#e8eef7" : "var(--gray-900)", marginBottom: 14 }}>Projects</div>
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", marginBottom: 14, flexWrap: "wrap" }}>
+                        <div style={{ fontSize: 14, fontWeight: 650, color: isDarkMode ? "#e8eef7" : "var(--gray-900)" }}>Project evidence</div>
+                        <div style={{ fontSize: 12.5, color: isDarkMode ? "#8a9bb5" : "#6b7280" }}>{projectCount} project signals</div>
+                      </div>
                       {resumeData.projects.map((proj, i) => (
                         <div key={i} style={{ 
                           marginBottom: i < resumeData.projects.length - 1 ? 14 : 0,
@@ -2076,7 +2146,10 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed, isDarkMode }) => {
 
               {/* Issues */}
               <Card isDarkMode={isDarkMode} style={{ marginTop: 14 }}>
-                <div style={{ fontSize: 13.5, fontWeight: 650, color: isDarkMode ? "#e8eef7" : "var(--gray-900)", marginBottom: 14 }}>Issues Found</div>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", marginBottom: 14, flexWrap: "wrap" }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 650, color: isDarkMode ? "#e8eef7" : "var(--gray-900)" }}>Priority fixes</div>
+                  <div style={{ fontSize: 12.5, color: isDarkMode ? "#8a9bb5" : "#6b7280" }}>{issues.length} issues identified</div>
+                </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                   {issues.map((issue, i) => (
                     <div key={i} style={{
@@ -2094,7 +2167,10 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed, isDarkMode }) => {
 
               {/* Suggestions */}
               <Card isDarkMode={isDarkMode} style={{ marginTop: 14 }}>
-                <div style={{ fontSize: 13.5, fontWeight: 650, color: isDarkMode ? "#e8eef7" : "var(--gray-900)", marginBottom: 14 }}>AI Suggestions</div>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", marginBottom: 14, flexWrap: "wrap" }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 650, color: isDarkMode ? "#e8eef7" : "var(--gray-900)" }}>AI suggestions</div>
+                  <div style={{ fontSize: 12.5, color: isDarkMode ? "#8a9bb5" : "#6b7280" }}>What to improve next</div>
+                </div>
                 {suggestions.map((s, i) => (
                   <div key={i} style={{ display: "flex", gap: 10, padding: "8px 0", borderBottom: i < suggestions.length - 1 ? (isDarkMode ? "1px solid rgba(70,100,150,0.2)" : "1px solid var(--gray-100)") : "none" }}>
                     <Icon name="zap" size={14} color={isDarkMode ? "#6b93d6" : "var(--gray-400)"} style={{ marginTop: 2, flexShrink: 0 }}/>
@@ -2107,27 +2183,37 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed, isDarkMode }) => {
         </div>
 
         {/* Score */}
-        <Card isDarkMode={isDarkMode} style={{ padding: "28px 24px", textAlign: "center" }}>
-          <div style={{ fontSize: 12, color: isDarkMode ? "#8a9bb5" : "var(--gray-400)", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 20 }}>ATS Score</div>
+        <Card isDarkMode={isDarkMode} style={{ padding: "26px 22px", textAlign: "center", position: "sticky", top: 20, overflow: "hidden" }}>
+          <div style={{ position: "absolute", inset: 0, pointerEvents: "none", background: isDarkMode ? "radial-gradient(circle at top, rgba(107,147,214,0.16), transparent 36%)" : "radial-gradient(circle at top, rgba(17,24,39,0.06), transparent 36%)" }}/>
+          <div style={{ position: "relative" }}>
+          <div style={{ fontSize: 12, color: isDarkMode ? "#8a9bb5" : "var(--gray-400)", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 }}>Resume health</div>
+          <div style={{ fontSize: 24, fontWeight: 800, letterSpacing: "-0.05em", color: isDarkMode ? "#f5f9ff" : "#111827", marginBottom: 6 }}>ATS Score</div>
+          <div style={{ fontSize: 13, color: isDarkMode ? "#b4c3d9" : "#6b7280", marginBottom: 18 }}>A fast read on readiness for recruiter systems and hiring screens.</div>
           <CircularProgress value={uploaded ? atsScore : 0} size={140} label="Score" isDarkMode={isDarkMode}/>
           {loading && <div style={{ fontSize: 12, color: isDarkMode ? "#b4c3d9" : "var(--gray-500)", marginTop: 10 }}>{loadingStage || "Analyzing..."}</div>}
-          <div style={{ marginTop: 24, display: "flex", flexDirection: "column", gap: 10 }}>
-            {[
-              { label: "Formatting", val: scoreBreakdown.formatting_score },
-              { label: "Keywords", val: scoreBreakdown.keyword_match },
-              { label: "Impact", val: scoreBreakdown.readability_score },
-            ].map(item => (
+          {uploaded && <div style={{ marginTop: 16, display: "flex", justifyContent: "center" }}><Badge variant={scoreStatusVariant}>{scoreStatus}</Badge></div>}
+          <div style={{ marginTop: 24, display: "flex", flexDirection: "column", gap: 14, textAlign: "left" }}>
+            {scoreItems.map(item => (
               <div key={item.label}>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 5, color: isDarkMode ? "#b4c3d9" : "var(--gray-500)", fontWeight: 500 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 6, color: isDarkMode ? "#b4c3d9" : "var(--gray-500)", fontWeight: 600 }}>
                   <span>{item.label}</span><span>{item.val}%</span>
                 </div>
-                <div style={{ height: 4, background: isDarkMode ? "rgba(91,127,196,0.2)" : "var(--gray-100)", borderRadius: 99 }}>
-                  <div style={{ height: "100%", borderRadius: 99, width: `${uploaded ? item.val : 0}%`, background: isDarkMode ? "#6b93d6" : "var(--gray-700)", transition: "width 1s ease" }}/>
+                <div style={{ height: 5, background: isDarkMode ? "rgba(91,127,196,0.2)" : "var(--gray-100)", borderRadius: 99 }}>
+                  <div style={{ height: "100%", borderRadius: 99, width: `${uploaded ? item.val : 0}%`, background: item.accent, transition: "width 1s ease" }}/>
                 </div>
               </div>
             ))}
           </div>
+          <div style={{ marginTop: 20, padding: "14px 14px 0", borderTop: isDarkMode ? "1px solid rgba(122,147,193,0.18)" : "1px solid rgba(17,24,39,0.06)", textAlign: "left" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: isDarkMode ? "#8a9bb5" : "#9ca3af", marginBottom: 10 }}>System readout</div>
+            <div style={{ display: "grid", gap: 8 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, color: isDarkMode ? "#dbe8fb" : "#374151" }}><span>Projects surfaced</span><strong>{projectCount}</strong></div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, color: isDarkMode ? "#dbe8fb" : "#374151" }}><span>Issues flagged</span><strong>{issues.length}</strong></div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, color: isDarkMode ? "#dbe8fb" : "#374151" }}><span>Suggestions queued</span><strong>{suggestions.length}</strong></div>
+            </div>
+          </div>
           {uploaded && <Btn variant="primary" style={{ marginTop: 20, width: "100%", justifyContent: "center", padding: "10px", background: isDarkMode ? "#5b7fc4" : undefined }}>Download report</Btn>}
+          </div>
         </Card>
       </div>
     </div>

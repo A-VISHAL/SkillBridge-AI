@@ -193,15 +193,15 @@ export default function JDMatcher({ resumeId, jobDescription, setJobDescription 
             </Btn>
           </Card>
 
-          {analyzed && matchResult.focus_areas && (
-            <Card style={{ padding: 20 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: "var(--gray-700)", marginBottom: 14 }}>Focus Areas</div>
+          {matchResult && matchResult.focus_areas && matchResult.focus_areas.length > 0 && (
+            <Card style={{ padding: 20, background: "#ffffff" }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 14 }}>Focus Areas</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {matchResult.focus_areas.slice(0, 3).map((area, i) => (
                   <div key={i} style={{
                     display: "flex", alignItems: "center", gap: 10,
                     padding: "10px 14px", borderRadius: 10,
-                    background: "var(--gray-900)", color: "var(--white)",
+                    background: "#111827", color: "#ffffff",
                     fontSize: 13, fontWeight: 500,
                   }}>
                     <Icon name="target" size={14} color="rgba(255,255,255,0.6)"/>
@@ -267,27 +267,31 @@ export default function JDMatcher({ resumeId, jobDescription, setJobDescription 
               </div>
             </div>
           </Card>
-        ) : analyzed && matchResult ? (
+        ) : matchResult ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            <Card style={{ padding: "24px 22px", textAlign: "center" }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: "var(--gray-400)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 16 }}>Overall Match</div>
+            <Card style={{ padding: "24px 22px", textAlign: "center", background: "#ffffff" }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#9ca3af", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 16 }}>Overall Match</div>
               <CircularProgress value={Math.round(matchResult.match_percentage)} size={130} label="Match"/>
-              <div style={{ marginTop: 18, fontSize: 13, color: "var(--gray-500)", lineHeight: 1.6 }}>
-                You match <strong style={{ color: "var(--gray-900)" }}>{Math.round(matchResult.match_percentage)}%</strong> of this job's requirements.
+              <div style={{ marginTop: 18, fontSize: 13, color: "#6b7280", lineHeight: 1.6 }}>
+                You match <strong style={{ color: "#111827", fontWeight: 700 }}>{Math.round(matchResult.match_percentage)}%</strong> of this job's requirements.
               </div>
             </Card>
 
-            <Card style={{ padding: 20 }}>
-              <div style={{ fontSize: 13, fontWeight: 650, color: "var(--gray-900)", marginBottom: 14 }}>Missing Skills</div>
+            <Card style={{ padding: 20, background: "#ffffff" }}>
+              <div style={{ fontSize: 13, fontWeight: 650, color: "#111827", marginBottom: 14 }}>Missing Skills</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 18 }}>
-                {matchResult.missing_skills.slice(0, 6).map(skill => (
-                  <span key={skill} style={{
-                    padding: "5px 12px", borderRadius: 99,
-                    background: "var(--gray-100)", fontSize: 12,
-                    color: "var(--gray-600)", fontWeight: 500,
-                    border: "1px solid var(--gray-200)",
-                  }}>{skill}</span>
-                ))}
+                {matchResult.missing_skills && matchResult.missing_skills.length > 0 ? (
+                  matchResult.missing_skills.slice(0, 6).map((skill, idx) => (
+                    <span key={idx} style={{
+                      padding: "5px 12px", borderRadius: 99,
+                      background: "#f3f4f6", fontSize: 12,
+                      color: "#4b5563", fontWeight: 500,
+                      border: "1px solid #e5e7eb",
+                    }}>{skill}</span>
+                  ))
+                ) : (
+                  <span style={{ fontSize: 12, color: "#9ca3af" }}>No missing skills identified</span>
+                )}
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>

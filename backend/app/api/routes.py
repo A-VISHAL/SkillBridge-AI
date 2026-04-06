@@ -2,6 +2,7 @@ from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from fastapi.responses import JSONResponse
 from typing import List, Optional
 import json
+import re
 import os
 import uuid
 from datetime import datetime
@@ -79,6 +80,42 @@ def _build_roadmap_context_from_match(match_data: dict) -> List[dict]:
             "skill": skill,
             "task": f"Build and document one outcome-focused mini-project for {skill} mapped to JD requirements.",
             "resources": [f"{skill} official docs", "Role-aligned implementation guide"],
+        })
+
+    return tasks
+
+
+def _build_quiz_context_fast(resume_text: str, job_description: str) -> List[dict]:
+    """Build lightweight quiz context without any model calls for speed/cost control."""
+    text = f"{resume_text or ''} {job_description or ''}".lower()
+    skill_bank = [
+        "Python", "Java", "JavaScript", "TypeScript", "React", "Node.js", "SQL", "PostgreSQL",
+        "MongoDB", "Docker", "Kubernetes", "AWS", "GCP", "Azure", "System Design", "Microservices",
+        "TensorFlow", "PyTorch", "MLOps", "Data Structures", "Algorithms", "REST API", "Testing",
+    ]
+
+    found: List[str] = []
+    for skill in skill_bank:
+        aliases = [skill.lower()]
+        if skill == "Node.js":
+            aliases.extend(["node", "nodejs"])
+        if skill == "REST API":
+            aliases.extend(["rest", "restful", "api"])
+        if skill == "System Design":
+            aliases.extend(["system design", "distributed systems"])
+        if any(re.search(rf"(?<!\\w){re.escape(alias)}(?!\\w)", text) for alias in aliases):
+            found.append(skill)
+
+    if not found:
+        found = ["Data Structures", "Algorithms", "System Design", "REST API", "Testing", "SQL"]
+
+    tasks: List[dict] = []
+    for idx, skill in enumerate(found[:8], start=1):
+        tasks.append({
+            "week": idx,
+            "skill": skill,
+            "task": f"Master {skill} basics and complete one role-aligned practical problem.",
+            "resources": [f"{skill} official documentation", f"{skill} interview questions", f"{skill} hands-on tutorial"],
         })
 
     return tasks
@@ -332,20 +369,21 @@ async def analyze_resume(
             strong_points=ats_result.get("analysis", {}).get("strengths", [])
         )
         
-        # Get bullet improvements.
-        # This should not fail the full ATS analysis response.
+        # Optional bullet improvements can be expensive and slow.
+        # Keep disabled by default for faster, lower-token ATS responses.
         bullet_improvements: List[BulletImprovement] = []
         bullet_improvement_error = None
-        try:
-            improvements_data = await ai_service.improve_resume_bullets(
-                [exp.dict() for exp in resume.experiences],
-                job_description or target_role
-            )
-            bullet_improvements = [
-                BulletImprovement(**imp) for imp in improvements_data[:5]
-            ]
-        except Exception as e:
-            bullet_improvement_error = str(e)
+        if settings.ENABLE_BULLET_IMPROVEMENTS:
+            try:
+                improvements_data = await ai_service.improve_resume_bullets(
+                    [exp.dict() for exp in resume.experiences],
+                    job_description or target_role
+                )
+                bullet_improvements = [
+                    BulletImprovement(**imp) for imp in improvements_data[:5]
+                ]
+            except Exception as e:
+                bullet_improvement_error = str(e)
         
         result = ResumeAnalysisResult(
             ats_analysis=ats_analysis,
@@ -583,20 +621,14 @@ async def generate_quiz(
     job_description: str = Form(""),
 ):
     """Generate adaptive quiz questions with study material from resume/JD/roadmap context."""
+    normalized_count = max(10, count)
+    resume_text = ""
+    if resume_id and resume_id in resume_store:
+        resume_text = resume_store[resume_id].raw_text
+    roadmap_context = _build_quiz_context_fast(resume_text, job_description)
+
     try:
-        normalized_count = max(10, count)
-
-        resume_text = ""
-        if resume_id and resume_id in resume_store:
-            resume_text = resume_store[resume_id].raw_text
-
-        roadmap_context = []
-        try:
-            if resume_text and job_description:
-                match_data = await ai_service.match_resume_to_jd(resume_text, job_description)
-                roadmap_context = _build_roadmap_context_from_match(match_data)
-        except Exception:
-            roadmap_context = []
+        generation_meta = {}
 
         questions_data = await ai_service.generate_quiz_questions(
             topic=topic,
@@ -606,6 +638,7 @@ async def generate_quiz(
             resume_text=resume_text,
             jd_text=job_description,
             roadmap_context=roadmap_context,
+            generation_meta=generation_meta,
         )
         
         questions = [QuizQuestion(**q) for q in questions_data]
@@ -623,15 +656,42 @@ async def generate_quiz(
         return {
             "domain": domain,
             "difficulty": difficulty,
-            "generation_source": "model",
+            "generation_source": generation_meta.get("source", "model"),
             "passing_percentage": 80,
             "rules": rules,
             "study_materials": study_materials,
             "questions": [q.dict() for q in questions[:normalized_count]],
+            **({"generation_warning": generation_meta["warning"]} if generation_meta.get("warning") else {}),
         }
         
     except Exception as e:
-        raise HTTPException(500, f"Error generating quiz: {str(e)}")
+        fallback_questions = ai_service.build_quiz_fallback_questions(
+            topic=topic,
+            difficulty=difficulty,
+            count=normalized_count,
+            domain=domain,
+            resume_text=resume_text,
+            jd_text=job_description,
+            roadmap_context=roadmap_context,
+            reason=str(e),
+        )
+        study_materials = _build_quiz_study_materials(fallback_questions, roadmap_context)
+        return {
+            "domain": domain,
+            "difficulty": difficulty,
+            "generation_source": "quiz_fallback_route",
+            "passing_percentage": 80,
+            "rules": [
+                "Read every question carefully before selecting an answer.",
+                "No tab switching or external assistance during the quiz.",
+                "Each section contains 10 questions.",
+                "Passing criteria is 80% or higher.",
+                "Review explanations after submission to improve weak areas.",
+            ],
+            "study_materials": study_materials,
+            "questions": [q for q in fallback_questions[:normalized_count]],
+            "generation_warning": str(e),
+        }
 
 @router.post("/api/quiz/evaluate")
 async def evaluate_quiz(answers: List[QuizAnswer]):
@@ -716,6 +776,8 @@ async def start_interview(
         if not isinstance(roadmap_context, list):
             roadmap_context = []
 
+        interview_generation_meta = {}
+
         questions_data = await ai_service.generate_interview_questions(
             job_description,
             mode,
@@ -724,6 +786,7 @@ async def start_interview(
             resume_data=resume_data,
             quiz_context=parsed_quiz_context,
             roadmap_context=roadmap_context,
+            generation_meta=interview_generation_meta,
         )
 
         if not questions_data:
@@ -783,7 +846,9 @@ async def start_interview(
                 print(f"Warning: failed to persist interview session: {interview_err}")
         
         payload = session.dict()
-        payload["generation_source"] = "model"
+        payload["generation_source"] = interview_generation_meta.get("source", "model")
+        if interview_generation_meta.get("warning"):
+            payload["generation_warning"] = interview_generation_meta.get("warning")
         return payload
         
     except HTTPException:

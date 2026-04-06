@@ -66,7 +66,7 @@ class Settings:
 
     # Roadmap-specific model routing
     ROADMAP_API_KEY: str = _normalize_api_key(
-        _get_env("ROADMAP_API_KEY", "OXLO_ROADMAP_API_KEY")
+        _get_env("ROADMAP_API_KEY", "OXLO_ROADMAP_API_KEY", "OXLO_API_KEY", "OXLO_API_TOKEN")
     )
     ROADMAP_CHAT_ENDPOINT: str = _get_env(
         "ROADMAP_CHAT_ENDPOINT",
@@ -86,7 +86,7 @@ class Settings:
         "OXLO_CHAT_ENDPOINT",
         default="https://api.oxlo.ai/v1/chat/completions",
     )
-    QUIZ_MODEL: str = _get_env("QUIZ_MODEL", "OXLO_QUIZ_MODEL", default="deepseek-coder-33b")
+    QUIZ_MODEL: str = _get_env("QUIZ_MODEL", "OXLO_QUIZ_MODEL", default="deepseek-r1-8b")
 
     # Interview-specific model routing
     INTERVIEW_API_KEY: str = _normalize_api_key(
@@ -102,6 +102,9 @@ class Settings:
 
     # Fallback policy: only allow fallback for explicit provider rate limits
     ENABLE_RATE_LIMIT_FALLBACK: bool = _get_env_bool("ENABLE_RATE_LIMIT_FALLBACK", default=True)
+
+    # Resume analysis optimization
+    ENABLE_BULLET_IMPROVEMENTS: bool = _get_env_bool("ENABLE_BULLET_IMPROVEMENTS", default=False)
 
     # Supabase
     SUPABASE_URL: str = os.getenv("SUPABASE_URL", "")
