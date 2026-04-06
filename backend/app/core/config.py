@@ -98,7 +98,7 @@ class Settings:
         "OXLO_CHAT_ENDPOINT",
         default="https://api.oxlo.ai/v1/chat/completions",
     )
-    INTERVIEW_MODEL: str = _get_env("INTERVIEW_MODEL", "OXLO_INTERVIEW_MODEL", default="gemma-3-27b")
+    INTERVIEW_MODEL: str = _get_env("INTERVIEW_MODEL", "OXLO_INTERVIEW_MODEL", default="deepseek-r1-8b")
 
     # Fallback policy: only allow fallback for explicit provider rate limits
     ENABLE_RATE_LIMIT_FALLBACK: bool = _get_env_bool("ENABLE_RATE_LIMIT_FALLBACK", default=True)

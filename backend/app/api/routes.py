@@ -400,8 +400,9 @@ async def analyze_resume(
             "ats_scoring": ats_result.get("source", "unknown"),
             "bullet_improvements": "model" if not bullet_improvement_error else "unavailable",
         }
-        if ats_result.get("fallback_reason"):
-            response["ats_model_warning"] = ats_result.get("fallback_reason")
+        fallback_reason = str(ats_result.get("fallback_reason") or "").strip()
+        if fallback_reason and fallback_reason.lower() not in {"ai provider unavailable", "model unavailable"}:
+            response["ats_model_warning"] = fallback_reason
         if bullet_improvement_error:
             response["bullet_improvement_warning"] = bullet_improvement_error
         
@@ -468,16 +469,30 @@ async def match_jd(
             except Exception:
                 continue
         
+        def _ensure_list(value):
+            if isinstance(value, list):
+                return [str(v).strip() for v in value if str(v).strip()]
+            if isinstance(value, str):
+                text = value.strip()
+                if not text:
+                    return []
+                if "\n" in text:
+                    return [part.strip(" -•\t") for part in text.splitlines() if part.strip()]
+                if ";" in text:
+                    return [part.strip() for part in text.split(";") if part.strip()]
+                return [text]
+            return []
+
         result = JDMatchResult(
             match_percentage=match_data.get("match_percentage", 68),
             hire_probability=match_data.get("hire_probability", "Medium"),
-            matched_skills=match_data.get("matched_skills", []),
-            missing_skills=match_data.get("missing_skills", []),
+            matched_skills=_ensure_list(match_data.get("matched_skills", [])),
+            missing_skills=_ensure_list(match_data.get("missing_skills", [])),
             focus_areas=focus_areas,
-            interview_topics=match_data.get("interview_topics", []),
-            strengths=match_data.get("strengths", []),
-            weaknesses=match_data.get("weaknesses", []),
-            suggestions=match_data.get("suggestions", []),
+            interview_topics=_ensure_list(match_data.get("interview_topics", [])),
+            strengths=_ensure_list(match_data.get("strengths", [])),
+            weaknesses=_ensure_list(match_data.get("weaknesses", [])),
+            suggestions=_ensure_list(match_data.get("suggestions", [])),
         )
 
         # Persist JD + match details to Supabase (best-effort)
@@ -748,7 +763,7 @@ async def evaluate_quiz(answers: List[QuizAnswer]):
 async def start_interview(
     job_description: str = Form(""),
     mode: str = Form("Technical"),
-    count: int = Form(5),
+    count: int = Form(4),
     resume_id: Optional[str] = Form(None),
     quiz_context: str = Form(""),
 ):
@@ -781,7 +796,7 @@ async def start_interview(
         questions_data = await ai_service.generate_interview_questions(
             job_description,
             mode,
-            count,
+            max(1, min(4, count)),
             resume_text=resume_text,
             resume_data=resume_data,
             quiz_context=parsed_quiz_context,

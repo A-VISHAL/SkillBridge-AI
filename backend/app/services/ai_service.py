@@ -842,6 +842,30 @@ def _normalize_model_jd_payload(raw: Dict[str, Any]) -> Dict[str, Any]:
     if not isinstance(raw, dict):
         raise ValueError("JD model response must be a JSON object")
 
+    def _to_string_list(value: Any) -> List[str]:
+        if isinstance(value, list):
+            out: List[str] = []
+            for item in value:
+                text = str(item or "").strip()
+                if text:
+                    out.append(text)
+            return out
+
+        if isinstance(value, str):
+            text = value.strip()
+            if not text:
+                return []
+            # Handle model outputs that collapse arrays into a single sentence/blob.
+            if "\n" in text:
+                parts = [part.strip(" -•\t") for part in text.splitlines() if part.strip()]
+                return [part for part in parts if part]
+            if ";" in text:
+                parts = [part.strip() for part in text.split(";") if part.strip()]
+                return [part for part in parts if part]
+            return [text]
+
+        return []
+
     normalized_focus_areas: List[Dict[str, Any]] = []
     incoming_focus_areas = raw.get("focus_areas", [])
     if isinstance(incoming_focus_areas, list):
@@ -892,13 +916,13 @@ def _normalize_model_jd_payload(raw: Dict[str, Any]) -> Dict[str, Any]:
     return {
         "match_percentage": max(0, min(100, float(raw.get("match_percentage", 0)))),
         "hire_probability": str(raw.get("hire_probability", "Medium")),
-        "matched_skills": raw.get("matched_skills", []) or [],
-        "missing_skills": raw.get("missing_skills", []) or [],
+        "matched_skills": _to_string_list(raw.get("matched_skills", [])),
+        "missing_skills": _to_string_list(raw.get("missing_skills", [])),
         "focus_areas": normalized_focus_areas,
-        "interview_topics": raw.get("interview_topics", []) or [],
-        "strengths": raw.get("strengths", []) or [],
-        "weaknesses": raw.get("weaknesses", []) or [],
-        "suggestions": raw.get("suggestions", []) or [],
+        "interview_topics": _to_string_list(raw.get("interview_topics", [])),
+        "strengths": _to_string_list(raw.get("strengths", [])),
+        "weaknesses": _to_string_list(raw.get("weaknesses", [])),
+        "suggestions": _to_string_list(raw.get("suggestions", [])),
     }
 
 
@@ -1207,8 +1231,8 @@ def build_quiz_fallback_questions(
 async def match_resume_to_jd(resume_text: str, jd_text: str, resume_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Match resume to job description with focus areas"""
 
-    resume_context = _build_resume_context_for_jd(resume_text, resume_data, max_chars=1400)
-    cache_key = f"jd_match:v2:{_stable_hash(resume_context)}:{_stable_hash(jd_text[:1800])}"
+    resume_context = _build_resume_context_for_jd(resume_text, resume_data, max_chars=950)
+    cache_key = f"jd_match:v3:{_stable_hash(resume_context)}:{_stable_hash(jd_text[:1200])}"
     cached_payload = await _cache_get_json(cache_key)
     if isinstance(cached_payload, dict):
         cached_payload["source"] = cached_payload.get("source", "model")
@@ -1236,7 +1260,7 @@ Resume:
 {resume_context}
 
 Job Description:
-{jd_text[:1800]}
+{jd_text[:1200]}
 
 Return JSON with keys: match_percentage, hire_probability, matched_skills, missing_skills, focus_areas, interview_topics, strengths, weaknesses, suggestions"""
 
@@ -1248,7 +1272,7 @@ Return JSON with keys: match_percentage, hire_probability, matched_skills, missi
     ]
     
     try:
-        response = await call_jd_chat(messages, temperature=0.15, max_tokens=700)
+        response = await call_jd_chat(messages, temperature=0.1, max_tokens=380)
     except Exception as e:
         should_fallback = _allow_rate_limit_fallback(e)
         if isinstance(e, AIServiceError) and e.code in {"auth", "config", "network", "http_error", "parse"}:
@@ -1470,7 +1494,7 @@ async def generate_roadmap(
             "completion_criteria": completion_criteria,
         }
 
-    resume_context = _build_resume_context_for_jd(resume_text, resume_data, max_chars=1800)
+    resume_context = _build_resume_context_for_jd(resume_text, resume_data, max_chars=1000)
     jd_analysis_summary = ""
     if isinstance(jd_analysis, dict):
         jd_analysis_summary = json.dumps({
@@ -1490,10 +1514,10 @@ JD Analysis Summary:
 {jd_analysis_summary or 'Not provided'}
 
 Job Description:
-{jd_text[:1800]}
+{jd_text[:1000]}
 
 Missing skills:
-{', '.join(skill_gaps[:8])}
+{', '.join(skill_gaps[:6])}
 
 Return valid JSON with keys:
 - duration_weeks
@@ -1549,7 +1573,7 @@ Rules:
 
     try:
         # Primary model attempt.
-        response = await call_roadmap_chat(messages, temperature=0.45, max_tokens=1000)
+        response = await call_roadmap_chat(messages, temperature=0.25, max_tokens=520)
         parsed = json.loads(_extract_json_block(response))
         normalized = _normalize_payload(parsed)
         normalized["source"] = "model"
@@ -1565,7 +1589,7 @@ Rules:
                 },
                 {"role": "user", "content": compact_prompt},
             ]
-            retry_response = await call_roadmap_chat(retry_messages, temperature=0.35, max_tokens=650)
+            retry_response = await call_roadmap_chat(retry_messages, temperature=0.2, max_tokens=380)
             retry_parsed = json.loads(_extract_json_block(retry_response))
             normalized = _normalize_payload(retry_parsed)
             normalized["source"] = "model"
@@ -1887,7 +1911,7 @@ async def generate_interview_questions(
 ) -> List[Dict]:
     """Generate interview questions based on resume, quiz, roadmap, and JD context."""
 
-    cache_key = f"interview:v2:{_stable_hash(mode)}:{int(count or 5)}:{_stable_hash(jd_text[:1200])}:{_stable_hash(resume_text[:1400])}:{_stable_hash(quiz_context or {})}:{_stable_hash(roadmap_context or [])}"
+    cache_key = f"interview:v3:{_stable_hash(mode)}:{int(count or 4)}:{_stable_hash(jd_text[:800])}:{_stable_hash(resume_text[:900])}:{_stable_hash(quiz_context or {})}:{_stable_hash(roadmap_context or [])}"
     cached_payload = await _cache_get_json(cache_key)
     if isinstance(cached_payload, list) and cached_payload:
         if isinstance(generation_meta, dict):
@@ -1949,9 +1973,11 @@ async def generate_interview_questions(
         if not isinstance(item, dict):
             return None
 
-        question_text = str(item.get("question", "")).strip()
+        question_text = " ".join(str(item.get("question", "")).strip().split())
         if not question_text:
             return None
+        if len(question_text) > 170:
+            question_text = question_text[:167].rstrip() + "..."
 
         q_type = str(item.get("type", "Technical")).strip().title()
         if q_type not in {"Technical", "Hr", "Behavioral", "System Design"}:
@@ -2055,7 +2081,7 @@ async def generate_interview_questions(
 
         return normalized[:target_count]
 
-    normalized_count = max(1, int(count or 5))
+    normalized_count = max(1, min(4, int(count or 4)))
     project_focus = _extract_project_focus()
     roadmap_focus = _extract_roadmap_focus()
     quiz_focus = _extract_quiz_focus()
@@ -2065,25 +2091,26 @@ async def generate_interview_questions(
 
 Mode: {mode_label}
 Job Description:
-{(jd_text or "")[:800]}
+{(jd_text or "")[:500]}
 
 Resume Extract:
-{(resume_text or "")[:1000]}
+{(resume_text or "")[:550]}
 
 Project Highlights:
-{json.dumps(project_focus[:4], ensure_ascii=True)}
+{json.dumps(project_focus[:3], ensure_ascii=True)}
 
 Roadmap Progress Signals:
-{json.dumps(roadmap_focus[:4], ensure_ascii=True)}
+{json.dumps(roadmap_focus[:3], ensure_ascii=True)}
 
 Quiz Signals:
-{json.dumps(quiz_focus[:4], ensure_ascii=True)}
+{json.dumps(quiz_focus[:3], ensure_ascii=True)}
 
 Rules:
 1) Questions must be personalized to this candidate profile and JD.
 2) Include resume projects, roadmap progress, and quiz weak areas in questioning strategy.
 3) Do not return generic interview questions.
 4) Questions must be unique and progressively challenging.
+5) Keep each question short (max 20 words) and direct.
 5) Return ONLY a JSON array with objects containing keys:
    id, type, difficulty, question, expected_keywords (array), evaluation_criteria (array)
 6) expected_keywords must contain 3-8 concrete terms.
@@ -2093,6 +2120,7 @@ Rules:
     compact_prompt = f"""Return {normalized_count} personalized {mode_label} interview questions as JSON array only.
 Use resume + JD + roadmap + quiz + project context.
 Keys per item: id,type,difficulty,question,expected_keywords,evaluation_criteria.
+Question text must be short (max 20 words).
 No duplicates."""
 
     messages = [
@@ -2108,7 +2136,7 @@ No duplicates."""
         return fallback_output
 
     try:
-        response = await call_interview_chat(messages, temperature=0.35, max_tokens=550)
+        response = await call_interview_chat(messages, temperature=0.2, max_tokens=260)
         parsed = json.loads(_extract_json_block(response))
         if isinstance(parsed, list):
             normalized = []
@@ -2135,7 +2163,7 @@ No duplicates."""
                 {"role": "system", "content": "You are a senior interviewer generating realistic, candidate-specific interview questions."},
                 {"role": "user", "content": compact_prompt},
             ]
-            retry_response = await call_interview_chat(retry_messages, temperature=0.25, max_tokens=380)
+            retry_response = await call_interview_chat(retry_messages, temperature=0.15, max_tokens=180)
             retry_parsed = json.loads(_extract_json_block(retry_response))
             if isinstance(retry_parsed, list):
                 normalized = []
@@ -2542,6 +2570,20 @@ def _extract_json_block(text: str) -> str:
     return cleaned
 
 
+def _sanitize_model_error_message(err: Exception) -> str:
+    """Clean nested provider error wrappers for clearer UI warnings."""
+    message = str(err or "").strip()
+    if not message:
+        return "AI provider unavailable"
+
+    prefix = "AI API request failed:"
+    # Some paths can double-wrap the same prefix; remove repeated wrappers.
+    while message.lower().startswith(prefix.lower()):
+        message = message[len(prefix):].strip()
+
+    return message or "AI provider unavailable"
+
+
 def _normalize_model_ats_payload(raw: Dict[str, Any], fallback: Dict[str, Any]) -> Dict[str, Any]:
     if not isinstance(raw, dict):
         raise ValueError("ATS model response must be a JSON object")
@@ -2740,7 +2782,7 @@ async def calculate_ats_score(
         if should_fallback:
             fallback_with_reason = dict(fallback)
             fallback_with_reason["source"] = "rule_engine_model_unavailable"
-            fallback_with_reason["fallback_reason"] = str(e)
+            fallback_with_reason["fallback_reason"] = _sanitize_model_error_message(e)
             await _cache_set_json(cache_key, fallback_with_reason)
             return fallback_with_reason
         raise

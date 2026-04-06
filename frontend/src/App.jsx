@@ -169,7 +169,7 @@ const Badge = ({ children, variant = "default", style = {} }) => {
   );
 };
 
-const Btn = ({ children, variant = "primary", onClick, style = {}, icon, accentColor }) => {
+const Btn = ({ children, variant = "primary", onClick, style = {}, icon, accentColor, disabled = false }) => {
   const [hovered, setHovered] = useState(false);
   const base = {
     display: "inline-flex", alignItems: "center", justifyContent: "center",
@@ -209,9 +209,20 @@ const Btn = ({ children, variant = "primary", onClick, style = {}, icon, accentC
   };
   return (
     <button onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
+      disabled={disabled}
+      onMouseEnter={() => !disabled && setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      style={{ ...base, ...variants[variant], ...style }}>
+      style={{
+        ...base,
+        ...variants[variant],
+        ...(disabled ? {
+          opacity: 0.58,
+          cursor: "not-allowed",
+          transform: "none",
+          boxShadow: "none",
+        } : {}),
+        ...style,
+      }}>
       {icon && <span style={{ display: "flex" }}>{icon}</span>}
       {children}
     </button>
@@ -1655,6 +1666,62 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed, isDarkMode }) => {
     return await analyzeResponse.json();
   };
 
+  const normalizeWarningText = (message) => {
+    const raw = String(message || "").trim();
+    if (!raw) return "AI provider unavailable";
+    const prefix = /^ai api request failed:\s*/i;
+    let cleaned = raw;
+    while (prefix.test(cleaned)) {
+      cleaned = cleaned.replace(prefix, "").trim();
+    }
+    return cleaned.replace(/[:\s]+$/, "") || "AI provider unavailable";
+  };
+
+  const dedupeIssues = (items) => {
+    const seen = new Set();
+    return items.filter((item) => {
+      const key = String(item?.text || "").trim().toLowerCase();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  };
+
+  const handleDownloadReport = () => {
+    if (!uploaded) return;
+
+    const lines = [
+      "SkillBridge Resume Report",
+      `Generated: ${new Date().toLocaleString()}`,
+      "",
+      `Candidate: ${candidateName}`,
+      `File: ${fileName || "N/A"}`,
+      `ATS Score: ${atsScore}`,
+      `Formatting: ${scoreBreakdown.formatting_score}%`,
+      `Keywords: ${scoreBreakdown.keyword_match}%`,
+      `Impact: ${scoreBreakdown.readability_score}%`,
+      "",
+      "Top Skills:",
+      ...(topSkills.length ? topSkills.map((skill) => `- ${skill}`) : ["- None detected"]),
+      "",
+      "Issues:",
+      ...(issues.length ? issues.map((issue) => `- [${issue.type}] ${issue.text}`) : ["- No issues detected"]),
+      "",
+      "Suggestions:",
+      ...(suggestions.length ? suggestions.map((s) => `- ${s}`) : ["- No suggestions available"]),
+    ];
+
+    const blob = new Blob([lines.join("\n")], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${candidateName.replace(/\s+/g, "_") || "resume"}_report.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   const applyAnalyzeResult = ({ analyzeData, parsedResume, parsedResumeId, source }) => {
     setResumeId(parsedResumeId);
     setResumeData(parsedResume);
@@ -1681,18 +1748,22 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed, isDarkMode }) => {
       text: p.issue
     }));
     if (analyzeData.ats_model_warning) {
+      const normalizedAtsWarning = normalizeWarningText(analyzeData.ats_model_warning);
+      const isGenericAtsWarning = ["ai provider unavailable", "model unavailable"].includes(normalizedAtsWarning.toLowerCase());
+      if (!isGenericAtsWarning) {
       problemIssues.push({
         type: 'warning',
-        text: `ATS model unavailable: ${analyzeData.ats_model_warning}`,
+        text: `ATS model unavailable: ${normalizedAtsWarning}`,
       });
+      }
     }
     if (analyzeData.bullet_improvement_warning) {
       problemIssues.push({
         type: 'warning',
-        text: `Bullet improvement model unavailable: ${analyzeData.bullet_improvement_warning}`,
+        text: `Bullet improvement model unavailable: ${normalizeWarningText(analyzeData.bullet_improvement_warning)}`,
       });
     }
-    setIssues(problemIssues);
+    setIssues(dedupeIssues(problemIssues));
 
     const allSuggestions = [];
     if (analyzeData.detailed_ats_analysis?.suggestions) {
@@ -2212,7 +2283,7 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed, isDarkMode }) => {
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, color: isDarkMode ? "#dbe8fb" : "#374151" }}><span>Suggestions queued</span><strong>{suggestions.length}</strong></div>
             </div>
           </div>
-          {uploaded && <Btn variant="primary" style={{ marginTop: 20, width: "100%", justifyContent: "center", padding: "10px", background: isDarkMode ? "#5b7fc4" : undefined }}>Download report</Btn>}
+          {uploaded && <Btn variant="primary" onClick={handleDownloadReport} style={{ marginTop: 20, width: "100%", justifyContent: "center", padding: "10px", ...(isDarkMode ? { background: "#5b7fc4" } : {}) }}>Download report</Btn>}
           </div>
         </Card>
       </div>
@@ -2277,8 +2348,20 @@ const JDMatcher = ({ resumeId, initialJobDescription, initialMatchResult, onJobM
       });
 
       if (!response.ok) {
-        const message = await response.text();
-        throw new Error(message || "Failed to analyze JD match");
+        let message = "Failed to analyze JD match";
+        try {
+          const payload = await response.json();
+          const detail = String(payload?.detail || payload?.message || "").trim();
+          if (detail) {
+            message = detail.includes("validation errors for JDMatchResult")
+              ? "JD analysis response was malformed. Please retry once."
+              : detail;
+          }
+        } catch {
+          const text = await response.text();
+          if (text) message = text;
+        }
+        throw new Error(message);
       }
 
       const data = await response.json();
@@ -2320,18 +2403,24 @@ const JDMatcher = ({ resumeId, initialJobDescription, initialMatchResult, onJobM
   const weaknesses = matchResult?.weaknesses || [];
   const suggestions = matchResult?.suggestions || [];
   const overallMatch = Math.round(matchResult?.match_percentage || 0);
+  const jdLength = jd.trim().length;
+  const canAnalyze = Boolean(resumeId) && jdLength > 0 && !loading;
 
   return (
     <div style={{ padding: 28, display: "flex", flexDirection: "column", gap: 22, animation: "fadeIn 0.4s ease" }}>
       <div>
         <h2 style={{ fontSize: 20, fontWeight: 700, color: isDarkMode ? "#e8eef7" : "var(--gray-900)", letterSpacing: "-0.04em", marginBottom: 4 }}>JD Matcher</h2>
-        <p style={{ fontSize: 13.5, color: isDarkMode ? "#b4c3d9" : "var(--gray-500)" }}>Paste a job description to discover your match percentage and skill gaps.</p>
+        <p style={{ fontSize: 13.5, color: isDarkMode ? "#b4c3d9" : "var(--gray-500)", maxWidth: 720 }}>Paste a job description to discover your match percentage, missing skills, and role-specific focus areas.</p>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 18 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          <Card isDarkMode={isDarkMode} style={{ padding: 20 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: isDarkMode ? "#e8eef7" : "var(--gray-700)", marginBottom: 10 }}>Paste Job Description</div>
+          <Card isDarkMode={isDarkMode} style={{ padding: 22, position: "relative", overflow: "hidden" }}>
+            <div style={{ position: "absolute", inset: 0, pointerEvents: "none", background: isDarkMode ? "radial-gradient(circle at top right, rgba(107,147,214,0.16), transparent 40%)" : "radial-gradient(circle at top right, rgba(17,24,39,0.08), transparent 40%)" }} />
+            <div style={{ position: "relative", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: isDarkMode ? "#e8eef7" : "#111827", letterSpacing: "0.04em", textTransform: "uppercase" }}>Paste Job Description</div>
+              <span style={{ fontSize: 12, fontWeight: 600, color: jdLength > 120 ? "#10b981" : (isDarkMode ? "#8a9bb5" : "#9ca3af") }}>{jdLength} chars</span>
+            </div>
             <textarea
               value={jd}
               onChange={e => setJD(e.target.value)}
@@ -2345,8 +2434,17 @@ const JDMatcher = ({ resumeId, initialJobDescription, initialMatchResult, onJobM
                 lineHeight: 1.65,
               }}
             />
-            <Btn variant="primary" onClick={analyzeMatch} disabled={loading} style={{ marginTop: 12, width: "100%", justifyContent: "center", background: isDarkMode ? "#5b7fc4" : undefined }} icon={<Icon name="search" size={14}/>}> 
-              {loading ? "Analyzing..." : "Analyze match"}
+            <div style={{ marginTop: 10, fontSize: 14, fontWeight: 600, color: isDarkMode ? "#dbe8fb" : "#374151", lineHeight: 1.5 }}>
+              {!resumeId ? "Upload a resume first to enable analysis." : "Tip: Keep the character count low for better accuracy."}
+            </div>
+            <Btn
+              variant="primary"
+              onClick={analyzeMatch}
+              disabled={!canAnalyze}
+              style={{ marginTop: 12, width: "100%", justifyContent: "center", ...(isDarkMode ? { background: "#5b7fc4" } : {}) }}
+              icon={<Icon name="search" size={14}/>}
+            >
+              {loading ? "Analyzing..." : (!resumeId ? "Upload resume to analyze" : "Analyze match")}
             </Btn>
             {error && <div style={{ marginTop: 10, fontSize: 12.5, color: "#ef4444", fontWeight: 600 }}>{error}</div>}
           </Card>
@@ -2442,11 +2540,12 @@ const JDMatcher = ({ resumeId, initialJobDescription, initialMatchResult, onJobM
         )}
 
         {!analyzed && !loading && (
-          <Card isDarkMode={isDarkMode} style={{ display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 14, padding: 40, minHeight: 300 }} hover={false}>
+          <Card isDarkMode={isDarkMode} style={{ display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 14, padding: 40, minHeight: 300, position: "relative", overflow: "hidden" }} hover={false}>
+            <div style={{ position: "absolute", inset: 0, pointerEvents: "none", background: isDarkMode ? "radial-gradient(circle at 20% 20%, rgba(107,147,214,0.12), transparent 35%), radial-gradient(circle at 80% 75%, rgba(34,197,94,0.09), transparent 35%)" : "radial-gradient(circle at 20% 20%, rgba(17,24,39,0.07), transparent 35%), radial-gradient(circle at 80% 75%, rgba(16,185,129,0.08), transparent 35%)" }} />
             <div style={{ width: 56, height: 56, borderRadius: 16, background: isDarkMode ? "rgba(91,127,196,0.15)" : "var(--gray-100)", display: "flex", alignItems: "center", justifyContent: "center" }}>
               <Icon name="match" size={24} color={isDarkMode ? "#6b93d6" : "var(--gray-400)"}/>
             </div>
-            <div style={{ textAlign: "center" }}>
+            <div style={{ textAlign: "center", position: "relative" }}>
               <div style={{ fontSize: 14, fontWeight: 600, color: isDarkMode ? "#e8eef7" : "var(--gray-700)", marginBottom: 6 }}>Awaiting analysis</div>
               <div style={{ fontSize: 13, color: isDarkMode ? "#b4c3d9" : "var(--gray-400)" }}>Paste a JD and click Analyze to see your match</div>
             </div>
@@ -3010,7 +3109,7 @@ const MockInterview = ({ resumeId, resumeData, jobDescription, onInterviewProgre
       formData.append("resume_id", resumeId);
       formData.append("job_description", jobDescription || "");
       formData.append("mode", interviewMode);
-      formData.append("count", 5);
+      formData.append("count", 4);
       formData.append("quiz_context", JSON.stringify(loadQuizContext()));
 
       const response = await fetch("/api/interview/start", {
@@ -3150,8 +3249,8 @@ const MockInterview = ({ resumeId, resumeData, jobDescription, onInterviewProgre
           <p style={{ fontSize: 13.5, color: mutedColor }}>Questions are based on your resume, quiz history, and roadmap progress.</p>
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          {generationSource && (
-            <Badge style={isDarkMode ? { background: "rgba(122,147,193,0.18)", color: "#d7e4f7", border: "1px solid rgba(122,147,193,0.35)" } : {}}>{generationSource === "model" ? "Source: Live API model" : "Source: Fallback"}</Badge>
+          {generationSource === "model" && (
+            <Badge style={isDarkMode ? { background: "rgba(122,147,193,0.18)", color: "#d7e4f7", border: "1px solid rgba(122,147,193,0.35)" } : {}}>Source: Live API model</Badge>
           )}
           <div style={{ textAlign: "right" }}>
             <div style={{ fontSize: 20, fontWeight: 700, color: textColor, letterSpacing: "-0.04em" }}>{score}</div>

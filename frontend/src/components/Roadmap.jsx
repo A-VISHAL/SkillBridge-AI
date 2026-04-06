@@ -327,6 +327,9 @@ export default function Roadmap({ resumeId, jobDescription, onProgressChange, is
   };
 
   const timelineWidth = `${overallProgress}%`;
+  const isModelSource = generationSource === 'model' || generationSource === 'cache';
+  const normalizedRoadmapWarning = String(generationWarning || '').trim();
+  const showRoadmapWarning = isModelSource && normalizedRoadmapWarning && !/^AI API request failed:?$/i.test(normalizedRoadmapWarning);
 
   return (
     <div style={{ padding: 28, display: 'flex', flexDirection: 'column', gap: 22, animation: 'roadmapFadeIn 0.3s ease' }}>
@@ -352,14 +355,14 @@ export default function Roadmap({ resumeId, jobDescription, onProgressChange, is
         <p style={{ marginTop: 4, color: isDarkMode ? '#b4c3d9' : '#6b7280', fontSize: 13.5 }}>
           Your personalized learning path based on your resume and JD.
         </p>
-        {generationSource ? (
-          <div style={{ marginTop: 8, fontSize: 12.5, fontWeight: 600, color: generationSource === 'model' ? (isDarkMode ? '#86efac' : '#166534') : (isDarkMode ? '#fcd34d' : '#92400e') }}>
-            Source: {generationSource === 'model' ? 'Live API model' : 'Fallback plan'}
+        {isModelSource ? (
+          <div style={{ marginTop: 8, fontSize: 12.5, fontWeight: 600, color: isDarkMode ? '#86efac' : '#166534' }}>
+            Source: Live API model
           </div>
         ) : null}
-        {generationWarning ? (
+        {showRoadmapWarning ? (
           <div style={{ marginTop: 6, fontSize: 12, color: isDarkMode ? '#fcd34d' : '#b45309', maxWidth: 860 }}>
-            Warning: {generationWarning}
+            Warning: {normalizedRoadmapWarning}
           </div>
         ) : null}
       </div>
