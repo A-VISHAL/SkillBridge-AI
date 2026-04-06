@@ -312,19 +312,6 @@ This project is licensed under the MIT License.
 
 ---
 
-## 👥 Team
 
-Built with ❤️ by the SkillBridge AI Team
-
----
-
-## 📞 Support
-
-For issues and questions:
-- Open an issue on GitHub
-- Email: support@skillbridge.ai
-- Documentation: [docs.skillbridge.ai](https://docs.skillbridge.ai)
-
----
 
 **⭐ Star this repo if you find it helpful!**
