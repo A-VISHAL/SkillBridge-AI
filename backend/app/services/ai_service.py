@@ -602,22 +602,18 @@ async def _call_model_chat_with_fallback_key(
     max_tokens: int = 2000,
 ) -> str:
     fallback_key = (fallback_api_key or "").strip().strip('"').strip("'")
-    primary_key = (api_key or "").strip().strip('"').strip("'")
+    route_key = (api_key or "").strip().strip('"').strip("'")
     default_primary_key = (getattr(settings, "OXLO_API_KEY", "") or "").strip().strip('"').strip("'")
 
     if fallback_key.lower().startswith("bearer "):
         fallback_key = fallback_key[7:].strip()
-    if primary_key.lower().startswith("bearer "):
-        primary_key = primary_key[7:].strip()
+    if route_key.lower().startswith("bearer "):
+        route_key = route_key[7:].strip()
     if default_primary_key.lower().startswith("bearer "):
         default_primary_key = default_primary_key[7:].strip()
 
-    # If a route key was accidentally set to the fallback key, prefer OXLO_API_KEY first.
-    if primary_key and fallback_key and default_primary_key and primary_key == fallback_key and default_primary_key != fallback_key:
-        primary_key = default_primary_key
-
-    if not primary_key and default_primary_key:
-        primary_key = default_primary_key
+    # Always honor OXLO_API_KEY as the primary key when available.
+    primary_key = default_primary_key or route_key
 
     try:
         return await call_model_chat(
