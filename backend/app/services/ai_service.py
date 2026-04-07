@@ -588,7 +588,7 @@ async def call_model_chat(
 
 
 def _should_retry_with_fallback_key(error: Exception) -> bool:
-    return isinstance(error, AIServiceError) and error.code in {"config", "auth", "rate_limit", "http_error", "network", "parse"}
+    return isinstance(error, AIServiceError) and error.code == "rate_limit"
 
 
 async def _call_model_chat_with_fallback_key(
@@ -2687,6 +2687,20 @@ def _sanitize_model_error_message(err: Exception) -> str:
     return message or "AI provider unavailable"
 
 
+def _normalize_percentage_score(value: Any) -> float:
+    try:
+        score = float(value)
+    except Exception:
+        return 0.0
+
+    if score <= 1:
+        score *= 100.0
+    elif score <= 10:
+        score *= 10.0
+
+    return round(max(0.0, min(100.0, score)), 2)
+
+
 def _normalize_model_ats_payload(raw: Dict[str, Any], fallback: Dict[str, Any]) -> Dict[str, Any]:
     if not isinstance(raw, dict):
         raise ValueError("ATS model response must be a JSON object")
@@ -2707,6 +2721,17 @@ def _normalize_model_ats_payload(raw: Dict[str, Any], fallback: Dict[str, Any]) 
 
     merged_score_breakdown = dict(fallback.get("score_breakdown", {}))
     merged_score_breakdown.update(score_breakdown)
+    for key in (
+        "keyword_match",
+        "skills_relevance",
+        "experience_alignment",
+        "education_fit",
+        "resume_structure",
+        "projects_quality",
+        "ats_compatibility",
+    ):
+        if key in merged_score_breakdown:
+            merged_score_breakdown[key] = _normalize_percentage_score(merged_score_breakdown[key])
 
     suggestions = merged.get("suggestions", {})
     if not isinstance(suggestions, dict):
