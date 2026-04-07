@@ -51,7 +51,6 @@ to accelerate job placement.**
 - [Installation & Setup](#installation--setup)
 - [Environment Variables](#environment-variables)
 - [Future Improvements](#future-improvements)
-- [Contributing](#contributing)
 - [License](#license)
 
 <br/>
@@ -99,7 +98,15 @@ SkillBridge AI is a full-stack agentic career operating system that provides end
 
 ## Demo Video
 
+## 🎬 Demo Video
+
 <div align="center">
+
+<a href="https://youtu.be/Q7K7YUlHHk4?si=kC6bsa8sQ3XgBSfP">
+  <img src="https://img.youtube.com/vi/Q7K7YUlHHk4/maxresdefault.jpg" width="80%" alt="Watch Demo Video"/>
+</a>
+
+<br/><br/>
 
 [![🎥 Watch Demo](https://img.shields.io/badge/Watch%20Demo-YouTube-red?style=for-the-badge&logo=youtube&logoColor=white)](https://youtu.be/Q7K7YUlHHk4?si=kC6bsa8sQ3XgBSfP)
 
