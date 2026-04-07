@@ -78,17 +78,25 @@ SkillBridge AI is a full-stack agentic career operating system that provides end
 ## Screenshots
 
 
+## 📸 Screenshots
+
 <div align="center">
+
+### 🧠 Core Features
 
 | Resume Analyzer | Learning Roadmap | Mock Interview |
 |:---:|:---:|:---:|
-| <img src="https://github.com/user-attachments/assets/31b03b14-7adc-4f5f-94f4-3d577f649346" width="100%" height="200"/> | <img src="https://github.com/user-attachments/assets/405bd9c7-8829-4803-ac24-667dae8f33af" width="100%" height="200"/> | <img src="https://github.com/user-attachments/assets/8b3f718a-3b18-4519-b3f8-b33afb6f50d8" width="100%" height="200"/> |
-| _ATS scoring & keyword suggestions_ | _Week-by-week personalized plan_ | _AI-evaluated interview simulation_ |
+| <img src="https://github.com/user-attachments/assets/31b03b14-7adc-4f5f-94f4-3d577f649346" width="100%" height="180"/> | <img src="https://github.com/user-attachments/assets/405bd9c7-8829-4803-ac24-667dae8f33af" width="100%" height="180"/> | <img src="https://github.com/user-attachments/assets/8b3f718a-3b18-4519-b3f8-b33afb6f50d8" width="100%" height="180"/> |
+| <sub><b>ATS scoring & keyword suggestions</b></sub> | <sub><b>Week-by-week personalized plan</b></sub> | <sub><b>AI-evaluated interview simulation</b></sub> |
+
+<br/>
+
+### ⚙️ Advanced Modules
 
 | JD Matcher | Adaptive Quiz | Admin Dashboard |
 |:---:|:---:|:---:|
-| <img src="https://github.com/user-attachments/assets/548da043-9f4e-453a-b059-625dfe92f90b" width="100%" height="200"/> | <img src="https://github.com/user-attachments/assets/09959a23-48d9-45ab-9417-2ea5610c0349" width="100%" height="200"/> | <img src="https://github.com/user-attachments/assets/d70a8e63-da60-436a-83ef-8b2e08ff4819" width="100%" height="200"/> |
-| _Skill gap identification_ | _Domain-specific assessments_ | _Analytics & student management_ |
+| <img src="https://github.com/user-attachments/assets/548da043-9f4e-453a-b059-625dfe92f90b" width="100%" height="180"/> | <img src="https://github.com/user-attachments/assets/09959a23-48d9-45ab-9417-2ea5610c0349" width="100%" height="180"/> | <img src="https://github.com/user-attachments/assets/d70a8e63-da60-436a-83ef-8b2e08ff4819" width="100%" height="180"/> |
+| <sub><b>Skill gap identification</b></sub> | <sub><b>Domain-specific assessments</b></sub> | <sub><b>Analytics & student management</b></sub> |
 
 </div>
 
