@@ -1301,11 +1301,14 @@ async def generate_roadmap(
 ) -> Dict[str, Any]:
     """Generate a detailed weekly roadmap from resume and JD, with complete week coverage."""
 
-    cache_key = f"roadmap:v3:{_stable_hash(resume_text[:900])}:{_stable_hash(jd_text[:800])}:{_stable_hash(skill_gaps[:6])}"
+    cache_key = f"roadmap:v4:{_stable_hash(resume_text[:900])}:{_stable_hash(jd_text[:800])}:{_stable_hash(skill_gaps[:6])}"
     cached_payload = await _cache_get_json(cache_key)
     if isinstance(cached_payload, dict):
-        cached_payload["cached"] = True
-        return cached_payload
+        if settings.ROADMAP_STRICT_MODEL and cached_payload.get("source") == "roadmap_fallback":
+            cached_payload = None
+        else:
+            cached_payload["cached"] = True
+            return cached_payload
 
     def _unique_items(items: List[str]) -> List[str]:
         output: List[str] = []
@@ -1528,11 +1531,11 @@ Return valid JSON with keys:
 
 Rules:
 1) Include ALL weeks 1..12.
-2) At least 3 unique tasks per week.
+2) Provide exactly one anchor task per week (12 tasks total).
 3) Keep each task under 18 words.
 4) No repeated task text.
 5) Task content must be specific and tied to resume/JD gaps.
-6) Every week must contain different tasks with concrete deliverables.
+6) Every week must contain a concrete deliverable.
 7) Do not output generic tasks like "practice" without a specific artifact.
 8) Return ONLY strict JSON. No markdown. Be concise."""
 
@@ -1559,7 +1562,7 @@ Return JSON keys only:
 
 Rules:
 1) Weeks 1..12 must exist.
-2) At least 3 unique tasks per week.
+2) Exactly one concise anchor task per week.
 3) No repeated task text.
 4) Each task must include a concrete deliverable tied to JD requirements.
 5) Keep wording concise and specific."""
@@ -1574,7 +1577,7 @@ Rules:
 
     try:
         # Primary model attempt.
-        response = await call_roadmap_chat(messages, temperature=0.18, max_tokens=320)
+        response = await call_roadmap_chat(messages, temperature=0.12, max_tokens=220)
         parsed = json.loads(_extract_json_block(response))
         normalized = _normalize_payload(parsed)
         normalized["source"] = "model"
@@ -1590,7 +1593,7 @@ Rules:
                 },
                 {"role": "user", "content": compact_prompt},
             ]
-            retry_response = await call_roadmap_chat(retry_messages, temperature=0.12, max_tokens=220)
+            retry_response = await call_roadmap_chat(retry_messages, temperature=0.08, max_tokens=180)
             retry_parsed = json.loads(_extract_json_block(retry_response))
             normalized = _normalize_payload(retry_parsed)
             normalized["source"] = "model"
@@ -1598,7 +1601,10 @@ Rules:
             await _cache_set_json(cache_key, normalized)
             return normalized
         except Exception as retry_error:
-            print(f"Error generating roadmap from AI: {str(first_error)} | Retry failed: {str(retry_error)}")
+            error_text = f"{str(first_error)} | Retry failed: {str(retry_error)}"
+            print(f"AI FAILED roadmap: {error_text}")
+            if settings.ROADMAP_STRICT_MODEL:
+                raise AIServiceError("roadmap_generation", error_text)
             normalized = _normalize_payload({})
             normalized["source"] = "roadmap_fallback"
             normalized["warning"] = str(retry_error)
@@ -1618,7 +1624,7 @@ async def generate_quiz_questions(
     """Generate quiz questions based on resume, JD, and followed roadmap context."""
 
     roadmap_context = roadmap_context or []
-    cache_key = f"quiz:v2:{_stable_hash(topic)}:{_stable_hash(difficulty)}:{_stable_hash(domain)}:{int(count or 10)}:{_stable_hash(resume_text[:1200])}:{_stable_hash(jd_text[:1200])}:{_stable_hash(roadmap_context[:8])}"
+    cache_key = f"quiz:v3:{_stable_hash(topic)}:{_stable_hash(difficulty)}:{_stable_hash(domain)}:{int(count or 10)}:{_stable_hash(resume_text[:1200])}:{_stable_hash(jd_text[:1200])}:{_stable_hash(roadmap_context[:8])}"
     cached_payload = await _cache_get_json(cache_key)
     if isinstance(cached_payload, list) and cached_payload:
         if isinstance(generation_meta, dict):
@@ -1791,6 +1797,8 @@ Return JSON array only."""
     ]
 
     def _build_and_cache_fallback(reason: str) -> List[Dict[str, Any]]:
+        if settings.QUIZ_STRICT_MODEL:
+            raise AIServiceError("quiz_generation", reason)
         fallback_questions = _build_quiz_fallback_questions(
             topic=topic,
             difficulty=difficulty,

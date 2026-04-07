@@ -758,7 +758,7 @@ async def generate_roadmap(
         match_data = _build_fast_roadmap_match_data(resume.raw_text, job_description, resume.dict())
         missing_skills = match_data.get("missing_skills", [])
         
-        # Generate roadmap (with built-in fallback)
+        # Generate roadmap with strict model enforcement when enabled
         roadmap_data = await ai_service.generate_roadmap(
             resume.raw_text,
             job_description,
@@ -805,6 +805,8 @@ async def generate_roadmap(
         
     except HTTPException:
         raise
+    except ai_service.AIServiceError as e:
+        raise HTTPException(503, f"Roadmap model unavailable: {str(e)}")
     except Exception as e:
         print(f"Error generating roadmap: {str(e)}")
         raise HTTPException(500, "Error generating roadmap. Please try again.")
@@ -865,6 +867,8 @@ async def generate_quiz(
         }
         
     except Exception as e:
+        if settings.QUIZ_STRICT_MODEL:
+            raise HTTPException(503, f"Quiz model unavailable: {str(e)}")
         fallback_questions = ai_service.build_quiz_fallback_questions(
             topic=topic,
             difficulty=difficulty,

@@ -2028,11 +2028,11 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed, isDarkMode }) => {
                     </div>
                   </div>
                 )}
-                <div style={{ fontSize: 13, color: isDarkMode ? "#8a9bb5" : "var(--gray-400)", marginBottom: 20, position: "relative" }}>PDF, DOCX supported | Max 5MB</div>
+                <div style={{ fontSize: 13, color: isDarkMode ? "#8a9bb5" : "var(--gray-400)", marginBottom: 20, position: "relative" }}>PDF supported | Max 5MB</div>
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".pdf,.doc,.docx"
+                  accept=".pdf"
                   onChange={handleFileInputChange}
                   style={{ display: "none" }}
                 />

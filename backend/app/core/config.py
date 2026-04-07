@@ -106,6 +106,10 @@ class Settings:
     # Resume analysis optimization
     ENABLE_BULLET_IMPROVEMENTS: bool = _get_env_bool("ENABLE_BULLET_IMPROVEMENTS", default=False)
 
+    # Strict model policy for generation-heavy endpoints
+    ROADMAP_STRICT_MODEL: bool = _get_env_bool("ROADMAP_STRICT_MODEL", default=True)
+    QUIZ_STRICT_MODEL: bool = _get_env_bool("QUIZ_STRICT_MODEL", default=True)
+
     # Supabase
     SUPABASE_URL: str = os.getenv("SUPABASE_URL", "")
     SUPABASE_ANON_KEY: str = os.getenv("SUPABASE_ANON_KEY", "")

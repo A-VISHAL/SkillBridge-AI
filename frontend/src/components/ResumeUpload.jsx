@@ -74,9 +74,7 @@ export default function ResumeUpload({ onResumeUploaded }) {
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
-      'application/pdf': ['.pdf'],
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
-      'text/plain': ['.txt']
+      'application/pdf': ['.pdf']
     },
     maxFiles: 1
   })
@@ -121,7 +119,7 @@ export default function ResumeUpload({ onResumeUploaded }) {
         <div style={{ fontSize: 15, fontWeight: 600, color: "var(--gray-800)", marginBottom: 6 }}>
           {isDragActive ? "Drop your resume here" : "Drop your resume here"}
         </div>
-        <div style={{ fontSize: 13, color: "var(--gray-400)" }}>PDF, DOCX, TXT supported · Max 5MB</div>
+        <div style={{ fontSize: 13, color: "var(--gray-400)" }}>PDF supported · Max 5MB</div>
         <Btn variant="secondary" style={{ marginTop: 20, padding: "8px 20px", fontSize: 13 }}>Browse files</Btn>
       </div>
 
