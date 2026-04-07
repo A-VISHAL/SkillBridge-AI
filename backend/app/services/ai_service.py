@@ -612,8 +612,16 @@ async def _call_model_chat_with_fallback_key(
     if default_primary_key.lower().startswith("bearer "):
         default_primary_key = default_primary_key[7:].strip()
 
-    # Always honor OXLO_API_KEY as the primary key when available.
-    primary_key = default_primary_key or route_key
+    # Always honor OXLO_API_KEY as primary. Never allow fallback key to become primary.
+    if default_primary_key:
+        primary_key = default_primary_key
+    elif route_key and route_key != fallback_key:
+        primary_key = route_key
+    else:
+        raise AIServiceError(
+            "config",
+            "Primary API key is missing or invalid. Set OXLO_API_KEY and keep it different from OXLO_FALLBACK_API_KEY.",
+        )
 
     try:
         return await call_model_chat(
