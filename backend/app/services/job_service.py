@@ -34,8 +34,30 @@ async def search_jobs_adzuna(query: str, location: str = "india", max_results: i
         print(f"Error calling Adzuna API: {e}")
         return []
 
+def _location_to_country(location: str) -> str:
+    """Map location string to country code for RapidAPI"""
+    location_lower = location.lower()
+    country_map = {
+        "india": "in",
+        "united states": "us",
+        "usa": "us",
+        "us": "us",
+        "uk": "gb",
+        "united kingdom": "gb",
+        "canada": "ca",
+        "australia": "au",
+        "germany": "de",
+        "france": "fr",
+        "netherlands": "nl",
+        "singapore": "sg",
+        "dubai": "ae",
+        "uae": "ae",
+    }
+    return country_map.get(location_lower, "in")  # Default to India
+
+
 async def search_jobs_rapidapi(query: str, location: str = "India") -> List[Dict]:
-    """Search jobs using RapidAPI JSearch"""
+    """Search jobs using RapidAPI JSearch with country and date filters"""
     
     if not settings.RAPIDAPI_KEY:
         return []
@@ -44,12 +66,16 @@ async def search_jobs_rapidapi(query: str, location: str = "India") -> List[Dict
         url = "https://jsearch.p.rapidapi.com/search"
         headers = {
             "X-RapidAPI-Key": settings.RAPIDAPI_KEY,
-            "X-RapidAPI-Host": "jsearch.p.rapidapi.com"
+            "X-RapidAPI-Host": "jsearch.p.rapidapi.com",
+            "Content-Type": "application/json"
         }
+        country_code = _location_to_country(location)
         params = {
             "query": query,
             "page": "1",
-            "num_pages": "1"
+            "num_pages": "1",
+            "country": country_code,
+            "date_posted": "all"
         }
         
         async with httpx.AsyncClient(timeout=settings.API_TIMEOUT_SECONDS) as client:
@@ -59,6 +85,7 @@ async def search_jobs_rapidapi(query: str, location: str = "India") -> List[Dict
                 data = response.json()
                 return data.get("data", [])
             else:
+                print(f"RapidAPI error: {response.status_code}")
                 return []
                 
     except Exception as e:
