@@ -587,15 +587,57 @@ async def call_model_chat(
     raise AIServiceError("parse", f"No textual content in response payload keys={list(data.keys())}")
 
 
+def _should_retry_with_fallback_key(error: Exception) -> bool:
+    return isinstance(error, AIServiceError) and error.code in {"config", "auth", "rate_limit", "http_error", "network", "parse"}
+
+
+async def _call_model_chat_with_fallback_key(
+    messages: List[Dict[str, str]],
+    endpoint: str,
+    api_key: str,
+    fallback_api_key: str,
+    model: str,
+    temperature: float = 0.7,
+    max_tokens: int = 2000,
+) -> str:
+    try:
+        return await call_model_chat(
+            messages=messages,
+            endpoint=endpoint,
+            api_key=api_key,
+            model=model,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
+    except Exception as primary_error:
+        fallback_key = (fallback_api_key or "").strip().strip('"').strip("'")
+        primary_key = (api_key or "").strip().strip('"').strip("'")
+        if fallback_key.lower().startswith("bearer "):
+            fallback_key = fallback_key[7:].strip()
+        if primary_key.lower().startswith("bearer "):
+            primary_key = primary_key[7:].strip()
+        if not fallback_key or fallback_key == primary_key or not _should_retry_with_fallback_key(primary_error):
+            raise
+        return await call_model_chat(
+            messages=messages,
+            endpoint=endpoint,
+            api_key=fallback_key,
+            model=model,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
+
+
 async def call_ats_chat(
     messages: List[Dict[str, str]],
     temperature: float = 0.7,
     max_tokens: int = 2000,
 ) -> str:
-    return await call_model_chat(
+    return await _call_model_chat_with_fallback_key(
         messages=messages,
         endpoint=settings.ATS_CHAT_ENDPOINT,
         api_key=settings.ATS_API_KEY,
+        fallback_api_key=settings.OXLO_FALLBACK_API_KEY,
         model=settings.ATS_MODEL,
         temperature=temperature,
         max_tokens=max_tokens,
@@ -607,10 +649,11 @@ async def call_jd_chat(
     temperature: float = 0.7,
     max_tokens: int = 2000,
 ) -> str:
-    return await call_model_chat(
+    return await _call_model_chat_with_fallback_key(
         messages=messages,
         endpoint=settings.JD_CHAT_ENDPOINT,
         api_key=settings.JD_API_KEY,
+        fallback_api_key=settings.OXLO_FALLBACK_API_KEY,
         model=settings.JD_MODEL,
         temperature=temperature,
         max_tokens=max_tokens,
@@ -622,10 +665,11 @@ async def call_roadmap_chat(
     temperature: float = 0.7,
     max_tokens: int = 2000,
 ) -> str:
-    return await call_model_chat(
+    return await _call_model_chat_with_fallback_key(
         messages=messages,
         endpoint=settings.ROADMAP_CHAT_ENDPOINT,
         api_key=settings.ROADMAP_API_KEY,
+        fallback_api_key=settings.OXLO_FALLBACK_API_KEY,
         model=settings.ROADMAP_MODEL,
         temperature=temperature,
         max_tokens=max_tokens,
@@ -637,10 +681,11 @@ async def call_quiz_chat(
     temperature: float = 0.7,
     max_tokens: int = 2000,
 ) -> str:
-    return await call_model_chat(
+    return await _call_model_chat_with_fallback_key(
         messages=messages,
         endpoint=settings.QUIZ_CHAT_ENDPOINT,
         api_key=settings.QUIZ_API_KEY,
+        fallback_api_key=settings.OXLO_FALLBACK_API_KEY,
         model=settings.QUIZ_MODEL,
         temperature=temperature,
         max_tokens=max_tokens,
@@ -652,10 +697,11 @@ async def call_interview_chat(
     temperature: float = 0.7,
     max_tokens: int = 2000,
 ) -> str:
-    return await call_model_chat(
+    return await _call_model_chat_with_fallback_key(
         messages=messages,
         endpoint=settings.INTERVIEW_CHAT_ENDPOINT,
         api_key=settings.INTERVIEW_API_KEY,
+        fallback_api_key=settings.OXLO_FALLBACK_API_KEY,
         model=settings.INTERVIEW_MODEL,
         temperature=temperature,
         max_tokens=max_tokens,

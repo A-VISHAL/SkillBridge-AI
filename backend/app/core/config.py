@@ -36,6 +36,9 @@ class Settings:
     OXLO_API_KEY: str = _normalize_api_key(
         _get_env("OXLO_API_KEY", "OXLO_API_TOKEN", "OPENAI_API_KEY", "ANTHROPIC_API_KEY")
     )
+    OXLO_FALLBACK_API_KEY: str = _normalize_api_key(
+        _get_env("OXLO_FALLBACK_API_KEY", "FALLBACK_API_KEY")
+    )
     OXLO_CHAT_ENDPOINT: str = _get_env("OXLO_CHAT_ENDPOINT", default="https://api.oxlo.ai/v1/chat/completions")
     OXLO_MODEL: str = _get_env("OXLO_MODEL", default="deepseek r1 8b")
     OXLO_EMBEDDINGS_ENDPOINT: str = os.getenv("OXLO_EMBEDDINGS_ENDPOINT", "https://api.oxlo.ai/v1/embeddings")
