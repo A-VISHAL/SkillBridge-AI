@@ -1889,6 +1889,8 @@ Return JSON array only."""
         {"role": "user", "content": prompt},
     ]
 
+    last_model_questions: List[Dict[str, Any]] = []
+
     async def _call_quiz_with_model_route_fallback(
         request_messages: List[Dict[str, str]],
         temperature: float,
@@ -1934,6 +1936,7 @@ Return JSON array only."""
                     normalized_questions.append(normalized)
 
             normalized_questions = _dedupe_questions(normalized_questions)
+            last_model_questions = normalized_questions
             if len(normalized_questions) >= normalized_count:
                 output = normalized_questions[:normalized_count]
                 await _cache_set_json(cache_key, output)
@@ -1959,6 +1962,8 @@ Return JSON array only."""
                 if normalized:
                     normalized_questions.append(normalized)
             normalized_questions = _dedupe_questions(normalized_questions)
+            if normalized_questions:
+                last_model_questions = normalized_questions
             if len(normalized_questions) >= normalized_count:
                 output = normalized_questions[:normalized_count]
                 await _cache_set_json(cache_key, output)
@@ -1967,10 +1972,24 @@ Return JSON array only."""
                     generation_meta["warning"] = None
                 return output
     except Exception as retry_error:
+        if last_model_questions:
+            if isinstance(generation_meta, dict):
+                generation_meta["source"] = "model"
+                generation_meta["warning"] = "Model returned fewer validated questions than requested"
+            await _cache_set_json(cache_key, last_model_questions)
+            return last_model_questions
+
         fallback_reason = f"{str(primary_error or 'Primary model failed')} | Retry failed: {str(retry_error)}"
         fallback_questions = _build_and_cache_fallback(fallback_reason)
         await _cache_set_json(cache_key, fallback_questions)
         return fallback_questions
+
+    if last_model_questions:
+        if isinstance(generation_meta, dict):
+            generation_meta["source"] = "model"
+            generation_meta["warning"] = "Model returned fewer validated questions than requested"
+        await _cache_set_json(cache_key, last_model_questions)
+        return last_model_questions
 
     fallback_reason = "Quiz generation returned insufficient unique validated questions from model after retry"
     fallback_questions = _build_and_cache_fallback(fallback_reason)
