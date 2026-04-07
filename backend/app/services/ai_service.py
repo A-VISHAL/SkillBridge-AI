@@ -539,7 +539,8 @@ async def call_model_chat(
                 try:
                     response = await client.post(endpoint, headers=headers, json=payload)
                 except Exception as e:
-                    raise AIServiceError("network", f"AI API request failed: {str(e)}") from e
+                    error_detail = str(e).strip() or e.__class__.__name__
+                    raise AIServiceError("network", f"AI API request failed: {error_detail}") from e
 
                 if response.status_code == 200:
                     last_response = response
@@ -1905,7 +1906,7 @@ Return JSON array only."""
             raise
 
     def _build_and_cache_fallback(reason: str) -> List[Dict[str, Any]]:
-        if settings.QUIZ_STRICT_MODEL and not _quiz_reason_is_rate_limited(reason):
+        if settings.QUIZ_STRICT_MODEL or not _quiz_reason_is_rate_limited(reason):
             raise AIServiceError("quiz_generation", reason)
         fallback_questions = _build_quiz_fallback_questions(
             topic=topic,
