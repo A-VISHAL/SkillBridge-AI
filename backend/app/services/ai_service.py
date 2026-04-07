@@ -1906,7 +1906,7 @@ Return JSON array only."""
             raise
 
     def _build_and_cache_fallback(reason: str) -> List[Dict[str, Any]]:
-        if settings.QUIZ_STRICT_MODEL or not _quiz_reason_is_rate_limited(reason):
+        if settings.QUIZ_STRICT_MODEL and not _quiz_reason_is_rate_limited(reason):
             raise AIServiceError("quiz_generation", reason)
         fallback_questions = _build_quiz_fallback_questions(
             topic=topic,
