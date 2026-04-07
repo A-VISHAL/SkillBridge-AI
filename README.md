@@ -468,10 +468,10 @@ See the `LICENSE` file for full details.
 
 <div align="center">
 
-**Built with purpose. Powered by AI. Designed for impact.**
+**🚀 Built with purpose. Powered by AI. Designed for impact.**
 
-If you found this project useful, please consider giving it a star.
+If you found this project useful, please consider giving it a ⭐
 
-[![Star on GitHub](https://img.shields.io/github/stars/yourusername/skillbridge-ai?style=social)](https://github.com/A-VISHAL/SkillBridge-AI)
+[![⭐ Star](https://img.shields.io/github/stars/A-VISHAL/SkillBridge-AI?style=social)](https://github.com/A-VISHAL/SkillBridge-AI) [![🍴 Fork](https://img.shields.io/github/forks/A-VISHAL/SkillBridge-AI?style=social)](https://github.com/A-VISHAL/SkillBridge-AI)
 
 </div>
