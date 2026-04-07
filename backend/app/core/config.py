@@ -108,7 +108,7 @@ class Settings:
 
     # Strict model policy for generation-heavy endpoints
     ROADMAP_STRICT_MODEL: bool = _get_env_bool("ROADMAP_STRICT_MODEL", default=True)
-    QUIZ_STRICT_MODEL: bool = _get_env_bool("QUIZ_STRICT_MODEL", default=True)
+    QUIZ_STRICT_MODEL: bool = _get_env_bool("QUIZ_STRICT_MODEL", default=False)
 
     # Supabase
     SUPABASE_URL: str = os.getenv("SUPABASE_URL", "")

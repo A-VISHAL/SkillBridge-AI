@@ -670,6 +670,11 @@ def _allow_rate_limit_fallback(error: Exception) -> bool:
     )
 
 
+def _quiz_reason_is_rate_limited(reason: str) -> bool:
+    normalized_reason = reason.lower()
+    return "rate_limit" in normalized_reason or "rate limit" in normalized_reason or "429" in normalized_reason
+
+
 async def call_oxlo_chat(
     messages: List[Dict[str, str]],
     temperature: float = 0.7,
@@ -1685,9 +1690,10 @@ async def generate_quiz_questions(
                         flagged_correct += 1
                         if not correct_answer:
                             correct_answer = option_text
-
-        if flagged_correct != 1:
-            return None
+            elif isinstance(option, str):
+                option_text = option.strip()
+                if option_text:
+                    cleaned_options.append(option_text)
 
         if len(set(opt.lower() for opt in cleaned_options)) < 4:
             return None
@@ -1695,11 +1701,40 @@ async def generate_quiz_questions(
         if len(cleaned_options) < 4:
             return None
 
+        # Accept common model variants for correct answer:
+        # - exact option text
+        # - option letter (A/B/C/D)
+        # - 1-based index (1..4)
+        # - 0-based index (0..3)
+        correct_raw = item.get("correct_answer", "")
+        if not correct_answer and flagged_correct == 1:
+            pass
+        elif flagged_correct > 1:
+            return None
+        elif not correct_answer:
+            raw = str(correct_raw).strip()
+            if raw:
+                lower_map = {opt.lower(): opt for opt in cleaned_options}
+                if raw.lower() in lower_map:
+                    correct_answer = lower_map[raw.lower()]
+                else:
+                    letter = raw.upper()
+                    if letter in {"A", "B", "C", "D"}:
+                        idx = ord(letter) - ord("A")
+                        if 0 <= idx < len(cleaned_options):
+                            correct_answer = cleaned_options[idx]
+                    elif raw.isdigit():
+                        n = int(raw)
+                        if 1 <= n <= len(cleaned_options):
+                            correct_answer = cleaned_options[n - 1]
+                        elif 0 <= n < len(cleaned_options):
+                            correct_answer = cleaned_options[n]
+
         if not correct_answer:
-            correct_answer = str(item.get("correct_answer", cleaned_options[0])).strip() or cleaned_options[0]
+            return None
 
         if correct_answer not in cleaned_options:
-            correct_answer = cleaned_options[0]
+            return None
 
         correct_index = cleaned_options.index(correct_answer)
         model_difficulty = str(item.get("difficulty", "")).strip().title()
@@ -1796,8 +1831,21 @@ Return JSON array only."""
         {"role": "user", "content": prompt},
     ]
 
+    async def _call_quiz_with_model_route_fallback(
+        request_messages: List[Dict[str, str]],
+        temperature: float,
+        max_tokens: int,
+    ) -> str:
+        """Prefer dedicated quiz route; fall back to ATS model route when provider rejects quiz route settings."""
+        try:
+            return await call_quiz_chat(request_messages, temperature=temperature, max_tokens=max_tokens)
+        except AIServiceError as quiz_error:
+            if quiz_error.code in {"auth", "config", "http_error", "network"}:
+                return await call_ats_chat(request_messages, temperature=temperature, max_tokens=max_tokens)
+            raise
+
     def _build_and_cache_fallback(reason: str) -> List[Dict[str, Any]]:
-        if settings.QUIZ_STRICT_MODEL:
+        if settings.QUIZ_STRICT_MODEL and not _quiz_reason_is_rate_limited(reason):
             raise AIServiceError("quiz_generation", reason)
         fallback_questions = _build_quiz_fallback_questions(
             topic=topic,
@@ -1814,8 +1862,11 @@ Return JSON array only."""
             generation_meta["warning"] = reason
         return fallback_questions
 
+    primary_error: Optional[Exception] = None
     try:
-        response = await call_quiz_chat(messages, temperature=0.3, max_tokens=420)
+        # 10 validated MCQs with options typically needs >900 output tokens.
+        primary_max_tokens = min(1400, max(700, 90 * normalized_count + 220))
+        response = await _call_quiz_with_model_route_fallback(messages, temperature=0.3, max_tokens=primary_max_tokens)
         parsed = json.loads(_extract_json_block(response))
         if isinstance(parsed, list):
             normalized_questions: List[Dict[str, Any]] = []
@@ -1833,40 +1884,37 @@ Return JSON array only."""
                     generation_meta["warning"] = None
                 return output
     except Exception as first_error:
-        if isinstance(first_error, AIServiceError) and first_error.code in {"auth", "config", "network", "http_error", "parse"}:
-            fallback_reason = f"Primary model call failed without retry: {str(first_error)}"
-            fallback_questions = _build_and_cache_fallback(fallback_reason)
-            await _cache_set_json(cache_key, fallback_questions)
-            return fallback_questions
+        primary_error = first_error
 
-        try:
-            retry_messages = [
-                {"role": "system", "content": "You are an expert technical interviewer creating highly relevant adaptive quizzes."},
-                {"role": "user", "content": compact_prompt},
-            ]
-            retry_response = await call_quiz_chat(retry_messages, temperature=0.2, max_tokens=320)
-            retry_parsed = json.loads(_extract_json_block(retry_response))
-            if isinstance(retry_parsed, list):
-                normalized_questions = []
-                for index, item in enumerate(retry_parsed):
-                    normalized = _normalize_ai_question(item, index)
-                    if normalized:
-                        normalized_questions.append(normalized)
-                normalized_questions = _dedupe_questions(normalized_questions)
-                if len(normalized_questions) >= normalized_count:
-                    output = normalized_questions[:normalized_count]
-                    await _cache_set_json(cache_key, output)
-                    if isinstance(generation_meta, dict):
-                        generation_meta["source"] = "model"
-                        generation_meta["warning"] = None
-                    return output
-        except Exception as retry_error:
-            fallback_reason = f"{str(first_error)} | Retry failed: {str(retry_error)}"
-            fallback_questions = _build_and_cache_fallback(fallback_reason)
-            await _cache_set_json(cache_key, fallback_questions)
-            return fallback_questions
+    try:
+        retry_messages = [
+            {"role": "system", "content": "You are an expert technical interviewer creating highly relevant adaptive quizzes."},
+            {"role": "user", "content": compact_prompt},
+        ]
+        retry_max_tokens = min(1200, max(650, 80 * normalized_count + 180))
+        retry_response = await _call_quiz_with_model_route_fallback(retry_messages, temperature=0.2, max_tokens=retry_max_tokens)
+        retry_parsed = json.loads(_extract_json_block(retry_response))
+        if isinstance(retry_parsed, list):
+            normalized_questions = []
+            for index, item in enumerate(retry_parsed):
+                normalized = _normalize_ai_question(item, index)
+                if normalized:
+                    normalized_questions.append(normalized)
+            normalized_questions = _dedupe_questions(normalized_questions)
+            if len(normalized_questions) >= normalized_count:
+                output = normalized_questions[:normalized_count]
+                await _cache_set_json(cache_key, output)
+                if isinstance(generation_meta, dict):
+                    generation_meta["source"] = "model"
+                    generation_meta["warning"] = None
+                return output
+    except Exception as retry_error:
+        fallback_reason = f"{str(primary_error or 'Primary model failed')} | Retry failed: {str(retry_error)}"
+        fallback_questions = _build_and_cache_fallback(fallback_reason)
+        await _cache_set_json(cache_key, fallback_questions)
+        return fallback_questions
 
-    fallback_reason = "Quiz generation returned insufficient unique validated questions from model"
+    fallback_reason = "Quiz generation returned insufficient unique validated questions from model after retry"
     fallback_questions = _build_and_cache_fallback(fallback_reason)
     await _cache_set_json(cache_key, fallback_questions)
     return fallback_questions
