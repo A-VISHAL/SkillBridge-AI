@@ -86,7 +86,10 @@ SkillBridge AI is a full-stack agentic career operating system that provides end
 
 | Resume Analyzer | Learning Roadmap | Mock Interview |
 |:---:|:---:|:---:|
-| ![Resume Analyzer]() | ![Learning Roadmap](https://via.placeholder.com/320x200?text=Learning+Roadmap) | ![Mock Interview](https://via.placeholder.com/320x200?text=Mock+Interview) |
+| ![Resume Analyzer]<img width="1898" height="899" alt="image" src="https://github.com/user-attachments/assets/31b03b14-7adc-4f5f-94f4-3d577f649346" />
+| ![Learning Roadmap]<img width="1894" height="901" alt="image" src="https://github.com/user-attachments/assets/405bd9c7-8829-4803-ac24-667dae8f33af" />
+| ![Mock Interview]<img width="1888" height="883" alt="image" src="https://github.com/user-attachments/assets/8b3f718a-3b18-4519-b3f8-b33afb6f50d8" />
+|
 | _ATS scoring & keyword suggestions_ | _Week-by-week personalized plan_ | _AI-evaluated interview simulation_ |
 
 | JD Matcher | Adaptive Quiz | Admin Dashboard |
