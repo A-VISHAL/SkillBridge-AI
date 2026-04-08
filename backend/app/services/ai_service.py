@@ -2339,7 +2339,7 @@ No duplicates."""
         return fallback_output
 
     try:
-        response = await call_interview_chat(messages, temperature=0.2, max_tokens=260)
+        response = await call_interview_chat(messages, temperature=0.2, max_tokens=900)
         parsed = json.loads(_extract_json_block(response))
         if isinstance(parsed, list):
             normalized = []
@@ -2347,7 +2347,9 @@ No duplicates."""
                 question = _normalize_interview_question(item, index)
                 if question:
                     normalized.append(question)
-            normalized = _fill_with_fallback(normalized, normalized_count)
+            normalized = _dedupe(normalized)
+            if not settings.INTERVIEW_STRICT_MODEL:
+                normalized = _fill_with_fallback(normalized, normalized_count)
             if len(normalized) >= normalized_count:
                 output = normalized[:normalized_count]
                 await _cache_set_json(cache_key, output)
@@ -2366,7 +2368,7 @@ No duplicates."""
                 {"role": "system", "content": "You are a senior interviewer generating realistic, candidate-specific interview questions."},
                 {"role": "user", "content": compact_prompt},
             ]
-            retry_response = await call_interview_chat(retry_messages, temperature=0.15, max_tokens=180)
+            retry_response = await call_interview_chat(retry_messages, temperature=0.15, max_tokens=700)
             retry_parsed = json.loads(_extract_json_block(retry_response))
             if isinstance(retry_parsed, list):
                 normalized = []
@@ -2374,7 +2376,9 @@ No duplicates."""
                     question = _normalize_interview_question(item, index)
                     if question:
                         normalized.append(question)
-                normalized = _fill_with_fallback(normalized, normalized_count)
+                normalized = _dedupe(normalized)
+                if not settings.INTERVIEW_STRICT_MODEL:
+                    normalized = _fill_with_fallback(normalized, normalized_count)
                 if len(normalized) >= normalized_count:
                     output = normalized[:normalized_count]
                     await _cache_set_json(cache_key, output)
