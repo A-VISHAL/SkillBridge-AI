@@ -6,6 +6,7 @@ import re
 import os
 import uuid
 from datetime import datetime
+from pathlib import Path
 from urllib.parse import quote_plus
 
 from app.core.config import settings
@@ -39,6 +40,61 @@ resume_store = {}
 progress_store = {}
 interview_sessions = {}
 interview_session_contexts = {}
+
+
+def _normalize_user_api_key(raw_key: str) -> str:
+    value = str(raw_key or "").strip().strip('"').strip("'")
+    if value.lower().startswith("bearer "):
+        value = value[7:].strip()
+    return value
+
+
+def _mask_api_key(api_key: str) -> str:
+    key = _normalize_user_api_key(api_key)
+    if len(key) <= 8:
+        return "*" * len(key)
+    return f"{key[:4]}...{key[-4:]}"
+
+
+def _resolve_current_runtime_api_key() -> str:
+    candidates = [
+        getattr(settings, "OXLO_API_KEY", ""),
+        getattr(settings, "ATS_API_KEY", ""),
+        getattr(settings, "JD_API_KEY", ""),
+        getattr(settings, "ROADMAP_API_KEY", ""),
+        getattr(settings, "QUIZ_API_KEY", ""),
+        getattr(settings, "INTERVIEW_API_KEY", ""),
+    ]
+    for value in candidates:
+        normalized = _normalize_user_api_key(str(value or ""))
+        if normalized:
+            return normalized
+    return ""
+
+
+def _update_env_file_value(env_file_path: Path, env_key: str, env_value: str) -> None:
+    if env_file_path.exists():
+        lines = env_file_path.read_text(encoding="utf-8").splitlines()
+    else:
+        lines = []
+
+    updated = False
+    updated_lines: List[str] = []
+    key_prefix = f"{env_key}="
+
+    for line in lines:
+        if line.startswith(key_prefix):
+            updated_lines.append(f"{env_key}={env_value}")
+            updated = True
+        else:
+            updated_lines.append(line)
+
+    if not updated:
+        if updated_lines and updated_lines[-1].strip() != "":
+            updated_lines.append("")
+        updated_lines.append(f"{env_key}={env_value}")
+
+    env_file_path.write_text("\n".join(updated_lines) + "\n", encoding="utf-8")
 
 
 def _supabase_enabled() -> bool:
@@ -426,6 +482,60 @@ async def test_ai_connection(task: str = "ats"):
         }
     except Exception as e:
         return {"task": normalized_task, "error": str(e)}
+
+
+@router.post("/api/settings/api-key")
+async def set_runtime_api_key(
+    api_key: str = Form(...),
+    apply_to_all_routes: bool = Form(True),
+):
+    """Save user-provided Oxlo API key and apply immediately to active model routes."""
+    normalized_key = _normalize_user_api_key(api_key)
+    if not normalized_key:
+        raise HTTPException(status_code=400, detail="API key is required")
+
+    if len(normalized_key) < 16:
+        raise HTTPException(status_code=400, detail="API key looks too short. Please paste a valid key.")
+
+    settings.OXLO_API_KEY = normalized_key
+    settings.ATS_API_KEY = normalized_key
+
+    applied_env_keys = ["OXLO_API_KEY", "ATS_API_KEY"]
+    if apply_to_all_routes:
+        settings.JD_API_KEY = normalized_key
+        settings.ROADMAP_API_KEY = normalized_key
+        settings.QUIZ_API_KEY = normalized_key
+        settings.INTERVIEW_API_KEY = normalized_key
+        applied_env_keys.extend(["JD_API_KEY", "ROADMAP_API_KEY", "QUIZ_API_KEY", "INTERVIEW_API_KEY"])
+
+    env_file_path = Path(__file__).resolve().parents[2] / ".env"
+    for env_key in applied_env_keys:
+        _update_env_file_value(env_file_path, env_key, normalized_key)
+
+    return {
+        "success": True,
+        "message": "API key saved and applied.",
+        "masked_key": _mask_api_key(normalized_key),
+        "applied_to": applied_env_keys,
+        "persisted_file": str(env_file_path),
+    }
+
+
+@router.get("/api/settings/api-key/status")
+async def get_runtime_api_key_status():
+    """Return masked API key status so UI can show if a key is already configured."""
+    current_key = _resolve_current_runtime_api_key()
+    return {
+        "configured": bool(current_key),
+        "masked_key": _mask_api_key(current_key) if current_key else "",
+        "routes": {
+            "ats": bool(_normalize_user_api_key(getattr(settings, "ATS_API_KEY", ""))),
+            "jd": bool(_normalize_user_api_key(getattr(settings, "JD_API_KEY", ""))),
+            "roadmap": bool(_normalize_user_api_key(getattr(settings, "ROADMAP_API_KEY", ""))),
+            "quiz": bool(_normalize_user_api_key(getattr(settings, "QUIZ_API_KEY", ""))),
+            "interview": bool(_normalize_user_api_key(getattr(settings, "INTERVIEW_API_KEY", ""))),
+        },
+    }
 
 @router.get("/health")
 async def health_check():
