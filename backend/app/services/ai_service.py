@@ -592,6 +592,35 @@ def _should_retry_with_fallback_key(error: Exception) -> bool:
     return isinstance(error, AIServiceError) and error.code == "rate_limit"
 
 
+def _resolve_db_primary_api_key() -> str:
+    """Try loading persisted API key from Supabase encrypted storage."""
+    encryption_secret = str(getattr(settings, "API_KEY_ENCRYPTION_SECRET", "") or "").strip()
+    if not encryption_secret:
+        return ""
+
+    try:
+        from app.services.supabase_service import supabase_service
+    except Exception:
+        return ""
+
+    enabled_attr = getattr(supabase_service, "enabled", False)
+    enabled = bool(enabled_attr() if callable(enabled_attr) else enabled_attr)
+    if not enabled:
+        return ""
+
+    ok, db_key, _ = supabase_service.get_runtime_api_key(
+        scope_key="global",
+        encryption_secret=encryption_secret,
+    )
+    if not ok or not db_key:
+        return ""
+
+    key = str(db_key).strip().strip('"').strip("'")
+    if key.lower().startswith("bearer "):
+        key = key[7:].strip()
+    return key
+
+
 async def _call_model_chat_with_fallback_key(
     messages: List[Dict[str, str]],
     endpoint: str,
@@ -603,6 +632,7 @@ async def _call_model_chat_with_fallback_key(
 ) -> str:
     fallback_key = (fallback_api_key or "").strip().strip('"').strip("'")
     route_key = (api_key or "").strip().strip('"').strip("'")
+    db_primary_key = _resolve_db_primary_api_key()
     default_primary_key = (getattr(settings, "OXLO_API_KEY", "") or "").strip().strip('"').strip("'")
 
     if fallback_key.lower().startswith("bearer "):
@@ -612,8 +642,13 @@ async def _call_model_chat_with_fallback_key(
     if default_primary_key.lower().startswith("bearer "):
         default_primary_key = default_primary_key[7:].strip()
 
+    if db_primary_key.lower().startswith("bearer "):
+        db_primary_key = db_primary_key[7:].strip()
+
     # Always honor OXLO_API_KEY as primary. Never allow fallback key to become primary.
-    if default_primary_key:
+    if db_primary_key:
+        primary_key = db_primary_key
+    elif default_primary_key:
         primary_key = default_primary_key
     elif route_key and route_key != fallback_key:
         primary_key = route_key

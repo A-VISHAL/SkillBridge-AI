@@ -121,3 +121,46 @@ create index if not exists idx_roadmaps_resume_id on public.roadmaps(resume_id);
 create index if not exists idx_roadmap_tasks_roadmap_id on public.roadmap_tasks(roadmap_id);
 create index if not exists idx_interview_sessions_resume_id on public.interview_sessions(resume_id);
 create index if not exists idx_interview_questions_session_id on public.interview_questions(interview_session_id);
+
+create table if not exists public.runtime_api_keys (
+  scope_key text primary key,
+  encrypted_api_key text not null,
+  updated_at timestamptz not null default now()
+);
+
+create or replace function public.set_runtime_api_key_encrypted(
+  p_scope_key text,
+  p_plain_api_key text,
+  p_secret text
+) returns void
+language plpgsql
+security definer
+as $$
+begin
+  insert into public.runtime_api_keys (scope_key, encrypted_api_key, updated_at)
+  values (
+    p_scope_key,
+    encode(pgp_sym_encrypt(p_plain_api_key, p_secret), 'base64'),
+    now()
+  )
+  on conflict (scope_key)
+  do update set
+    encrypted_api_key = excluded.encrypted_api_key,
+    updated_at = now();
+end;
+$$;
+
+create or replace function public.get_runtime_api_key_decrypted(
+  p_scope_key text,
+  p_secret text
+) returns table (api_key text, updated_at timestamptz)
+language sql
+security definer
+as $$
+  select
+    pgp_sym_decrypt(decode(r.encrypted_api_key, 'base64')::bytea, p_secret) as api_key,
+    r.updated_at
+  from public.runtime_api_keys r
+  where r.scope_key = p_scope_key
+  limit 1;
+$$;

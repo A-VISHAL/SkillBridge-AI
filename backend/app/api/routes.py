@@ -72,6 +72,14 @@ def _resolve_current_runtime_api_key() -> str:
     return ""
 
 
+def _api_key_db_scope() -> str:
+    return "global"
+
+
+def _api_key_encryption_secret() -> str:
+    return str(getattr(settings, "API_KEY_ENCRYPTION_SECRET", "") or "").strip()
+
+
 def _update_env_file_value(env_file_path: Path, env_key: str, env_value: str) -> None:
     if env_file_path.exists():
         lines = env_file_path.read_text(encoding="utf-8").splitlines()
@@ -512,6 +520,20 @@ async def set_runtime_api_key(
     for env_key in applied_env_keys:
         os.environ[env_key] = normalized_key
 
+    persisted_to_db = False
+    db_warning = ""
+    if _supabase_enabled() and _api_key_encryption_secret():
+        db_ok, db_err = supabase_service.save_runtime_api_key(
+            scope_key=_api_key_db_scope(),
+            api_key=normalized_key,
+            encryption_secret=_api_key_encryption_secret(),
+        )
+        persisted_to_db = db_ok
+        if not db_ok:
+            db_warning = f"DB persistence failed: {db_err}"
+    elif _supabase_enabled() and not _api_key_encryption_secret():
+        db_warning = "DB persistence skipped: API_KEY_ENCRYPTION_SECRET is not configured"
+
     env_file_path = Path(__file__).resolve().parents[2] / ".env"
     persisted_to_env_file = True
     persistence_warning = ""
@@ -527,8 +549,12 @@ async def set_runtime_api_key(
         "message": "API key saved and applied.",
         "masked_key": _mask_api_key(normalized_key),
         "applied_to": applied_env_keys,
+        "persisted_to_db": persisted_to_db,
         "persisted_to_env_file": persisted_to_env_file,
     }
+
+    if db_warning:
+        response["db_warning"] = db_warning
 
     if persistence_warning:
         response["warning"] = persistence_warning
@@ -539,10 +565,25 @@ async def set_runtime_api_key(
 @router.get("/api/settings/api-key/status")
 async def get_runtime_api_key_status():
     """Return masked API key status so UI can show if a key is already configured."""
-    current_key = _resolve_current_runtime_api_key()
+    current_key = ""
+    source = "runtime"
+
+    if _supabase_enabled() and _api_key_encryption_secret():
+        db_ok, db_key, _ = supabase_service.get_runtime_api_key(
+            scope_key=_api_key_db_scope(),
+            encryption_secret=_api_key_encryption_secret(),
+        )
+        if db_ok and db_key:
+            current_key = _normalize_user_api_key(db_key)
+            source = "db"
+
+    if not current_key:
+        current_key = _resolve_current_runtime_api_key()
+
     return {
         "configured": bool(current_key),
         "masked_key": _mask_api_key(current_key) if current_key else "",
+        "source": source,
         "routes": {
             "ats": bool(_normalize_user_api_key(getattr(settings, "ATS_API_KEY", ""))),
             "jd": bool(_normalize_user_api_key(getattr(settings, "JD_API_KEY", ""))),

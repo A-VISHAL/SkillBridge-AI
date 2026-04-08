@@ -58,6 +58,21 @@ class SupabaseService:
         except Exception as exc:
             return False, str(exc)
 
+    def _rpc(
+        self,
+        function_name: str,
+        params: Dict[str, Any],
+    ) -> Tuple[bool, Optional[List[Dict[str, Any]]], str]:
+        if not self._client:
+            return False, None, "Supabase is not configured"
+
+        try:
+            response = self._client.rpc(function_name, params).execute()
+            data = getattr(response, "data", None)
+            return True, data, ""
+        except Exception as exc:
+            return False, None, str(exc)
+
     def get_resume(
         self,
         resume_id: str
@@ -222,6 +237,48 @@ class SupabaseService:
         ]
 
         return self._insert_many("interview_questions", question_rows)
+
+    def save_runtime_api_key(
+        self,
+        scope_key: str,
+        api_key: str,
+        encryption_secret: str,
+    ) -> Tuple[bool, str]:
+        ok, _, err = self._rpc(
+            "set_runtime_api_key_encrypted",
+            {
+                "p_scope_key": scope_key,
+                "p_plain_api_key": api_key,
+                "p_secret": encryption_secret,
+            },
+        )
+        return ok, err
+
+    def get_runtime_api_key(
+        self,
+        scope_key: str,
+        encryption_secret: str,
+    ) -> Tuple[bool, Optional[str], str]:
+        ok, data, err = self._rpc(
+            "get_runtime_api_key_decrypted",
+            {
+                "p_scope_key": scope_key,
+                "p_secret": encryption_secret,
+            },
+        )
+        if not ok:
+            return False, None, err
+
+        rows = data or []
+        if not rows:
+            return False, None, "Runtime API key not found"
+
+        first = rows[0] if isinstance(rows[0], dict) else {}
+        value = str(first.get("api_key", "") or "").strip()
+        if not value:
+            return False, None, "Runtime API key is empty"
+
+        return True, value, ""
 
 
 supabase_service = SupabaseService()

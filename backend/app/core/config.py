@@ -117,6 +117,7 @@ class Settings:
     SUPABASE_URL: str = os.getenv("SUPABASE_URL", "")
     SUPABASE_ANON_KEY: str = os.getenv("SUPABASE_ANON_KEY", "")
     SUPABASE_SERVICE_ROLE_KEY: str = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+    API_KEY_ENCRYPTION_SECRET: str = _get_env("API_KEY_ENCRYPTION_SECRET", default="")
     
     # Job Search APIs
     ADZUNA_APP_ID: str = os.getenv("ADZUNA_APP_ID", "")
