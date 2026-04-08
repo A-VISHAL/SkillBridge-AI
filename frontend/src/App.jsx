@@ -1827,6 +1827,7 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed, isDarkMode }) => {
   const [isSavingApiKey, setIsSavingApiKey] = useState(false);
   const [isLoadingApiKeyStatus, setIsLoadingApiKeyStatus] = useState(true);
   const [currentMaskedKey, setCurrentMaskedKey] = useState("");
+  const [isUserApiKeyConfigured, setIsUserApiKeyConfigured] = useState(false);
   const [apiKeyStatus, setApiKeyStatus] = useState({ type: "", message: "" });
   const fileInputRef = useRef(null);
 
@@ -1842,10 +1843,16 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed, isDarkMode }) => {
           throw new Error(data?.detail || data?.message || "Could not load API key status");
         }
         if (!cancelled) {
-          setCurrentMaskedKey(data?.configured ? String(data?.masked_key || "") : "");
+          const configured = Boolean(data?.user_configured ?? data?.configured);
+          const masked = configured
+            ? String(data?.user_masked_key || data?.masked_key || "")
+            : "";
+          setIsUserApiKeyConfigured(configured);
+          setCurrentMaskedKey(masked);
         }
       } catch {
         if (!cancelled) {
+          setIsUserApiKeyConfigured(false);
           setCurrentMaskedKey("");
         }
       } finally {
@@ -1890,6 +1897,7 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed, isDarkMode }) => {
         type: "success",
         message: `Saved successfully (${data?.masked_key || "key updated"}).`,
       });
+      setIsUserApiKeyConfigured(true);
       setCurrentMaskedKey(String(data?.masked_key || ""));
       setApiKeyInput("");
     } catch (error) {
@@ -2265,7 +2273,7 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed, isDarkMode }) => {
       <Card isDarkMode={isDarkMode} style={{ padding: "18px 18px 16px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
           <div style={{ fontSize: 14.5, fontWeight: 700, color: isDarkMode ? "#e8eef7" : "var(--gray-900)" }}>API Key for AI Usage</div>
-          <Badge variant={currentMaskedKey ? "success" : "warning"}>{currentMaskedKey ? "Configured" : "Not configured"}</Badge>
+          <Badge variant={isUserApiKeyConfigured ? "success" : "warning"}>{isUserApiKeyConfigured ? "Configured" : "Not configured"}</Badge>
         </div>
 
         <div style={{
@@ -2279,7 +2287,7 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed, isDarkMode }) => {
         }}>
           {isLoadingApiKeyStatus
             ? "Checking current key status..."
-            : currentMaskedKey
+            : isUserApiKeyConfigured && currentMaskedKey
               ? `Current key configured: ${currentMaskedKey}`
               : "No API key configured yet."}
         </div>

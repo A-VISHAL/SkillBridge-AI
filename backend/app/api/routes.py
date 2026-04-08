@@ -567,6 +567,7 @@ async def set_runtime_api_key(
 async def get_runtime_api_key_status():
     """Return masked API key status so UI can show if a key is already configured."""
     current_key = ""
+    user_key = ""
     source = "runtime"
 
     if _supabase_enabled() and _api_key_encryption_secret():
@@ -575,15 +576,23 @@ async def get_runtime_api_key_status():
             encryption_secret=_api_key_encryption_secret(),
         )
         if db_ok and db_key:
-            current_key = _normalize_user_api_key(db_key)
+            user_key = _normalize_user_api_key(db_key)
+            current_key = user_key
             source = "db"
 
     if not current_key:
         current_key = _resolve_current_runtime_api_key()
+        if not current_key:
+            source = "none"
 
     return {
-        "configured": bool(current_key),
-        "masked_key": _mask_api_key(current_key) if current_key else "",
+        # `configured` reflects user-saved configuration only (DB), not env defaults.
+        "configured": bool(user_key),
+        "masked_key": _mask_api_key(user_key) if user_key else "",
+        "user_configured": bool(user_key),
+        "user_masked_key": _mask_api_key(user_key) if user_key else "",
+        "runtime_configured": bool(current_key),
+        "runtime_masked_key": _mask_api_key(current_key) if current_key else "",
         "source": source,
         "storage_source": "db" if source == "db" else "runtime",
         "routes": {
