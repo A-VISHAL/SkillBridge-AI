@@ -508,17 +508,32 @@ async def set_runtime_api_key(
         settings.INTERVIEW_API_KEY = normalized_key
         applied_env_keys.extend(["JD_API_KEY", "ROADMAP_API_KEY", "QUIZ_API_KEY", "INTERVIEW_API_KEY"])
 
-    env_file_path = Path(__file__).resolve().parents[2] / ".env"
+    # Ensure current process uses the new key immediately.
     for env_key in applied_env_keys:
-        _update_env_file_value(env_file_path, env_key, normalized_key)
+        os.environ[env_key] = normalized_key
 
-    return {
+    env_file_path = Path(__file__).resolve().parents[2] / ".env"
+    persisted_to_env_file = True
+    persistence_warning = ""
+    try:
+        for env_key in applied_env_keys:
+            _update_env_file_value(env_file_path, env_key, normalized_key)
+    except Exception as persistence_error:
+        persisted_to_env_file = False
+        persistence_warning = f"Runtime key applied, but .env persistence failed: {str(persistence_error)}"
+
+    response = {
         "success": True,
         "message": "API key saved and applied.",
         "masked_key": _mask_api_key(normalized_key),
         "applied_to": applied_env_keys,
-        "persisted_file": str(env_file_path),
+        "persisted_to_env_file": persisted_to_env_file,
     }
+
+    if persistence_warning:
+        response["warning"] = persistence_warning
+
+    return response
 
 
 @router.get("/api/settings/api-key/status")
