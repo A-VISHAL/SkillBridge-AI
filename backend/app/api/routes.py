@@ -549,6 +549,7 @@ async def set_runtime_api_key(
         "message": "API key saved and applied.",
         "masked_key": _mask_api_key(normalized_key),
         "applied_to": applied_env_keys,
+        "storage_source": "db" if persisted_to_db else "runtime",
         "persisted_to_db": persisted_to_db,
         "persisted_to_env_file": persisted_to_env_file,
     }
@@ -584,6 +585,7 @@ async def get_runtime_api_key_status():
         "configured": bool(current_key),
         "masked_key": _mask_api_key(current_key) if current_key else "",
         "source": source,
+        "storage_source": "db" if source == "db" else "runtime",
         "routes": {
             "ats": bool(_normalize_user_api_key(getattr(settings, "ATS_API_KEY", ""))),
             "jd": bool(_normalize_user_api_key(getattr(settings, "JD_API_KEY", ""))),
