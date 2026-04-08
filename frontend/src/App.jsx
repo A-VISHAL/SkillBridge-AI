@@ -4020,6 +4020,8 @@ const JobFinder = ({ resumeId, resumeData, onJobsUpdated, isDarkMode }) => {
           const match = Math.round(job.match_percentage || 0);
           const company = job.company || "Company";
           const skills = (job.required_skills || []).slice(0, 4);
+          const sourceLabel = String(job.source || "").trim();
+          const showSourceLabel = sourceLabel && sourceLabel.toLowerCase() !== "fallback";
           const isSaved = Boolean(savedJobs[job.id]);
           return (
           <Card key={i} isDarkMode={isDarkMode} style={{ padding: "20px 22px", overflow: "hidden", position: "relative" }}>
@@ -4045,7 +4047,7 @@ const JobFinder = ({ resumeId, resumeData, onJobsUpdated, isDarkMode }) => {
             <div style={{ fontSize: 13, color: isDarkMode ? "#b4c3d9" : "var(--gray-500)", marginBottom: 4 }}>{company}</div>
             <div style={{ fontSize: 12, color: isDarkMode ? "#9db2d3" : "var(--gray-400)", marginBottom: 16, display: "flex", gap: 8 }}>
               <span>📍 {job.location || "India"}</span>
-              <span>· {job.source || "Job Board"}</span>
+              {showSourceLabel && <span>· {sourceLabel}</span>}
             </div>
             {job.salary && (
               <div style={{ fontSize: 12, color: isDarkMode ? "#c7d7ef" : "var(--gray-500)", marginBottom: 10, fontWeight: 600 }}>

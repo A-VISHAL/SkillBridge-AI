@@ -1045,7 +1045,9 @@ async def generate_quiz(
         
     except Exception as e:
         is_rate_limited = isinstance(e, ai_service.AIServiceError) and e.code == "rate_limit"
-        if settings.QUIZ_STRICT_MODEL and not is_rate_limited:
+        if settings.QUIZ_STRICT_MODEL:
+            if is_rate_limited:
+                raise HTTPException(429, "Quiz API is rate-limited right now. Please wait a few seconds and retry.")
             raise HTTPException(503, f"Quiz model unavailable: {str(e)}")
         fallback_questions = ai_service.build_quiz_fallback_questions(
             topic=topic,

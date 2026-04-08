@@ -1754,7 +1754,7 @@ async def generate_quiz_questions(
     """Generate quiz questions based on resume, JD, and followed roadmap context."""
 
     roadmap_context = roadmap_context or []
-    cache_key = f"quiz:v3:{_stable_hash(topic)}:{_stable_hash(difficulty)}:{_stable_hash(domain)}:{int(count or 10)}:{_stable_hash(resume_text[:1200])}:{_stable_hash(jd_text[:1200])}:{_stable_hash(roadmap_context[:8])}"
+    cache_key = f"quiz:v4:{_stable_hash(topic)}:{_stable_hash(difficulty)}:{_stable_hash(domain)}:{int(count or 10)}:{_stable_hash(resume_text[:1200])}:{_stable_hash(jd_text[:1200])}:{_stable_hash(roadmap_context[:8])}"
     cached_payload = await _cache_get_json(cache_key)
     if isinstance(cached_payload, list) and cached_payload:
         if isinstance(generation_meta, dict):
@@ -1972,7 +1972,7 @@ Return JSON array only."""
             raise
 
     def _build_and_cache_fallback(reason: str) -> List[Dict[str, Any]]:
-        if settings.QUIZ_STRICT_MODEL and not _quiz_reason_is_rate_limited(reason):
+        if settings.QUIZ_STRICT_MODEL:
             raise AIServiceError("quiz_generation", reason)
         fallback_questions = _build_quiz_fallback_questions(
             topic=topic,
@@ -2112,7 +2112,7 @@ async def generate_interview_questions(
 ) -> List[Dict]:
     """Generate interview questions based on resume, quiz, roadmap, and JD context."""
 
-    cache_key = f"interview:v3:{_stable_hash(mode)}:{int(count or 4)}:{_stable_hash(jd_text[:800])}:{_stable_hash(resume_text[:900])}:{_stable_hash(quiz_context or {})}:{_stable_hash(roadmap_context or [])}"
+    cache_key = f"interview:v4:{_stable_hash(mode)}:{int(count or 4)}:{_stable_hash(jd_text[:800])}:{_stable_hash(resume_text[:900])}:{_stable_hash(quiz_context or {})}:{_stable_hash(roadmap_context or [])}"
     cached_payload = await _cache_get_json(cache_key)
     if isinstance(cached_payload, list) and cached_payload:
         if isinstance(generation_meta, dict):
@@ -2330,6 +2330,8 @@ No duplicates."""
     ]
 
     def _finalize_fallback(reason: str) -> List[Dict[str, Any]]:
+        if settings.INTERVIEW_STRICT_MODEL:
+            raise AIServiceError("interview_generation", reason)
         fallback_output = _fill_with_fallback([], normalized_count)
         if isinstance(generation_meta, dict):
             generation_meta["source"] = "interview_fallback"
