@@ -592,33 +592,42 @@ def _should_retry_with_fallback_key(error: Exception) -> bool:
     return isinstance(error, AIServiceError) and error.code == "rate_limit"
 
 
-def _resolve_db_primary_api_key() -> str:
+def _mask_key_for_logs(key: str) -> str:
+    value = str(key or "").strip()
+    if not value:
+        return "missing"
+    if len(value) <= 10:
+        return "*" * len(value)
+    return f"{value[:6]}...{value[-4:]}"
+
+
+def _resolve_db_primary_api_key() -> tuple[str, str]:
     """Try loading persisted API key from Supabase encrypted storage."""
     encryption_secret = str(getattr(settings, "API_KEY_ENCRYPTION_SECRET", "") or "").strip()
     if not encryption_secret:
-        return ""
+        return "", "API_KEY_ENCRYPTION_SECRET not configured"
 
     try:
         from app.services.supabase_service import supabase_service
     except Exception:
-        return ""
+        return "", "Supabase service import failed"
 
     enabled_attr = getattr(supabase_service, "enabled", False)
     enabled = bool(enabled_attr() if callable(enabled_attr) else enabled_attr)
     if not enabled:
-        return ""
+        return "", "Supabase is not enabled"
 
-    ok, db_key, _ = supabase_service.get_runtime_api_key(
+    ok, db_key, err = supabase_service.get_runtime_api_key(
         scope_key="global",
         encryption_secret=encryption_secret,
     )
     if not ok or not db_key:
-        return ""
+        return "", err or "DB key lookup failed"
 
     key = str(db_key).strip().strip('"').strip("'")
     if key.lower().startswith("bearer "):
         key = key[7:].strip()
-    return key
+    return key, ""
 
 
 async def _call_model_chat_with_fallback_key(
@@ -627,12 +636,13 @@ async def _call_model_chat_with_fallback_key(
     api_key: str,
     fallback_api_key: str,
     model: str,
+    route_name: str,
     temperature: float = 0.7,
     max_tokens: int = 2000,
 ) -> str:
     fallback_key = (fallback_api_key or "").strip().strip('"').strip("'")
     route_key = (api_key or "").strip().strip('"').strip("'")
-    db_primary_key = _resolve_db_primary_api_key()
+    db_primary_key, db_lookup_detail = _resolve_db_primary_api_key()
     default_primary_key = (getattr(settings, "OXLO_API_KEY", "") or "").strip().strip('"').strip("'")
 
     if fallback_key.lower().startswith("bearer "):
@@ -645,18 +655,26 @@ async def _call_model_chat_with_fallback_key(
     if db_primary_key.lower().startswith("bearer "):
         db_primary_key = db_primary_key[7:].strip()
 
-    # Always honor OXLO_API_KEY as primary. Never allow fallback key to become primary.
+    primary_source = ""
     if db_primary_key:
         primary_key = db_primary_key
-    elif default_primary_key:
-        primary_key = default_primary_key
+        primary_source = "db"
     elif route_key and route_key != fallback_key:
         primary_key = route_key
+        primary_source = "route"
+    elif default_primary_key:
+        primary_key = default_primary_key
+        primary_source = "env_default"
     else:
         raise AIServiceError(
             "config",
             "Primary API key is missing or invalid. Set OXLO_API_KEY and keep it different from OXLO_FALLBACK_API_KEY.",
         )
+
+    print(
+        f"[AI KEY] route={route_name} source={primary_source} key={_mask_key_for_logs(primary_key)} "
+        f"db_lookup={'ok' if db_primary_key else db_lookup_detail}"
+    )
 
     try:
         return await call_model_chat(
@@ -670,6 +688,10 @@ async def _call_model_chat_with_fallback_key(
     except Exception as primary_error:
         if not fallback_key or fallback_key == primary_key or not _should_retry_with_fallback_key(primary_error):
             raise
+        print(
+            f"[AI KEY] route={route_name} switching_to_fallback key={_mask_key_for_logs(fallback_key)} "
+            f"reason={str(primary_error)}"
+        )
         return await call_model_chat(
             messages=messages,
             endpoint=endpoint,
@@ -691,6 +713,7 @@ async def call_ats_chat(
         api_key=settings.ATS_API_KEY,
         fallback_api_key=settings.OXLO_FALLBACK_API_KEY,
         model=settings.ATS_MODEL,
+        route_name="ats",
         temperature=temperature,
         max_tokens=max_tokens,
     )
@@ -707,6 +730,7 @@ async def call_jd_chat(
         api_key=settings.JD_API_KEY,
         fallback_api_key=settings.OXLO_FALLBACK_API_KEY,
         model=settings.JD_MODEL,
+        route_name="jd",
         temperature=temperature,
         max_tokens=max_tokens,
     )
@@ -723,6 +747,7 @@ async def call_roadmap_chat(
         api_key=settings.ROADMAP_API_KEY,
         fallback_api_key=settings.OXLO_FALLBACK_API_KEY,
         model=settings.ROADMAP_MODEL,
+        route_name="roadmap",
         temperature=temperature,
         max_tokens=max_tokens,
     )
@@ -739,6 +764,7 @@ async def call_quiz_chat(
         api_key=settings.QUIZ_API_KEY,
         fallback_api_key=settings.OXLO_FALLBACK_API_KEY,
         model=settings.QUIZ_MODEL,
+        route_name="quiz",
         temperature=temperature,
         max_tokens=max_tokens,
     )
@@ -755,6 +781,7 @@ async def call_interview_chat(
         api_key=settings.INTERVIEW_API_KEY,
         fallback_api_key=settings.OXLO_FALLBACK_API_KEY,
         model=settings.INTERVIEW_MODEL,
+        route_name="interview",
         temperature=temperature,
         max_tokens=max_tokens,
     )
