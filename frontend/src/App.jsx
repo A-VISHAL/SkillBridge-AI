@@ -633,7 +633,7 @@ const ProjectExperiencePanel = ({ isDarkMode }) => {
 // LANDING PAGE
 // ═══════════════════════════════════════════════════════════════════════════════
 
-const LandingPage = ({ onEnterApp }) => {
+const LandingPage = ({ onEnterApp, onLogout }) => {
   const [scrolled, setScrolled] = useState(false);
   const [visible, setVisible] = useState({});
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -857,6 +857,28 @@ const LandingPage = ({ onEnterApp }) => {
             >
               {isDarkMode ? "Light mode" : "Dark mode"}
             </Btn>
+            {onLogout && (
+              <Btn 
+                variant="outline" 
+                onClick={onLogout}
+                style={{ 
+                  padding: "8px 18px", 
+                  fontSize: 13.5,
+                  borderColor: isDarkMode ? "rgba(239, 68, 68, 0.4)" : "rgba(239, 68, 68, 0.3)",
+                  color: isDarkMode ? "#fca5a5" : "#dc2626",
+                  background: "transparent",
+                }}
+                icon={
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                    <polyline points="16 17 21 12 16 7"/>
+                    <line x1="21" y1="12" x2="9" y2="12"/>
+                  </svg>
+                }
+              >
+                Logout
+              </Btn>
+            )}
             <Btn variant="primary" accentColor={brandAccent} onClick={onEnterApp} style={{ padding: "8px 18px", fontSize: 13.5 }}>Get started</Btn>
           </div>
         </div>
@@ -1408,6 +1430,39 @@ const Topbar = ({ title, onLogout, isDarkMode, setIsDarkMode }) => {
             background: isDarkMode ? "#6b93d6" : "var(--gray-700)", border: isDarkMode ? "1.5px solid #1e2a3a" : "1.5px solid var(--white)",
           }}/>
         </div>
+        <button
+          onClick={onLogout}
+          style={{
+            padding: "8px 16px",
+            borderRadius: 99,
+            background: isDarkMode ? "rgba(239, 68, 68, 0.15)" : "rgba(239, 68, 68, 0.1)",
+            border: isDarkMode ? "1px solid rgba(239, 68, 68, 0.3)" : "1px solid rgba(239, 68, 68, 0.2)",
+            color: isDarkMode ? "#fca5a5" : "#dc2626",
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            transition: "all 0.2s ease",
+            fontFamily: "inherit",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = isDarkMode ? "rgba(239, 68, 68, 0.25)" : "rgba(239, 68, 68, 0.15)";
+            e.currentTarget.style.transform = "translateY(-1px)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = isDarkMode ? "rgba(239, 68, 68, 0.15)" : "rgba(239, 68, 68, 0.1)";
+            e.currentTarget.style.transform = "translateY(0)";
+          }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+            <polyline points="16 17 21 12 16 7"/>
+            <line x1="21" y1="12" x2="9" y2="12"/>
+          </svg>
+          Logout
+        </button>
         <div ref={profileRef} style={{ position: "relative" }}>
           <div 
             onClick={() => setShowProfileMenu(!showProfileMenu)}
@@ -4327,7 +4382,7 @@ function StudentPortal({ onExit }) {
   return (
     <>
       {view === "landing"
-        ? <LandingPage onEnterApp={() => setView("app")}/>
+        ? <LandingPage onEnterApp={() => setView("app")} onLogout={handleLogout}/>
         : <Dashboard onLogout={handleLogout}/>}
     </>
   );
