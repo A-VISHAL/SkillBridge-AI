@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 
 const defaultCredentials = {
@@ -18,58 +18,191 @@ const roleLabels = {
 };
 
 const flowNodes = [
-  { key: 'resume', label: 'Resume Upload', hint: 'Extract profile', color: '#7dd3fc' },
-  { key: 'match', label: 'JD Match', hint: 'Measure fit score', color: '#22d3ee' },
-  { key: 'roadmap', label: 'Roadmap', hint: 'Personalized plan', color: '#34d399' },
-  { key: 'interview', label: 'Interview', hint: 'Practice + feedback', color: '#facc15' },
+  { key: 'resume', label: 'Resume Upload', hint: 'Extract profile', color: '#60a5fa', step: '1/4' },
+  { key: 'match', label: 'JD Match', hint: 'Measure fit score', color: '#22d3ee', step: '2/4' },
+  { key: 'roadmap', label: 'Roadmap', hint: 'Personalized plan', color: '#34d399', step: '3/4' },
+  { key: 'interview', label: 'Interview', hint: 'Practice + feedback', color: '#fbbf24', step: '4/4' },
 ];
 
-function CareerFlowPanel() {
+// Starfield background component
+function StarField() {
+  const [stars, setStars] = useState([]);
+
+  useEffect(() => {
+    const starArray = Array.from({ length: 80 }, (_, i) => ({
+      id: i,
+      x: Math.random() * 100,
+      y: Math.random() * 100,
+      size: Math.random() * 2 + 1,
+      duration: Math.random() * 3 + 2,
+      delay: Math.random() * 2,
+    }));
+    setStars(starArray);
+  }, []);
+
   return (
-    <div style={{ width: '100%', height: '100%', display: 'grid', gridTemplateRows: 'auto 1fr', gap: 16, padding: 22 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ fontSize: 13, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.7)', fontWeight: 700 }}>
-          Career Pipeline
-        </div>
+    <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }}>
+      {stars.map((star) => (
         <motion.div
-          animate={{ opacity: [0.35, 1, 0.35] }}
-          transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
-          style={{ fontSize: 12, color: '#86efac', fontWeight: 700 }}
-        >
-          Live
-        </motion.div>
+          key={star.id}
+          animate={{
+            y: [0, -20, 0],
+            opacity: [0.2, 0.8, 0.2],
+            scale: [1, 1.2, 1],
+          }}
+          transition={{
+            duration: star.duration,
+            repeat: Infinity,
+            delay: star.delay,
+            ease: 'easeInOut',
+          }}
+          style={{
+            position: 'absolute',
+            left: `${star.x}%`,
+            top: `${star.y}%`,
+            width: star.size,
+            height: star.size,
+            borderRadius: '50%',
+            background: 'rgba(255, 255, 255, 0.6)',
+            boxShadow: '0 0 4px rgba(255, 255, 255, 0.4)',
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+// Geometric dot grid background
+function DotGrid() {
+  return (
+    <div style={{ position: 'absolute', inset: 0, opacity: 0.15, pointerEvents: 'none' }}>
+      <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <pattern id="dot-pattern" x="0" y="0" width="40" height="40" patternUnits="userSpaceOnUse">
+            <circle cx="2" cy="2" r="1" fill="rgba(0, 229, 196, 0.3)" />
+          </pattern>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#dot-pattern)" />
+      </svg>
+    </div>
+  );
+}
+
+function CareerFlowPanel() {
+  const [hoveredIndex, setHoveredIndex] = useState(null);
+
+  return (
+    <div style={{ 
+      width: '100%', 
+      borderRadius: 24,
+      background: 'rgba(15, 25, 45, 0.6)',
+      backdropFilter: 'blur(20px)',
+      WebkitBackdropFilter: 'blur(20px)',
+      border: '1px solid rgba(0, 229, 196, 0.2)',
+      padding: 24,
+      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+      transition: 'border-color 300ms ease',
+    }}
+    onMouseEnter={(e) => e.currentTarget.style.borderColor = 'rgba(0, 229, 196, 0.4)'}
+    onMouseLeave={(e) => e.currentTarget.style.borderColor = 'rgba(0, 229, 196, 0.2)'}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+        <div style={{ 
+          fontSize: 11, 
+          letterSpacing: '0.1em', 
+          textTransform: 'uppercase', 
+          color: 'rgba(0, 229, 196, 0.8)', 
+          fontWeight: 700 
+        }}>
+          CAREER PIPELINE
+        </div>
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: 6,
+          padding: '4px 10px',
+          borderRadius: 12,
+          background: 'rgba(34, 197, 94, 0.1)',
+          border: '1px solid rgba(34, 197, 94, 0.3)',
+        }}>
+          <motion.span
+            animate={{ opacity: [0.4, 1, 0.4] }}
+            transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+            style={{ 
+              width: 6, 
+              height: 6, 
+              borderRadius: '50%', 
+              background: '#22c55e',
+              boxShadow: '0 0 8px #22c55e',
+            }}
+          />
+          <span style={{ fontSize: 11, color: '#86efac', fontWeight: 700 }}>Live</span>
+        </div>
       </div>
 
-      <div style={{ position: 'relative', display: 'grid', gap: 10 }}>
+      <div style={{ display: 'grid', gap: 12 }}>
         {flowNodes.map((node, index) => (
           <motion.div
             key={node.key}
-            initial={{ opacity: 0, x: -12 }}
+            initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.35, delay: index * 0.08 }}
+            transition={{ duration: 0.4, delay: index * 0.1 }}
+            onMouseEnter={() => setHoveredIndex(index)}
+            onMouseLeave={() => setHoveredIndex(null)}
             style={{
-              position: 'relative',
-              zIndex: 1,
               display: 'grid',
-              gridTemplateColumns: '18px 1fr auto',
+              gridTemplateColumns: '12px 1fr auto',
               alignItems: 'center',
-              gap: 12,
-              borderRadius: 16,
-              padding: '12px 14px',
-              background: 'rgba(255,255,255,0.06)',
-              border: '1px solid rgba(255,255,255,0.14)',
+              gap: 14,
+              borderRadius: 14,
+              padding: '14px 16px',
+              background: hoveredIndex === index 
+                ? 'rgba(0, 229, 196, 0.08)' 
+                : 'rgba(255, 255, 255, 0.04)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              cursor: 'pointer',
+              transition: 'all 250ms ease',
             }}
           >
             <motion.span
-              animate={{ scale: [1, 1.2, 1] }}
-              transition={{ duration: 2.4, repeat: Infinity, delay: index * 0.3 }}
-              style={{ width: 10, height: 10, borderRadius: '50%', background: node.color, boxShadow: `0 0 18px ${node.color}` }}
+              animate={{ 
+                scale: hoveredIndex === index ? [1, 1.3, 1] : 1,
+                boxShadow: hoveredIndex === index 
+                  ? [`0 0 0px ${node.color}`, `0 0 12px ${node.color}`, `0 0 0px ${node.color}`]
+                  : `0 0 8px ${node.color}`
+              }}
+              transition={{ duration: 1.5, repeat: Infinity }}
+              style={{ 
+                width: 10, 
+                height: 10, 
+                borderRadius: '50%', 
+                background: node.color,
+              }}
             />
             <div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.94)' }}>{node.label}</div>
-              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.62)' }}>{node.hint}</div>
+              <div style={{ 
+                fontSize: 14, 
+                fontWeight: 700, 
+                color: 'rgba(255, 255, 255, 0.95)',
+                marginBottom: 2,
+              }}>
+                {node.label}
+              </div>
+              <div style={{ 
+                fontSize: 12, 
+                color: 'rgba(255, 255, 255, 0.55)',
+              }}>
+                {node.hint}
+              </div>
             </div>
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.62)', fontWeight: 700 }}>{index + 1}/4</div>
+            <div style={{ 
+              fontSize: 12, 
+              color: 'rgba(255, 255, 255, 0.5)', 
+              fontWeight: 700,
+              fontFamily: 'monospace',
+            }}>
+              {node.step}
+            </div>
           </motion.div>
         ))}
       </div>
@@ -106,163 +239,441 @@ export function AuthPage({ onLogin }) {
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: 'radial-gradient(circle at top left, #132238 0%, #0b1020 42%, #060814 100%)', color: 'white', overflow: 'hidden' }}>
-      <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', opacity: 0.5, background:
-        'radial-gradient(circle at 20% 20%, rgba(98, 171, 255, 0.18), transparent 25%), radial-gradient(circle at 80% 10%, rgba(155, 107, 255, 0.16), transparent 24%), radial-gradient(circle at 80% 80%, rgba(33, 212, 180, 0.12), transparent 28%)' }} />
+    <div style={{ 
+      minHeight: '100vh', 
+      background: '#0a0f1e',
+      color: 'white', 
+      overflow: 'hidden',
+      position: 'relative',
+      fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
+    }}>
+      {/* Starfield background */}
+      <StarField />
+      
+      {/* Dot grid pattern */}
+      <DotGrid />
 
-      <div style={{ position: 'relative', zIndex: 1, minHeight: '100vh', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))' }}>
+      {/* Main content container */}
+      <div style={{ 
+        position: 'relative', 
+        zIndex: 1, 
+        minHeight: '100vh', 
+        display: 'grid', 
+        gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 500px), 1fr))',
+        gap: 40,
+        padding: '40px clamp(20px, 5vw, 60px)',
+        maxWidth: 1600,
+        margin: '0 auto',
+      }}>
+        {/* LEFT SECTION - Hero */}
         <motion.div
-          initial={{ opacity: 0, x: -30 }}
+          initial={{ opacity: 0, x: -40 }}
           animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.7, ease: 'easeOut' }}
-          style={{ padding: 32, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 24 }}
+          transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+          style={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            justifyContent: 'center',
+            gap: 32,
+          }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 42, height: 42, borderRadius: 14, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)', display: 'grid', placeItems: 'center', boxShadow: '0 18px 50px rgba(0,0,0,0.35)' }}>
-              <span style={{ fontSize: 18 }}>✦</span>
+          {/* Logo */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ 
+              width: 48, 
+              height: 48, 
+              borderRadius: 14, 
+              background: 'linear-gradient(135deg, rgba(0, 229, 196, 0.2), rgba(0, 229, 196, 0.05))',
+              border: '1px solid rgba(0, 229, 196, 0.3)',
+              display: 'grid', 
+              placeItems: 'center',
+              boxShadow: '0 8px 32px rgba(0, 229, 196, 0.2)',
+            }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#00e5c4" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+              </svg>
             </div>
             <div>
-              <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: '-0.03em' }}>SkillBridge AI</div>
-              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>Career operating system</div>
+              <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-0.02em', color: '#ffffff' }}>
+                SkillBridge AI
+              </div>
+              <div style={{ fontSize: 13, color: 'rgba(255, 255, 255, 0.6)', letterSpacing: '0.01em' }}>
+                Career operating system
+              </div>
             </div>
           </div>
 
-          <div style={{ maxWidth: 640 }}>
-            <div style={{ display: 'inline-flex', padding: '8px 14px', borderRadius: 999, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.86)', fontSize: 12, fontWeight: 600, marginBottom: 24 }}>
+          {/* Powered by badge */}
+          <div>
+            <div style={{ 
+              display: 'inline-flex', 
+              padding: '8px 16px', 
+              borderRadius: 999, 
+              border: '1px solid rgba(0, 229, 196, 0.3)',
+              background: 'rgba(0, 229, 196, 0.08)',
+              color: '#00e5c4',
+              fontSize: 12, 
+              fontWeight: 600,
+              letterSpacing: '0.02em',
+              boxShadow: '0 0 20px rgba(0, 229, 196, 0.15)',
+            }}>
               Powered by Supabase + AI workflows
             </div>
-            <h1 style={{ fontSize: 'clamp(42px, 7vw, 82px)', lineHeight: 0.95, letterSpacing: '-0.06em', margin: 0, fontWeight: 800 }}>
-              {role === 'admin' ? 'Command the dashboard.' : 'Start your career mission.'}
+          </div>
+
+          {/* Hero heading */}
+          <div style={{ maxWidth: 600 }}>
+            <h1 style={{ 
+              fontSize: 'clamp(36px, 6vw, 64px)', 
+              lineHeight: 1.1, 
+              letterSpacing: '-0.04em', 
+              margin: 0, 
+              fontWeight: 800,
+              background: 'linear-gradient(135deg, #ffffff 0%, #00e5c4 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text',
+            }}>
+              Start your career{' '}
+              <span style={{ 
+                background: 'linear-gradient(135deg, #ffffff 0%, #22d3ee 100%)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text',
+              }}>
+                mission.
+              </span>
             </h1>
-            <p style={{ marginTop: 22, maxWidth: 560, fontSize: 18, lineHeight: 1.7, color: 'rgba(255,255,255,0.7)' }}>
-              {role === 'admin'
-                ? 'Control eligibility rules, review student performance, and monitor live Supabase data from one premium dashboard.'
-                : 'Upload resumes, compare job descriptions, generate roadmaps, and practice interviews from a single student workspace.'}
+            <p style={{ 
+              marginTop: 20, 
+              fontSize: 17, 
+              lineHeight: 1.7, 
+              color: 'rgba(255, 255, 255, 0.7)',
+              maxWidth: 540,
+            }}>
+              Upload resumes, compare job descriptions, generate roadmaps, and practice interviews from a single student workspace.
             </p>
           </div>
 
-          <div style={{ width: '100%', maxWidth: 520, alignSelf: 'center', marginTop: 10 }}>
-            <div style={{ minHeight: 320, borderRadius: 32, background: 'linear-gradient(180deg, rgba(255,255,255,0.09), rgba(255,255,255,0.03))', border: '1px solid rgba(255,255,255,0.16)', boxShadow: '0 28px 90px rgba(0,0,0,0.32)', backdropFilter: 'blur(18px)', display: 'grid' }}>
-              <CareerFlowPanel />
-            </div>
+          {/* Career Pipeline Card */}
+          <div style={{ maxWidth: 560 }}>
+            <CareerFlowPanel />
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 14, maxWidth: 620 }}>
+          {/* Feature badges */}
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', 
+            gap: 12,
+            maxWidth: 560,
+          }}>
             {[
-              ['Live ATS', 'Real student data'],
-              ['Supabase', 'Persistent records'],
-              ['Motion UI', 'Smooth transitions'],
-            ].map(([title, desc]) => (
-              <div key={title} style={{ padding: 18, borderRadius: 22, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', backdropFilter: 'blur(20px)' }}>
-                <div style={{ fontSize: 14, fontWeight: 700 }}>{title}</div>
-                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', marginTop: 6 }}>{desc}</div>
-              </div>
+              { title: 'Live ATS', desc: 'Real student data' },
+              { title: 'Supabase', desc: 'Persistent records' },
+              { title: 'Motion UI', desc: 'Smooth transitions' },
+            ].map((feature, idx) => (
+              <motion.div
+                key={feature.title}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.6 + idx * 0.1 }}
+                style={{ 
+                  padding: 16, 
+                  borderRadius: 16, 
+                  background: 'rgba(255, 255, 255, 0.04)',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  backdropFilter: 'blur(10px)',
+                  transition: 'all 250ms ease',
+                }}
+                whileHover={{
+                  background: 'rgba(0, 229, 196, 0.08)',
+                  borderColor: 'rgba(0, 229, 196, 0.2)',
+                }}
+              >
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#ffffff', marginBottom: 4 }}>
+                  {feature.title}
+                </div>
+                <div style={{ fontSize: 12, color: 'rgba(255, 255, 255, 0.55)' }}>
+                  {feature.desc}
+                </div>
+              </motion.div>
             ))}
           </div>
         </motion.div>
 
-        <div style={{ padding: 24, display: 'grid', placeItems: 'center' }}>
+        {/* RIGHT SECTION - Login Panel */}
+        <div style={{ 
+          display: 'grid', 
+          placeItems: 'center',
+          padding: '20px 0',
+        }}>
           <motion.div
-            initial={{ opacity: 0, y: 24 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, delay: 0.12 }}
-            style={{ width: '100%', maxWidth: 480, background: 'linear-gradient(160deg, rgba(15,24,45,0.88), rgba(16,34,57,0.82))', border: '1px solid rgba(125,211,252,0.22)', borderRadius: 32, padding: 28, boxShadow: '0 28px 100px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08)', backdropFilter: 'blur(24px)' }}
+            initial={{ opacity: 0, y: 30, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.8, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
+            style={{ 
+              width: '100%', 
+              maxWidth: 460,
+              position: 'relative',
+            }}
           >
-            <div style={{ display: 'flex', gap: 8, padding: 6, borderRadius: 999, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.14)' }}>
-              <button
-                onClick={() => switchRole('student')}
-                style={{ flex: 1, border: 'none', cursor: 'pointer', padding: '12px 16px', borderRadius: 999, background: role === 'student' ? 'linear-gradient(135deg, #ffffff, #dbeafe)' : 'transparent', color: role === 'student' ? '#0b1020' : 'rgba(255,255,255,0.78)', fontWeight: 700 }}
-              >
-                Student Login
-              </button>
-              <button
-                onClick={() => switchRole('admin')}
-                style={{ flex: 1, border: 'none', cursor: 'pointer', padding: '12px 16px', borderRadius: 999, background: role === 'admin' ? 'linear-gradient(135deg, #8b5cf6, #38bdf8)' : 'transparent', color: role === 'admin' ? 'white' : 'rgba(255,255,255,0.7)', fontWeight: 700 }}
-              >
-                Admin Login
-              </button>
-            </div>
+            {/* Animated glow behind card */}
+            <motion.div
+              animate={{
+                opacity: [0.3, 0.6, 0.3],
+                scale: [1, 1.05, 1],
+              }}
+              transition={{
+                duration: 4,
+                repeat: Infinity,
+                ease: 'easeInOut',
+              }}
+              style={{
+                position: 'absolute',
+                inset: -20,
+                background: 'radial-gradient(circle, rgba(0, 229, 196, 0.3), transparent 70%)',
+                filter: 'blur(40px)',
+                zIndex: -1,
+              }}
+            />
 
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={role}
-                initial={{ opacity: 0, x: 18 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -18 }}
-                transition={{ duration: 0.25 }}
-                style={{ marginTop: 24 }}
-              >
-                <div style={{ marginBottom: 24 }}>
-                  <div style={{ fontSize: 13, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.45)', fontWeight: 700 }}>{activeConfig.title}</div>
-                  <div style={{ marginTop: 10, fontSize: 28, fontWeight: 800, letterSpacing: '-0.05em' }}>{role === 'admin' ? 'Admin access' : 'Student access'}</div>
-                  <p style={{ marginTop: 10, fontSize: 14, color: 'rgba(255,255,255,0.68)', lineHeight: 1.65 }}>{activeConfig.subtitle}</p>
-                </div>
+            {/* Login card */}
+            <div style={{ 
+              background: 'rgba(15, 25, 45, 0.7)',
+              backdropFilter: 'blur(24px)',
+              WebkitBackdropFilter: 'blur(24px)',
+              border: '1px solid rgba(0, 229, 196, 0.2)',
+              borderRadius: 28, 
+              padding: 32,
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+            }}>
+              {/* Tab toggle */}
+              <div style={{ 
+                display: 'flex', 
+                gap: 6, 
+                padding: 4, 
+                borderRadius: 999, 
+                background: 'rgba(255, 255, 255, 0.06)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                marginBottom: 28,
+              }}>
+                <button
+                  onClick={() => switchRole('student')}
+                  style={{ 
+                    flex: 1, 
+                    border: 'none', 
+                    cursor: 'pointer', 
+                    padding: '12px 20px', 
+                    borderRadius: 999,
+                    background: role === 'student' ? '#ffffff' : 'transparent',
+                    color: role === 'student' ? '#0a0f1e' : 'rgba(255, 255, 255, 0.7)',
+                    fontWeight: 700,
+                    fontSize: 14,
+                    transition: 'all 200ms ease',
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  Student Login
+                </button>
+                <button
+                  onClick={() => switchRole('admin')}
+                  style={{ 
+                    flex: 1, 
+                    border: 'none', 
+                    cursor: 'pointer', 
+                    padding: '12px 20px', 
+                    borderRadius: 999,
+                    background: role === 'admin' ? '#ffffff' : 'transparent',
+                    color: role === 'admin' ? '#0a0f1e' : 'rgba(255, 255, 255, 0.7)',
+                    fontWeight: 700,
+                    fontSize: 14,
+                    transition: 'all 200ms ease',
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  Admin Login
+                </button>
+              </div>
 
-                <div style={{ display: 'grid', gap: 14 }}>
-                  <label style={{ display: 'grid', gap: 8 }}>
-                    <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.72)', fontWeight: 600 }}>Username</span>
-                    <input
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
-                      style={{ width: '100%', borderRadius: 18, border: '1px solid rgba(125,211,252,0.24)', background: 'rgba(255,255,255,0.1)', color: 'white', padding: '14px 16px', outline: 'none', fontSize: 14 }}
-                    />
-                  </label>
-
-                  <label style={{ display: 'grid', gap: 8 }}>
-                    <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.72)', fontWeight: 600 }}>Password</span>
-                    <input
-                      type="password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      style={{ width: '100%', borderRadius: 18, border: '1px solid rgba(125,211,252,0.24)', background: 'rgba(255,255,255,0.1)', color: 'white', padding: '14px 16px', outline: 'none', fontSize: 14 }}
-                    />
-                  </label>
-
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>
-                    <span>Demo credentials are prefilled.</span>
-                    <span>{role === 'admin' ? 'admin / admin123' : 'student / 1234'}</span>
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={role}
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  {/* Section label */}
+                  <div style={{ 
+                    fontSize: 11, 
+                    letterSpacing: '0.12em', 
+                    textTransform: 'uppercase', 
+                    color: 'rgba(0, 229, 196, 0.8)',
+                    fontWeight: 700,
+                    marginBottom: 12,
+                  }}>
+                    {activeConfig.title.toUpperCase()}
                   </div>
 
-                  {error && (
-                    <div style={{ padding: '12px 14px', borderRadius: 16, background: 'rgba(244,63,94,0.14)', border: '1px solid rgba(244,63,94,0.26)', color: '#fecdd3', fontSize: 13, fontWeight: 600 }}>
-                      {error}
-                    </div>
-                  )}
+                  {/* Heading */}
+                  <div style={{ 
+                    fontSize: 32, 
+                    fontWeight: 800, 
+                    letterSpacing: '-0.03em',
+                    color: '#ffffff',
+                    marginBottom: 10,
+                  }}>
+                    {role === 'admin' ? 'Admin access' : 'Student access'}
+                  </div>
 
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={handleLogin}
-                    style={{
-                      border: 'none',
-                      cursor: 'pointer',
-                      padding: '15px 18px',
-                      borderRadius: 18,
-                      background: role === 'admin' ? 'linear-gradient(135deg, #8b5cf6, #22d3ee)' : 'linear-gradient(135deg, #ffffff, #dbeafe)',
-                      color: '#0b1020',
-                      fontWeight: 800,
-                      fontSize: 15,
-                      boxShadow: '0 18px 40px rgba(0,0,0,0.28)',
-                    }}
-                  >
-                    Sign in
-                  </motion.button>
-                </div>
-              </motion.div>
-            </AnimatePresence>
+                  {/* Subtitle */}
+                  <p style={{ 
+                    fontSize: 14, 
+                    color: 'rgba(255, 255, 255, 0.65)', 
+                    lineHeight: 1.6,
+                    marginBottom: 28,
+                  }}>
+                    {activeConfig.subtitle}
+                  </p>
+
+                  {/* Form */}
+                  <div style={{ display: 'grid', gap: 16 }}>
+                    <label style={{ display: 'grid', gap: 8 }}>
+                      <span style={{ 
+                        fontSize: 13, 
+                        color: 'rgba(255, 255, 255, 0.75)', 
+                        fontWeight: 600 
+                      }}>
+                        Username
+                      </span>
+                      <input
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                        style={{ 
+                          width: '100%', 
+                          borderRadius: 14, 
+                          border: '1px solid rgba(0, 229, 196, 0.2)',
+                          background: 'rgba(255, 255, 255, 0.06)',
+                          color: 'white', 
+                          padding: '14px 16px',
+                          outline: 'none', 
+                          fontSize: 14,
+                          fontFamily: 'inherit',
+                          transition: 'all 200ms ease',
+                        }}
+                        onFocus={(e) => {
+                          e.target.style.borderColor = 'rgba(0, 229, 196, 0.5)';
+                          e.target.style.boxShadow = '0 0 0 3px rgba(0, 229, 196, 0.1)';
+                        }}
+                        onBlur={(e) => {
+                          e.target.style.borderColor = 'rgba(0, 229, 196, 0.2)';
+                          e.target.style.boxShadow = 'none';
+                        }}
+                      />
+                    </label>
+
+                    <label style={{ display: 'grid', gap: 8 }}>
+                      <span style={{ 
+                        fontSize: 13, 
+                        color: 'rgba(255, 255, 255, 0.75)', 
+                        fontWeight: 600 
+                      }}>
+                        Password
+                      </span>
+                      <input
+                        type="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+                        style={{ 
+                          width: '100%', 
+                          borderRadius: 14, 
+                          border: '1px solid rgba(0, 229, 196, 0.2)',
+                          background: 'rgba(255, 255, 255, 0.06)',
+                          color: 'white', 
+                          padding: '14px 16px',
+                          outline: 'none', 
+                          fontSize: 14,
+                          fontFamily: 'inherit',
+                          transition: 'all 200ms ease',
+                        }}
+                        onFocus={(e) => {
+                          e.target.style.borderColor = 'rgba(0, 229, 196, 0.5)';
+                          e.target.style.boxShadow = '0 0 0 3px rgba(0, 229, 196, 0.1)';
+                        }}
+                        onBlur={(e) => {
+                          e.target.style.borderColor = 'rgba(0, 229, 196, 0.2)';
+                          e.target.style.boxShadow = 'none';
+                        }}
+                      />
+                    </label>
+
+                    {/* Hint row */}
+                    <div style={{ 
+                      display: 'flex', 
+                      justifyContent: 'space-between', 
+                      fontSize: 12, 
+                      color: 'rgba(255, 255, 255, 0.5)',
+                    }}>
+                      <span>Demo credentials are prefilled.</span>
+                      <span style={{ fontFamily: 'monospace', color: 'rgba(0, 229, 196, 0.7)' }}>
+                        {role === 'admin' ? 'admin / admin123' : 'student / 1234'}
+                      </span>
+                    </div>
+
+                    {/* Error message */}
+                    {error && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        style={{ 
+                          padding: '12px 16px', 
+                          borderRadius: 14, 
+                          background: 'rgba(239, 68, 68, 0.1)',
+                          border: '1px solid rgba(239, 68, 68, 0.3)',
+                          color: '#fca5a5', 
+                          fontSize: 13, 
+                          fontWeight: 600 
+                        }}
+                      >
+                        {error}
+                      </motion.div>
+                    )}
+
+                    {/* Sign in button */}
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={handleLogin}
+                      style={{
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: '16px 20px',
+                        borderRadius: 14,
+                        background: '#ffffff',
+                        color: '#0a0f1e',
+                        fontWeight: 800,
+                        fontSize: 15,
+                        boxShadow: '0 8px 24px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.1)',
+                        transition: 'all 200ms ease',
+                        fontFamily: 'inherit',
+                        marginTop: 8,
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.boxShadow = '0 12px 32px rgba(0, 229, 196, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.1)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.1)';
+                      }}
+                    >
+                      Sign in
+                    </motion.button>
+                  </div>
+                </motion.div>
+              </AnimatePresence>
+            </div>
           </motion.div>
         </div>
-      </div>
-
-      <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
-        {Array.from({ length: 18 }).map((_, index) => (
-          <motion.span
-            key={index}
-            animate={{ y: [0, -18, 0], opacity: [0.25, 0.55, 0.25], x: [0, 8, 0] }}
-            transition={{ duration: 5 + (index % 4), repeat: Infinity, ease: 'easeInOut', delay: index * 0.2 }}
-            style={{ position: 'absolute', left: `${(index * 17) % 100}%`, top: `${(index * 29) % 100}%`, width: 6, height: 6, borderRadius: '50%', background: 'rgba(255,255,255,0.22)', filter: 'blur(0.3px)' }}
-          />
-        ))}
       </div>
     </div>
   );
