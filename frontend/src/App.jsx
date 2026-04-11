@@ -1845,7 +1845,7 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed, isDarkMode, isActive
           throw new Error(data?.detail || data?.message || "Could not load API key status");
         }
         if (!cancelled) {
-          const configured = Boolean(data?.user_configured ?? data?.configured);
+          const configured = Boolean(data?.user_configured);
           const masked = configured
             ? String(data?.user_masked_key || data?.masked_key || "")
             : "";
@@ -2284,7 +2284,11 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed, isDarkMode, isActive
       {showApiKeyModal && (
         <ApiKeySettingsModal
           isDarkMode={isDarkMode}
-          onClose={() => setShowApiKeyModal(false)}
+          onClose={() => {
+            if (isUserApiKeyConfigured) {
+              setShowApiKeyModal(false);
+            }
+          }}
         />
       )}
       <div style={{ padding: 28, display: "flex", flexDirection: "column", gap: 22, animation: "fadeIn 0.4s ease" }}>
