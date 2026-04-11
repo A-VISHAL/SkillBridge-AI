@@ -116,7 +116,7 @@ SkillBridge AI is a full-stack agentic career operating system that provides end
 
 <br/><br/>
 
-[![🎥 Watch Demo](https://img.shields.io/badge/Watch%20Demo-YouTube-red?style=for-the-badge&logo=youtube&logoColor=white)](https://youtu.be/Q7K7YUlHHk4?si=kC6bsa8sQ3XgBSfP)
+[![🎥 Watch Demo](https://img.shields.io/badge/Watch%20Demo-YouTube-red?style=for-the-badge&logo=youtube&logoColor=white)](https://youtu.be/swuhnPk9tbA?si=kC6bsa8sQ3XgBSfP)
 
 </div>
 
