@@ -1876,15 +1876,12 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed, isDarkMode, isActive
       setShowApiKeyModal(false);
       return;
     }
-
-    if (isLoadingApiKeyStatus) return;
-
     if (isUserApiKeyConfigured) {
       setShowApiKeyModal(false);
     } else {
       setShowApiKeyModal(true);
     }
-  }, [isActive, isLoadingApiKeyStatus, isUserApiKeyConfigured]);
+  }, [isActive, isUserApiKeyConfigured]);
 
   const handleSaveApiKey = async () => {
     const trimmed = apiKeyInput.trim();
