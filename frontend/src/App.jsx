@@ -1831,6 +1831,7 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed, isDarkMode, isActive
   const [isUserApiKeyConfigured, setIsUserApiKeyConfigured] = useState(false);
   const [apiKeyStatus, setApiKeyStatus] = useState({ type: "", message: "" });
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
+  const [dismissedApiKeyModal, setDismissedApiKeyModal] = useState(false);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -1851,6 +1852,9 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed, isDarkMode, isActive
             : "";
           setIsUserApiKeyConfigured(configured);
           setCurrentMaskedKey(masked);
+          if (configured) {
+            setDismissedApiKeyModal(false);
+          }
         }
       } catch {
         if (!cancelled) {
@@ -1874,14 +1878,15 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed, isDarkMode, isActive
     if (typeof window === "undefined") return;
     if (!isActive) {
       setShowApiKeyModal(false);
+      setDismissedApiKeyModal(false);
       return;
     }
-    if (isUserApiKeyConfigured) {
+    if (isUserApiKeyConfigured || dismissedApiKeyModal) {
       setShowApiKeyModal(false);
     } else {
       setShowApiKeyModal(true);
     }
-  }, [isActive, isUserApiKeyConfigured]);
+  }, [isActive, isUserApiKeyConfigured, dismissedApiKeyModal]);
 
   const handleSaveApiKey = async () => {
     const trimmed = apiKeyInput.trim();
@@ -1915,6 +1920,7 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed, isDarkMode, isActive
       setIsUserApiKeyConfigured(true);
       setCurrentMaskedKey(String(data?.masked_key || ""));
       setApiKeyInput("");
+      setDismissedApiKeyModal(true);
       setShowApiKeyModal(false);
     } catch (error) {
       setApiKeyStatus({ type: "error", message: error.message || "Unable to save API key." });
@@ -2285,9 +2291,8 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed, isDarkMode, isActive
         <ApiKeySettingsModal
           isDarkMode={isDarkMode}
           onClose={() => {
-            if (isUserApiKeyConfigured) {
-              setShowApiKeyModal(false);
-            }
+            setDismissedApiKeyModal(true);
+            setShowApiKeyModal(false);
           }}
         />
       )}
