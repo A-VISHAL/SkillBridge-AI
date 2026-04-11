@@ -253,6 +253,28 @@ const Card = ({ children, style = {}, hover = true, glass = false, isDarkMode = 
 }
 
 // ─── Icons (minimal inline SVGs) ────────────────────────────────────────────
+const LogoMark = ({ size = 24, style = {} }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    role="img"
+    aria-label="SkillBridge logo"
+    style={style}
+  >
+    <rect x="0" y="0" width="24" height="24" rx="7" fill="#111111" />
+    <circle cx="12" cy="12" r="2.2" fill="#ffffff" />
+    <line x1="12" y1="3" x2="12" y2="6" stroke="#ffffff" strokeWidth="1.7" strokeLinecap="round" />
+    <line x1="12" y1="18" x2="12" y2="21" stroke="#ffffff" strokeWidth="1.7" strokeLinecap="round" />
+    <line x1="3" y1="12" x2="6" y2="12" stroke="#ffffff" strokeWidth="1.7" strokeLinecap="round" />
+    <line x1="18" y1="12" x2="21" y2="12" stroke="#ffffff" strokeWidth="1.7" strokeLinecap="round" />
+    <line x1="5.25" y1="5.25" x2="7.4" y2="7.4" stroke="#ffffff" strokeWidth="1.7" strokeLinecap="round" />
+    <line x1="16.6" y1="16.6" x2="18.75" y2="18.75" stroke="#ffffff" strokeWidth="1.7" strokeLinecap="round" />
+    <line x1="5.25" y1="18.75" x2="7.4" y2="16.6" stroke="#ffffff" strokeWidth="1.7" strokeLinecap="round" />
+    <line x1="16.6" y1="7.4" x2="18.75" y2="5.25" stroke="#ffffff" strokeWidth="1.7" strokeLinecap="round" />
+  </svg>
+);
+
 const Icon = ({ name, size = 18, color = "currentColor" }) => {
   const icons = {
     dashboard: <><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></>,
@@ -272,7 +294,6 @@ const Icon = ({ name, size = 18, color = "currentColor" }) => {
     target: <><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></>,
     layers: <><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></>,
     brain: <><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.84A2.5 2.5 0 0 1 9.5 2"/><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.84A2.5 2.5 0 0 0 14.5 2"/></>,
-    logo: <><circle cx="12" cy="12" r="3" fill="currentColor"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3" strokeWidth="2.5"/><path d="M5.64 5.64l2.12 2.12M16.24 16.24l2.12 2.12M5.64 18.36l2.12-2.12M16.24 7.76l2.12-2.12"/></>,
     trending: <><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></>,
     award: <><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/></>,
     play: <><polygon points="5 3 19 12 5 21 5 3"/></>,
@@ -815,9 +836,7 @@ const LandingPage = ({ onEnterApp }) => {
       }}>
         <div style={{ maxWidth: 1100, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-            <div style={{ width: 32, height: 32, borderRadius: 10, background: isDarkMode ? "#101827" : "var(--gray-900)", display: "flex", alignItems: "center", justifyContent: "center", border: isDarkMode ? "1px solid rgba(115,136,255,0.24)" : "none" }}>
-              <Icon name="logo" size={16} color="white"/>
-            </div>
+            <LogoMark size={32} />
             <span style={{ fontWeight: 700, fontSize: 15.5, letterSpacing: "-0.03em", color: isDarkMode ? "#edf1ff" : "var(--gray-900)" }}>SkillBridge AI</span>
           </div>
 
@@ -1263,9 +1282,7 @@ const LandingPage = ({ onEnterApp }) => {
       <footer style={{ borderTop: isDarkMode ? "1px solid rgba(124,143,255,0.2)" : "1px solid var(--gray-150)", padding: "32px 48px", maxWidth: 1100, margin: "0 auto" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div style={{ width: 24, height: 24, borderRadius: 7, background: "var(--gray-900)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Icon name="logo" size={12} color="white"/>
-            </div>
+            <LogoMark size={24} />
             <span style={{ fontWeight: 700, fontSize: 13, color: "var(--gray-900)", letterSpacing: "-0.03em" }}>SkillBridge AI</span>
           </div>
           <div style={{ fontSize: 12, color: "var(--gray-400)" }}>© 2025 SkillBridge AI. All rights reserved.</div>
@@ -1303,9 +1320,7 @@ const Sidebar = ({ active, setActive, isDarkMode }) => {
       {/* Logo */}
       <div style={{ padding: "0 20px 24px", borderBottom: isDarkMode ? "1px solid rgba(70,100,150,0.2)" : "1px solid var(--gray-100)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-          <div style={{ width: 30, height: 30, borderRadius: 9, background: isDarkMode ? "#5b7fc4" : "var(--gray-900)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <Icon name="logo" size={14} color="white"/>
-          </div>
+          <LogoMark size={30} />
           <div>
             <div style={{ fontWeight: 700, fontSize: 13.5, color: isDarkMode ? "#e8eef7" : "var(--gray-900)", letterSpacing: "-0.03em" }}>SkillBridge</div>
             <div style={{ fontSize: 10, color: isDarkMode ? "#8a9bb5" : "var(--gray-400)", fontWeight: 500 }}>AI Career OS</div>
