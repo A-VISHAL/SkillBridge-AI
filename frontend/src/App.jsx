@@ -1474,211 +1474,112 @@ const Topbar = ({ title, onLogout, isDarkMode, setIsDarkMode }) => {
   );
 };
 
-const ApiKeySettingsModal = ({ isDarkMode, onClose }) => {
-  const [apiKey, setApiKey] = useState("");
-  const [applyToAllRoutes, setApplyToAllRoutes] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [isLoadingStatus, setIsLoadingStatus] = useState(true);
-  const [currentMaskedKey, setCurrentMaskedKey] = useState("");
-  const [status, setStatus] = useState({ type: "", message: "" });
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const fetchStatus = async () => {
-      setIsLoadingStatus(true);
-      try {
-        const response = await fetch("/api/settings/api-key/status");
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok) {
-          throw new Error(data?.detail || data?.message || "Could not load key status");
-        }
-        if (!cancelled) {
-          setCurrentMaskedKey(data?.configured ? String(data?.masked_key || "") : "");
-        }
-      } catch {
-        if (!cancelled) {
-          setCurrentMaskedKey("");
-        }
-      } finally {
-        if (!cancelled) {
-          setIsLoadingStatus(false);
-        }
-      }
-    };
-
-    fetchStatus();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const handleSave = async () => {
-    const trimmed = apiKey.trim();
-    if (!trimmed) {
-      setStatus({ type: "error", message: "Please paste an API key first." });
-      return;
-    }
-
-    setIsSaving(true);
-    setStatus({ type: "", message: "" });
-
-    try {
-      const formData = new FormData();
-      formData.append("api_key", trimmed);
-      formData.append("apply_to_all_routes", String(applyToAllRoutes));
-
-      const response = await fetch("/api/settings/api-key", {
-        method: "POST",
-        body: formData,
-      });
-
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(data?.detail || data?.message || "Failed to save API key");
-      }
-
-      setStatus({
-        type: "success",
-        message: `Saved successfully (${data?.masked_key || "key updated"}).`,
-      });
-      setCurrentMaskedKey(String(data?.masked_key || ""));
-      setApiKey("");
-      onClose?.();
-    } catch (error) {
-      setStatus({ type: "error", message: error.message || "Unable to save API key." });
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
+const ApiKeySettingsPanel = ({
+  isDarkMode,
+  apiKey,
+  setApiKey,
+  applyToAllRoutes,
+  setApplyToAllRoutes,
+  isSaving,
+  isLoadingStatus,
+  currentMaskedKey,
+  status,
+  onSave,
+}) => {
   return (
-    <div
-      onClick={onClose}
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(5, 8, 14, 0.52)",
-        backdropFilter: "blur(3px)",
-        WebkitBackdropFilter: "blur(3px)",
-        zIndex: 150,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 16,
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
+    <Card isDarkMode={isDarkMode} style={{ padding: 20, borderRadius: 22, border: isDarkMode ? "1px solid rgba(90,120,180,0.28)" : "1px solid var(--gray-150)" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 10 }}>
+        <div>
+          <div style={{ fontSize: 11.5, letterSpacing: "0.12em", textTransform: "uppercase", color: isDarkMode ? "#9fb3d1" : "var(--gray-400)", fontWeight: 700 }}>
+            API Key Setup
+          </div>
+          <h3 style={{ marginTop: 6, fontSize: 18, fontWeight: 700, color: isDarkMode ? "#e8eef7" : "var(--gray-900)", letterSpacing: "-0.02em" }}>
+            Paste your Oxlo API key here
+          </h3>
+        </div>
+        <Badge variant={currentMaskedKey ? "success" : "warning"}>
+          {isLoadingStatus ? "Checking" : (currentMaskedKey ? "Configured" : "Not set")}
+        </Badge>
+      </div>
+
+      <p style={{ fontSize: 13, lineHeight: 1.55, color: isDarkMode ? "#b4c3d9" : "var(--gray-600)", marginBottom: 12 }}>
+        Save your key once and the backend will use it for ATS, JD Matcher, Roadmap, Quiz, and Interview models.
+      </p>
+
+      <div style={{
+        borderRadius: 10,
+        padding: "8px 10px",
+        marginBottom: 12,
+        fontSize: 12,
+        border: isDarkMode ? "1px solid rgba(90,120,180,0.35)" : "1px solid var(--gray-200)",
+        background: isDarkMode ? "rgba(16,24,40,0.45)" : "var(--gray-50)",
+        color: isDarkMode ? "#cdd9ec" : "var(--gray-700)",
+      }}>
+        {isLoadingStatus
+          ? "Checking current key status..."
+          : currentMaskedKey
+            ? `Current saved key: ${currentMaskedKey}`
+            : "No saved API key yet. Paste one below to enable AI features."}
+      </div>
+
+      <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: isDarkMode ? "#cdd9ec" : "var(--gray-700)", marginBottom: 6 }}>
+        API Key
+      </label>
+      <textarea
+        value={apiKey}
+        onChange={(e) => setApiKey(e.target.value)}
+        rows={3}
+        placeholder="Paste key here (example: sk_...)"
         style={{
           width: "100%",
-          maxWidth: 520,
-          borderRadius: 18,
-          border: isDarkMode ? "1px solid rgba(90,120,180,0.35)" : "1px solid var(--gray-200)",
-          background: isDarkMode ? "linear-gradient(160deg, #1e2b3f, #172233)" : "var(--white)",
-          boxShadow: "0 24px 60px rgba(0,0,0,0.25)",
-          padding: 20,
-          animation: "fadeUp 0.2s ease",
-        }}
-      >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-          <h3 style={{ fontSize: 18, fontWeight: 700, color: isDarkMode ? "#e8eef7" : "var(--gray-900)", letterSpacing: "-0.02em" }}>
-            API Key Settings
-          </h3>
-          <button
-            type="button"
-            onClick={onClose}
-            style={{
-              border: "none",
-              background: "transparent",
-              cursor: "pointer",
-              color: isDarkMode ? "#9fb3d1" : "var(--gray-500)",
-            }}
-          >
-            <Icon name="x" size={16} color={isDarkMode ? "#9fb3d1" : "var(--gray-500)"} />
-          </button>
-        </div>
-
-        <p style={{ fontSize: 13, lineHeight: 1.55, color: isDarkMode ? "#b4c3d9" : "var(--gray-600)", marginBottom: 12 }}>
-          Paste your Oxlo API key below. It will be saved in backend settings and used by the app for AI features.
-        </p>
-
-        <div style={{
-          borderRadius: 10,
-          padding: "8px 10px",
+          borderRadius: 12,
+          border: isDarkMode ? "1px solid rgba(90,120,180,0.4)" : "1px solid var(--gray-250)",
+          background: isDarkMode ? "rgba(16,24,40,0.68)" : "var(--gray-50)",
+          color: isDarkMode ? "#e8eef7" : "var(--gray-900)",
+          fontFamily: tokens.fontMono,
+          fontSize: 12.5,
+          padding: "10px 12px",
+          resize: "vertical",
+          outline: "none",
           marginBottom: 12,
-          fontSize: 12,
-          border: isDarkMode ? "1px solid rgba(90,120,180,0.35)" : "1px solid var(--gray-200)",
-          background: isDarkMode ? "rgba(16,24,40,0.45)" : "var(--gray-50)",
-          color: isDarkMode ? "#cdd9ec" : "var(--gray-700)",
-        }}>
-          {isLoadingStatus
-            ? "Checking current key status..."
-            : currentMaskedKey
-              ? `Current key configured: ${currentMaskedKey}`
-              : "No API key configured yet."}
-        </div>
+        }}
+      />
 
-        <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: isDarkMode ? "#cdd9ec" : "var(--gray-700)", marginBottom: 6 }}>
-          API Key
-        </label>
-        <textarea
-          value={apiKey}
-          onChange={(e) => setApiKey(e.target.value)}
-          rows={3}
-          placeholder="Paste key here (example: sk_...)"
-          style={{
-            width: "100%",
-            borderRadius: 12,
-            border: isDarkMode ? "1px solid rgba(90,120,180,0.4)" : "1px solid var(--gray-250)",
-            background: isDarkMode ? "rgba(16,24,40,0.68)" : "var(--gray-50)",
-            color: isDarkMode ? "#e8eef7" : "var(--gray-900)",
-            fontFamily: tokens.fontMono,
-            fontSize: 12.5,
-            padding: "10px 12px",
-            resize: "vertical",
-            outline: "none",
-            marginBottom: 12,
-          }}
+      <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13, color: isDarkMode ? "#cdd9ec" : "var(--gray-700)", marginBottom: 14 }}>
+        <input
+          type="checkbox"
+          checked={applyToAllRoutes}
+          onChange={(e) => setApplyToAllRoutes(e.target.checked)}
         />
+        Use this key for ATS, JD, Roadmap, Quiz, and Interview routes
+      </label>
 
-        <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13, color: isDarkMode ? "#cdd9ec" : "var(--gray-700)", marginBottom: 14 }}>
-          <input
-            type="checkbox"
-            checked={applyToAllRoutes}
-            onChange={(e) => setApplyToAllRoutes(e.target.checked)}
-          />
-          Use this key for ATS, JD, Roadmap, Quiz, and Interview routes
-        </label>
-
-        {status.message && (
-          <div
-            style={{
-              borderRadius: 10,
-              padding: "9px 10px",
-              marginBottom: 12,
-              fontSize: 12.5,
-              border: status.type === "error"
-                ? "1px solid rgba(220, 90, 90, 0.5)"
-                : "1px solid rgba(63, 176, 115, 0.55)",
-              color: status.type === "error" ? "#fca5a5" : (isDarkMode ? "#9ee6b4" : "#166534"),
-              background: status.type === "error"
-                ? "rgba(127, 29, 29, 0.22)"
-                : (isDarkMode ? "rgba(22, 101, 52, 0.25)" : "#f0fdf4"),
-            }}
-          >
-            {status.message}
-          </div>
-        )}
-
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-          <Btn variant="secondary" onClick={onClose} style={{ minWidth: 96 }}>Cancel</Btn>
-          <Btn variant="primary" onClick={handleSave} disabled={isSaving} style={{ minWidth: 132 }}>
-            {isSaving ? "Saving..." : "Save API Key"}
-          </Btn>
+      {status.message && (
+        <div
+          style={{
+            borderRadius: 10,
+            padding: "9px 10px",
+            marginBottom: 12,
+            fontSize: 12.5,
+            border: status.type === "error"
+              ? "1px solid rgba(220, 90, 90, 0.5)"
+              : "1px solid rgba(63, 176, 115, 0.55)",
+            color: status.type === "error" ? "#fca5a5" : (isDarkMode ? "#9ee6b4" : "#166534"),
+            background: status.type === "error"
+              ? "rgba(127, 29, 29, 0.22)"
+              : (isDarkMode ? "rgba(22, 101, 52, 0.25)" : "#f0fdf4"),
+          }}
+        >
+          {status.message}
         </div>
+      )}
+
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+        <Btn variant="primary" onClick={onSave} disabled={isSaving} style={{ minWidth: 132 }}>
+          {isSaving ? "Saving..." : "Save API Key"}
+        </Btn>
       </div>
-    </div>
+    </Card>
   );
 };
 
@@ -1830,8 +1731,6 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed, isDarkMode, isActive
   const [currentMaskedKey, setCurrentMaskedKey] = useState("");
   const [isUserApiKeyConfigured, setIsUserApiKeyConfigured] = useState(false);
   const [apiKeyStatus, setApiKeyStatus] = useState({ type: "", message: "" });
-  const [showApiKeyModal, setShowApiKeyModal] = useState(false);
-  const [dismissedApiKeyModal, setDismissedApiKeyModal] = useState(false);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -1852,9 +1751,6 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed, isDarkMode, isActive
             : "";
           setIsUserApiKeyConfigured(configured);
           setCurrentMaskedKey(masked);
-          if (configured) {
-            setDismissedApiKeyModal(false);
-          }
         }
       } catch {
         if (!cancelled) {
@@ -1873,20 +1769,6 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed, isDarkMode, isActive
       cancelled = true;
     };
   }, []);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (!isActive) {
-      setShowApiKeyModal(false);
-      setDismissedApiKeyModal(false);
-      return;
-    }
-    if (isUserApiKeyConfigured || dismissedApiKeyModal) {
-      setShowApiKeyModal(false);
-    } else {
-      setShowApiKeyModal(true);
-    }
-  }, [isActive, isUserApiKeyConfigured, dismissedApiKeyModal]);
 
   const handleSaveApiKey = async () => {
     const trimmed = apiKeyInput.trim();
@@ -1920,8 +1802,6 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed, isDarkMode, isActive
       setIsUserApiKeyConfigured(true);
       setCurrentMaskedKey(String(data?.masked_key || ""));
       setApiKeyInput("");
-      setDismissedApiKeyModal(true);
-      setShowApiKeyModal(false);
     } catch (error) {
       setApiKeyStatus({ type: "error", message: error.message || "Unable to save API key." });
     } finally {
@@ -2287,20 +2167,24 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed, isDarkMode, isActive
 
   return (
     <>
-      {showApiKeyModal && (
-        <ApiKeySettingsModal
-          isDarkMode={isDarkMode}
-          onClose={() => {
-            setDismissedApiKeyModal(true);
-            setShowApiKeyModal(false);
-          }}
-        />
-      )}
       <div style={{ padding: 28, display: "flex", flexDirection: "column", gap: 22, animation: "fadeIn 0.4s ease" }}>
       <div>
         <h2 style={{ fontSize: 20, fontWeight: 700, color: isDarkMode ? "#e8eef7" : "var(--gray-900)", letterSpacing: "-0.04em", marginBottom: 4 }}>Resume Analyzer</h2>
         <p style={{ fontSize: 13.5, color: isDarkMode ? "#b4c3d9" : "var(--gray-500)", maxWidth: 760 }}>Turn a raw resume into a role-ready profile with ATS scoring, extracted career signals, and project-focused improvement guidance.</p>
       </div>
+
+      <ApiKeySettingsPanel
+        isDarkMode={isDarkMode}
+        apiKey={apiKeyInput}
+        setApiKey={setApiKeyInput}
+        applyToAllRoutes={applyToAllRoutes}
+        setApplyToAllRoutes={setApplyToAllRoutes}
+        isSaving={isSavingApiKey}
+        isLoadingStatus={isLoadingApiKeyStatus}
+        currentMaskedKey={currentMaskedKey}
+        status={apiKeyStatus}
+        onSave={handleSaveApiKey}
+      />
 
       <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.5fr) minmax(280px, 0.82fr)", gap: 18, alignItems: "start" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
