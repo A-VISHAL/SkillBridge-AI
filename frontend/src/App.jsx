@@ -1525,11 +1525,13 @@ const ApiKeySettingsPanel = ({
       <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: isDarkMode ? "#cdd9ec" : "var(--gray-700)", marginBottom: 6 }}>
         API Key
       </label>
-      <textarea
+      <input
+        type="password"
         value={apiKey}
         onChange={(e) => setApiKey(e.target.value)}
-        rows={3}
         placeholder="Paste key here (example: sk_...)"
+        autoComplete="off"
+        spellCheck={false}
         style={{
           width: "100%",
           borderRadius: 12,
@@ -1539,7 +1541,6 @@ const ApiKeySettingsPanel = ({
           fontFamily: tokens.fontMono,
           fontSize: 12.5,
           padding: "10px 12px",
-          resize: "vertical",
           outline: "none",
           marginBottom: 12,
         }}
