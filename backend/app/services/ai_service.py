@@ -628,6 +628,28 @@ def _mask_key_for_logs(key: str) -> str:
     return f"{value[:6]}...{value[-4:]}"
 
 
+def _normalize_route_model(route_name: str, model: str) -> str:
+    normalized_model = str(model or "").strip()
+    if not normalized_model:
+        return "deepseek-r1-8b" if route_name in {"quiz", "interview", "roadmap"} else normalized_model
+
+    model_lower = normalized_model.lower()
+    if route_name in {"quiz", "interview", "roadmap"} and (
+        "gemma" in model_lower
+        or "claude" in model_lower
+        or "gpt-4" in model_lower
+        or "o1" in model_lower
+        or "deepseek-coder-33b" in model_lower
+        or model_lower.endswith("33b")
+        or model_lower.endswith("70b")
+        or "coder" in model_lower
+        or "premium" in model_lower
+    ):
+        return "deepseek-r1-8b"
+
+    return normalized_model
+
+
 def _resolve_db_primary_api_key() -> tuple[str, str]:
     """Try loading persisted API key from Supabase encrypted storage."""
     encryption_secret = str(getattr(settings, "API_KEY_ENCRYPTION_SECRET", "") or "").strip()
@@ -705,34 +727,51 @@ async def _call_model_chat_with_fallback_key(
         f"db_lookup={'ok' if db_primary_key else db_lookup_detail}"
     )
 
-    try:
-        return await call_model_chat(
-            messages=messages,
-            endpoint=endpoint,
-            api_key=primary_key,
-            model=model,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            require_authorization_header=require_authorization_header,
-            request_timeout_seconds=request_timeout_seconds,
-        )
-    except Exception as primary_error:
-        if not fallback_key or fallback_key == primary_key or not _should_retry_with_fallback_key(primary_error):
+    candidate_keys: List[tuple[str, str]] = []
+    seen_keys = set()
+    for source_name, candidate_key in [
+        ("db", db_primary_key),
+        ("route", route_key),
+        ("env_default", default_primary_key),
+        ("fallback", fallback_key),
+    ]:
+        if candidate_key and candidate_key not in seen_keys:
+            candidate_keys.append((source_name, candidate_key))
+            seen_keys.add(candidate_key)
+
+    last_error: Optional[Exception] = None
+    for candidate_source, candidate_key in candidate_keys:
+        try:
+            return await call_model_chat(
+                messages=messages,
+                endpoint=endpoint,
+                api_key=candidate_key,
+                model=model,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                require_authorization_header=require_authorization_header,
+                request_timeout_seconds=request_timeout_seconds,
+            )
+        except Exception as primary_error:
+            last_error = primary_error
+            if not isinstance(primary_error, AIServiceError):
+                raise
+
+            if primary_error.code in {"auth", "config", "rate_limit"}:
+                print(
+                    f"[AI KEY] route={route_name} candidate={candidate_source} failed reason={str(primary_error)}"
+                )
+                continue
+
             raise
-        print(
-            f"[AI KEY] route={route_name} switching_to_fallback key={_mask_key_for_logs(fallback_key)} "
-            f"reason={str(primary_error)}"
-        )
-        return await call_model_chat(
-            messages=messages,
-            endpoint=endpoint,
-            api_key=fallback_key,
-            model=model,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            require_authorization_header=require_authorization_header,
-            request_timeout_seconds=request_timeout_seconds,
-        )
+
+    if last_error is not None:
+        raise last_error
+
+    try:
+        raise AIServiceError("config", "No usable API key candidates were available")
+    except Exception:
+        raise
 
 
 async def call_ats_chat(
@@ -774,15 +813,17 @@ async def call_roadmap_chat(
     temperature: float = 0.7,
     max_tokens: int = 2000,
 ) -> str:
+    model = _normalize_route_model("roadmap", settings.ROADMAP_MODEL)
     return await _call_model_chat_with_fallback_key(
         messages=messages,
         endpoint=settings.ROADMAP_CHAT_ENDPOINT,
         api_key=settings.ROADMAP_API_KEY,
         fallback_api_key=settings.OXLO_FALLBACK_API_KEY,
-        model=settings.ROADMAP_MODEL,
+        model=model,
         route_name="roadmap",
         temperature=temperature,
         max_tokens=max_tokens,
+        require_authorization_header=True,
     )
 
 
@@ -791,17 +832,18 @@ async def call_quiz_chat(
     temperature: float = 0.7,
     max_tokens: int = 2000,
 ) -> str:
+    model = _normalize_route_model("quiz", settings.QUIZ_MODEL)
     return await _call_model_chat_with_fallback_key(
         messages=messages,
         endpoint=settings.QUIZ_CHAT_ENDPOINT,
         api_key=settings.QUIZ_API_KEY,
         fallback_api_key=settings.OXLO_FALLBACK_API_KEY,
-        model=settings.QUIZ_MODEL,
+        model=model,
         route_name="quiz",
         temperature=temperature,
         max_tokens=max_tokens,
         require_authorization_header=True,
-        request_timeout_seconds=getattr(settings, "QUIZ_API_TIMEOUT_SECONDS", 55),
+        request_timeout_seconds=getattr(settings, "QUIZ_API_TIMEOUT_SECONDS", 35),
     )
 
 
@@ -810,15 +852,17 @@ async def call_interview_chat(
     temperature: float = 0.7,
     max_tokens: int = 2000,
 ) -> str:
+    model = _normalize_route_model("interview", settings.INTERVIEW_MODEL)
     return await _call_model_chat_with_fallback_key(
         messages=messages,
         endpoint=settings.INTERVIEW_CHAT_ENDPOINT,
         api_key=settings.INTERVIEW_API_KEY,
         fallback_api_key=settings.OXLO_FALLBACK_API_KEY,
-        model=settings.INTERVIEW_MODEL,
+        model=model,
         route_name="interview",
         temperature=temperature,
         max_tokens=max_tokens,
+        require_authorization_header=True,
     )
 
 
@@ -1452,7 +1496,7 @@ Rules:
     ]
     
     def _parse_and_normalize(response_text: str) -> Dict[str, Any]:
-        parsed = json.loads(_extract_json_block(response_text))
+        parsed = _parse_model_json(response_text, expected_type="object")
         return _normalize_model_jd_payload(parsed)
 
     try:
@@ -1763,7 +1807,7 @@ Rules:
     try:
         # Primary model attempt.
         response = await call_roadmap_chat(messages, temperature=0.12, max_tokens=220)
-        parsed = json.loads(_extract_json_block(response))
+        parsed = _parse_model_json(response, expected_type="array")
         normalized = _normalize_payload(parsed)
         normalized["source"] = "model"
         await _cache_set_json(cache_key, normalized)
@@ -2014,8 +2058,6 @@ Return JSON array only."""
         {"role": "user", "content": prompt},
     ]
 
-    last_model_questions: List[Dict[str, Any]] = []
-
     async def _call_quiz_with_model_route(
         request_messages: List[Dict[str, str]],
         temperature: float,
@@ -2027,8 +2069,11 @@ Return JSON array only."""
     primary_error: Optional[Exception] = None
     try:
         # Keep token budget tight for faster first response while still fitting 10 MCQs.
-        primary_max_tokens = min(720, max(420, 50 * normalized_count + 80))
-        response = await _call_quiz_with_model_route(messages, temperature=0.2, max_tokens=primary_max_tokens)
+        primary_max_tokens = min(420, max(320, 34 * normalized_count + 60))
+        response = await _call_quiz_with_model_route([
+            {"role": "system", "content": "You are an expert technical interviewer creating highly relevant adaptive quizzes."},
+            {"role": "user", "content": compact_prompt},
+        ], temperature=0.2, max_tokens=primary_max_tokens)
         parsed = json.loads(_extract_json_block(response))
         if isinstance(parsed, list):
             normalized_questions: List[Dict[str, Any]] = []
@@ -2038,7 +2083,6 @@ Return JSON array only."""
                     normalized_questions.append(normalized)
 
             normalized_questions = _dedupe_questions(normalized_questions)
-            last_model_questions = normalized_questions
             if len(normalized_questions) >= normalized_count:
                 output = normalized_questions[:normalized_count]
                 await _cache_set_json(cache_key, output)
@@ -2057,9 +2101,9 @@ Return JSON array only."""
             {"role": "system", "content": "You are an expert technical interviewer creating highly relevant adaptive quizzes."},
             {"role": "user", "content": compact_prompt},
         ]
-        retry_max_tokens = min(620, max(360, 44 * normalized_count + 70))
+        retry_max_tokens = min(320, max(260, 28 * normalized_count + 50))
         retry_response = await _call_quiz_with_model_route(retry_messages, temperature=0.15, max_tokens=retry_max_tokens)
-        retry_parsed = json.loads(_extract_json_block(retry_response))
+        retry_parsed = _parse_model_json(retry_response, expected_type="array")
         if isinstance(retry_parsed, list):
             normalized_questions = []
             for index, item in enumerate(retry_parsed):
@@ -2067,8 +2111,6 @@ Return JSON array only."""
                 if normalized:
                     normalized_questions.append(normalized)
             normalized_questions = _dedupe_questions(normalized_questions)
-            if normalized_questions:
-                last_model_questions = normalized_questions
             if len(normalized_questions) >= normalized_count:
                 output = normalized_questions[:normalized_count]
                 await _cache_set_json(cache_key, output)
@@ -2077,24 +2119,10 @@ Return JSON array only."""
                     generation_meta["warning"] = None
                 return output
     except Exception as retry_error:
-        if last_model_questions:
-            if isinstance(generation_meta, dict):
-                generation_meta["source"] = "model"
-                generation_meta["warning"] = "Model returned fewer validated questions than requested"
-            await _cache_set_json(cache_key, last_model_questions)
-            return last_model_questions
-
         raise AIServiceError(
             "quiz_generation",
             f"{str(primary_error or 'Primary model failed')} | Retry failed: {str(retry_error)}",
         ) from retry_error
-
-    if last_model_questions:
-        if isinstance(generation_meta, dict):
-            generation_meta["source"] = "model"
-            generation_meta["warning"] = "Model returned fewer validated questions than requested"
-        await _cache_set_json(cache_key, last_model_questions)
-        return last_model_questions
 
     raise AIServiceError("quiz_generation", "Quiz generation returned insufficient unique validated questions from model after retry")
 
@@ -2259,64 +2287,6 @@ async def generate_interview_questions(
             output.append(item)
         return output
 
-    def _fill_with_fallback(items: List[Dict[str, Any]], target_count: int) -> List[Dict[str, Any]]:
-        """Ensure interview generation returns quickly even when model under-produces."""
-        fallback_pool = [
-            {
-                "type": "Technical" if not mode.lower().startswith("hr") else "HR",
-                "difficulty": "Easy",
-                "question": "Walk me through one project from your resume and explain your exact contribution, stack, and measurable impact.",
-            },
-            {
-                "type": "Technical" if not mode.lower().startswith("hr") else "HR",
-                "difficulty": "Medium",
-                "question": "Which technical trade-off did you make in your most relevant project, and why was that the best decision for the requirement?",
-            },
-            {
-                "type": "Technical" if not mode.lower().startswith("hr") else "HR",
-                "difficulty": "Medium",
-                "question": "Pick one weak area from your recent preparation and explain how you improved it with a concrete practice plan.",
-            },
-            {
-                "type": "Technical" if not mode.lower().startswith("hr") else "HR",
-                "difficulty": "Hard",
-                "question": "If this feature had to support 10x traffic tomorrow, what architecture or implementation changes would you make first?",
-            },
-            {
-                "type": "HR",
-                "difficulty": "Medium",
-                "question": "Tell me about a challenging situation in a team project and how you handled communication, ownership, and outcome.",
-            },
-        ]
-
-        normalized = _dedupe(items)
-        seen_questions = {" ".join(str(item.get("question", "")).strip().lower().split()) for item in normalized}
-
-        fallback_index = 0
-        max_attempts = max(target_count * 3, len(fallback_pool) * 2)
-        attempts = 0
-        while len(normalized) < target_count and attempts < max_attempts:
-            template = fallback_pool[fallback_index % len(fallback_pool)]
-            fallback_index += 1
-            attempts += 1
-            question_text = template["question"]
-            if fallback_index > len(fallback_pool):
-                question_text = f"{template['question']} Follow-up {fallback_index - len(fallback_pool)}: include one concrete project example and metric."
-            key = " ".join(question_text.strip().lower().split())
-            if not key or key in seen_questions:
-                continue
-            seen_questions.add(key)
-            normalized.append({
-                "id": f"int-fallback-{len(normalized) + 1}",
-                "type": template["type"],
-                "difficulty": template["difficulty"],
-                "question": question_text,
-                "expected_keywords": ["clarity", "impact", "decision"],
-                "evaluation_criteria": ["Clarity", "Technical depth", "Relevance"],
-            })
-
-        return normalized[:target_count]
-
     normalized_count = max(1, min(4, int(count or 4)))
     project_focus = _extract_project_focus()
     roadmap_focus = _extract_roadmap_focus()
@@ -2365,8 +2335,8 @@ No duplicates."""
     ]
 
     try:
-        response = await call_interview_chat(messages, temperature=0.15, max_tokens=560)
-        parsed = json.loads(_extract_json_block(response))
+        response = await call_interview_chat(messages, temperature=0.15, max_tokens=400)
+        parsed = _parse_model_json(response, expected_type="array")
         if isinstance(parsed, list):
             normalized = []
             for index, item in enumerate(parsed):
@@ -2390,8 +2360,8 @@ No duplicates."""
                 {"role": "system", "content": "You are a senior interviewer generating realistic, candidate-specific interview questions."},
                 {"role": "user", "content": compact_prompt},
             ]
-            retry_response = await call_interview_chat(retry_messages, temperature=0.12, max_tokens=420)
-            retry_parsed = json.loads(_extract_json_block(retry_response))
+            retry_response = await call_interview_chat(retry_messages, temperature=0.12, max_tokens=300)
+            retry_parsed = _parse_model_json(retry_response, expected_type="array")
             if isinstance(retry_parsed, list):
                 normalized = []
                 for index, item in enumerate(retry_parsed):
@@ -2409,7 +2379,7 @@ No duplicates."""
         except Exception as retry_error:
             raise AIServiceError("interview_generation", f"{str(first_error)} | Retry failed: {str(retry_error)}") from retry_error
 
-    raise AIServiceError("interview_generation", "Interview generation returned insufficient validated questions")
+        raise AIServiceError("interview_generation", "Interview generation returned insufficient validated questions from model")
 
 async def evaluate_interview_answer(
     question: str,
@@ -2545,7 +2515,7 @@ Expected Keywords: {json.dumps(keyword_context, ensure_ascii=True)}"""
 
     try:
         response = await call_interview_chat(messages, temperature=0.2, max_tokens=520)
-        parsed = json.loads(_extract_json_block(response))
+        parsed = _parse_model_json(response, expected_type="array")
         if isinstance(parsed, dict):
             return _normalize_feedback(parsed)
     except Exception as first_error:
@@ -2555,7 +2525,7 @@ Expected Keywords: {json.dumps(keyword_context, ensure_ascii=True)}"""
                 {"role": "user", "content": compact_prompt},
             ]
             retry_response = await call_interview_chat(retry_messages, temperature=0.15, max_tokens=360)
-            retry_parsed = json.loads(_extract_json_block(retry_response))
+            retry_parsed = _parse_model_json(retry_response, expected_type="array")
             if isinstance(retry_parsed, dict):
                 return _normalize_feedback(retry_parsed)
         except Exception as retry_error:
@@ -2791,6 +2761,30 @@ def _extract_json_block(text: str) -> str:
                     return cleaned[start:i + 1]
 
     return cleaned
+
+
+def _parse_model_json(text: str, expected_type: str = "any") -> Any:
+    """Parse model JSON output with light cleanup for common formatting issues."""
+    cleaned = _extract_json_block(text)
+
+    # Remove trailing commas before closing braces/brackets, which are common in
+    # otherwise valid model outputs and safe to repair deterministically.
+    cleaned = re.sub(r",\s*([}\]])", r"\1", cleaned)
+
+    try:
+        parsed = json.loads(cleaned)
+    except json.JSONDecodeError:
+        # Try one more time with the raw text in case the extractor trimmed too much.
+        raw = (text or "").strip()
+        raw = re.sub(r",\s*([}\]])", r"\1", raw)
+        parsed = json.loads(raw)
+
+    if expected_type == "array" and not isinstance(parsed, list):
+        raise ValueError("Model output was not a JSON array")
+    if expected_type == "object" and not isinstance(parsed, dict):
+        raise ValueError("Model output was not a JSON object")
+
+    return parsed
 
 
 def _sanitize_model_error_message(err: Exception) -> str:

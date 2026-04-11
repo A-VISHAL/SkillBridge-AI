@@ -1544,6 +1544,7 @@ const ApiKeySettingsModal = ({ isDarkMode, onClose }) => {
       });
       setCurrentMaskedKey(String(data?.masked_key || ""));
       setApiKey("");
+      onClose?.();
     } catch (error) {
       setStatus({ type: "error", message: error.message || "Unable to save API key." });
     } finally {
@@ -1871,15 +1872,19 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed, isDarkMode, isActive
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (!isActive || isLoadingApiKeyStatus) return;
-
-    const popupKey = "skillbridge.resume.apiPopupShown";
-    const popupShown = window.sessionStorage.getItem(popupKey) === "1";
-    if (!popupShown) {
-      setShowApiKeyModal(true);
-      window.sessionStorage.setItem(popupKey, "1");
+    if (!isActive) {
+      setShowApiKeyModal(false);
+      return;
     }
-  }, [isActive, isLoadingApiKeyStatus]);
+
+    if (isLoadingApiKeyStatus) return;
+
+    if (isUserApiKeyConfigured) {
+      setShowApiKeyModal(false);
+    } else {
+      setShowApiKeyModal(true);
+    }
+  }, [isActive, isLoadingApiKeyStatus, isUserApiKeyConfigured]);
 
   const handleSaveApiKey = async () => {
     const trimmed = apiKeyInput.trim();
