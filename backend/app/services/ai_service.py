@@ -2515,7 +2515,7 @@ Expected Keywords: {json.dumps(keyword_context, ensure_ascii=True)}"""
 
     try:
         response = await call_interview_chat(messages, temperature=0.2, max_tokens=520)
-        parsed = _parse_model_json(response, expected_type="array")
+        parsed = _parse_model_json(response, expected_type="object")
         if isinstance(parsed, dict):
             return _normalize_feedback(parsed)
     except Exception as first_error:
@@ -2525,7 +2525,7 @@ Expected Keywords: {json.dumps(keyword_context, ensure_ascii=True)}"""
                 {"role": "user", "content": compact_prompt},
             ]
             retry_response = await call_interview_chat(retry_messages, temperature=0.15, max_tokens=360)
-            retry_parsed = _parse_model_json(retry_response, expected_type="array")
+            retry_parsed = _parse_model_json(retry_response, expected_type="object")
             if isinstance(retry_parsed, dict):
                 return _normalize_feedback(retry_parsed)
         except Exception as retry_error:
