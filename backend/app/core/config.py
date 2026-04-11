@@ -138,5 +138,6 @@ class Settings:
     MAX_JOBS_PER_QUERY: int = int(os.getenv("MAX_JOBS_PER_QUERY", "50"))
     MIN_SKILL_MATCH_RATIO: float = float(os.getenv("MIN_SKILL_MATCH_RATIO", "0.6"))
     API_TIMEOUT_SECONDS: int = int(os.getenv("API_TIMEOUT_SECONDS", "10"))
+    QUIZ_API_TIMEOUT_SECONDS: int = int(os.getenv("QUIZ_API_TIMEOUT_SECONDS", "55"))
 
 settings = Settings()

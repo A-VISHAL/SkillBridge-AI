@@ -1805,7 +1805,7 @@ const DashboardOverview = ({ resumeContext, overviewMetrics, isDarkMode }) => {
 };
 
 // ─── Resume Analyzer ──────────────────────────────────────────────────────────
-const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed, isDarkMode }) => {
+const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed, isDarkMode, isActive = false }) => {
   const [uploaded, setUploaded] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [fileName, setFileName] = useState("");
@@ -1829,6 +1829,7 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed, isDarkMode }) => {
   const [currentMaskedKey, setCurrentMaskedKey] = useState("");
   const [isUserApiKeyConfigured, setIsUserApiKeyConfigured] = useState(false);
   const [apiKeyStatus, setApiKeyStatus] = useState({ type: "", message: "" });
+  const [showApiKeyModal, setShowApiKeyModal] = useState(false);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -1868,6 +1869,18 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed, isDarkMode }) => {
     };
   }, []);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!isActive || isLoadingApiKeyStatus) return;
+
+    const popupKey = "skillbridge.resume.apiPopupShown";
+    const popupShown = window.sessionStorage.getItem(popupKey) === "1";
+    if (!popupShown) {
+      setShowApiKeyModal(true);
+      window.sessionStorage.setItem(popupKey, "1");
+    }
+  }, [isActive, isLoadingApiKeyStatus]);
+
   const handleSaveApiKey = async () => {
     const trimmed = apiKeyInput.trim();
     if (!trimmed) {
@@ -1900,6 +1913,7 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed, isDarkMode }) => {
       setIsUserApiKeyConfigured(true);
       setCurrentMaskedKey(String(data?.masked_key || ""));
       setApiKeyInput("");
+      setShowApiKeyModal(false);
     } catch (error) {
       setApiKeyStatus({ type: "error", message: error.message || "Unable to save API key." });
     } finally {
@@ -2264,89 +2278,18 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed, isDarkMode }) => {
   ];
 
   return (
-    <div style={{ padding: 28, display: "flex", flexDirection: "column", gap: 22, animation: "fadeIn 0.4s ease" }}>
+    <>
+      {showApiKeyModal && (
+        <ApiKeySettingsModal
+          isDarkMode={isDarkMode}
+          onClose={() => setShowApiKeyModal(false)}
+        />
+      )}
+      <div style={{ padding: 28, display: "flex", flexDirection: "column", gap: 22, animation: "fadeIn 0.4s ease" }}>
       <div>
         <h2 style={{ fontSize: 20, fontWeight: 700, color: isDarkMode ? "#e8eef7" : "var(--gray-900)", letterSpacing: "-0.04em", marginBottom: 4 }}>Resume Analyzer</h2>
         <p style={{ fontSize: 13.5, color: isDarkMode ? "#b4c3d9" : "var(--gray-500)", maxWidth: 760 }}>Turn a raw resume into a role-ready profile with ATS scoring, extracted career signals, and project-focused improvement guidance.</p>
       </div>
-
-      <Card isDarkMode={isDarkMode} style={{ padding: "18px 18px 16px" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
-          <div style={{ fontSize: 14.5, fontWeight: 700, color: isDarkMode ? "#e8eef7" : "var(--gray-900)" }}>API Key for AI Usage</div>
-          <Badge variant={isUserApiKeyConfigured ? "success" : "warning"}>{isUserApiKeyConfigured ? "Configured" : "Not configured"}</Badge>
-        </div>
-
-        <div style={{
-          borderRadius: 10,
-          padding: "8px 10px",
-          marginBottom: 10,
-          fontSize: 12,
-          border: isDarkMode ? "1px solid rgba(90,120,180,0.35)" : "1px solid var(--gray-200)",
-          background: isDarkMode ? "rgba(16,24,40,0.45)" : "var(--gray-50)",
-          color: isDarkMode ? "#cdd9ec" : "var(--gray-700)",
-        }}>
-          {isLoadingApiKeyStatus
-            ? "Checking current key status..."
-            : isUserApiKeyConfigured && currentMaskedKey
-              ? `Current key configured: ${currentMaskedKey}`
-              : "No API key configured yet."}
-        </div>
-
-        <textarea
-          value={apiKeyInput}
-          onChange={(e) => setApiKeyInput(e.target.value)}
-          rows={2}
-          placeholder="Paste API key here (example: sk_...)"
-          style={{
-            width: "100%",
-            borderRadius: 10,
-            border: isDarkMode ? "1px solid rgba(90,120,180,0.4)" : "1px solid var(--gray-250)",
-            background: isDarkMode ? "rgba(16,24,40,0.68)" : "var(--gray-50)",
-            color: isDarkMode ? "#e8eef7" : "var(--gray-900)",
-            fontFamily: tokens.fontMono,
-            fontSize: 12.5,
-            padding: "10px 12px",
-            resize: "vertical",
-            outline: "none",
-            marginBottom: 10,
-          }}
-        />
-
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 12.5, color: isDarkMode ? "#cdd9ec" : "var(--gray-700)" }}>
-            <input
-              type="checkbox"
-              checked={applyToAllRoutes}
-              onChange={(e) => setApplyToAllRoutes(e.target.checked)}
-            />
-            Use this key for ATS, JD, Roadmap, Quiz, and Interview
-          </label>
-
-          <Btn variant="primary" onClick={handleSaveApiKey} disabled={isSavingApiKey} style={{ minWidth: 130 }}>
-            {isSavingApiKey ? "Saving..." : "Save API Key"}
-          </Btn>
-        </div>
-
-        {apiKeyStatus.message && (
-          <div
-            style={{
-              marginTop: 10,
-              borderRadius: 10,
-              padding: "9px 10px",
-              fontSize: 12.5,
-              border: apiKeyStatus.type === "error"
-                ? "1px solid rgba(220, 90, 90, 0.5)"
-                : "1px solid rgba(63, 176, 115, 0.55)",
-              color: apiKeyStatus.type === "error" ? "#fca5a5" : (isDarkMode ? "#9ee6b4" : "#166534"),
-              background: apiKeyStatus.type === "error"
-                ? "rgba(127, 29, 29, 0.22)"
-                : (isDarkMode ? "rgba(22, 101, 52, 0.25)" : "#f0fdf4"),
-            }}
-          >
-            {apiKeyStatus.message}
-          </div>
-        )}
-      </Card>
 
       <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.5fr) minmax(280px, 0.82fr)", gap: 18, alignItems: "start" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
@@ -2655,7 +2598,8 @@ const ResumeAnalyzer = ({ onResumeParsed, onResumeAnalyzed, isDarkMode }) => {
           </div>
         </Card>
       </div>
-    </div>
+      </div>
+    </>
   );
 }
 
@@ -3354,7 +3298,7 @@ const Quiz = ({ resumeId, resumeData, jobDescription, onQuizComplete, isDarkMode
 };
 
 // ─── Mock Interview ───────────────────────────────────────────────────────────
-const MockInterview = ({ resumeId, resumeData, jobDescription, onInterviewProgress, isDarkMode }) => {
+const MockInterview = ({ resumeId, resumeData, jobDescription, onInterviewProgress, onLogout, isDarkMode }) => {
   const [mode, setMode] = useState("Technical");
   const [session, setSession] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -3719,7 +3663,20 @@ const MockInterview = ({ resumeId, resumeData, jobDescription, onInterviewProgre
           </div>
 
           {error && <div style={{ marginTop: 12, color: isDarkMode ? "#fca5a5" : "#b91c1c", fontSize: 12.5, fontWeight: 600 }}>{error}</div>}
-          {completed && <div style={{ marginTop: 10, color: mutedColor, fontSize: 12.5 }}>You can restart the interview to generate a new session.</div>}
+          {completed && (
+            <div style={{ marginTop: 12, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+              <div style={{ color: mutedColor, fontSize: 12.5 }}>You can go back to the auth page when you're done.</div>
+              <Btn
+                variant="secondary"
+                onClick={onLogout}
+                style={isDarkMode
+                  ? { background: "rgba(255,255,255,0.08)", color: "#dbe8fb", border: "1px solid rgba(122,147,193,0.35)" }
+                  : {}}
+              >
+                Logout
+              </Btn>
+            </div>
+          )}
         </>
       )}
     </div>
@@ -3961,18 +3918,18 @@ const JobFinder = ({ resumeId, resumeData, onJobsUpdated, isDarkMode }) => {
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
         {quickChips.map((chip) => (
           <button
-            key={chip.id}
-            onClick={() => setActiveChip(chip.id)}
+            key={chip.key}
+            type="button"
+            onClick={() => setActiveChip(chip.key)}
             style={{
-              border: activeChip === chip.id ? (isDarkMode ? "1px solid rgba(143,176,227,0.55)" : "1px solid var(--gray-700)") : (isDarkMode ? "1px solid rgba(122,147,193,0.28)" : "1px solid var(--gray-200)"),
-              background: activeChip === chip.id ? (isDarkMode ? accentBg : "var(--gray-900)") : (isDarkMode ? "rgba(143,176,227,0.12)" : "var(--white)"),
-              color: activeChip === chip.id ? accentText : (isDarkMode ? "#dbe8fb" : "var(--gray-700)"),
-              borderRadius: 99,
-              padding: "6px 12px",
-              fontSize: 12,
+              border: isDarkMode ? "1px solid rgba(122,147,193,0.35)" : "1px solid var(--gray-200)",
+              background: activeChip === chip.key ? (isDarkMode ? "rgba(143,176,227,0.16)" : "var(--gray-100)") : panelBg,
+              color: isDarkMode ? "#dbe8fb" : "var(--gray-700)",
+              borderRadius: 999,
+              padding: "8px 12px",
+              fontSize: 12.5,
               fontWeight: 600,
               cursor: "pointer",
-              transition: "all var(--transition)",
             }}
           >
             {chip.label}
@@ -4183,7 +4140,7 @@ const Dashboard = ({ onLogout }) => {
     },
     resume: {
       title: "Resume Analyzer",
-      render: () => <ResumeAnalyzer onResumeParsed={handleResumeParsed} onResumeAnalyzed={handleResumeAnalyzed} isDarkMode={isDarkMode}/>,
+      render: () => <ResumeAnalyzer onResumeParsed={handleResumeParsed} onResumeAnalyzed={handleResumeAnalyzed} isDarkMode={isDarkMode} isActive={active === "resume"}/>,
       resetOnResumeChange: false,
     },
     matcher: {
@@ -4203,7 +4160,7 @@ const Dashboard = ({ onLogout }) => {
     },
     interview: {
       title: "Mock Interview",
-      render: () => <MockInterview resumeId={resumeContext.resumeId} resumeData={resumeContext.resumeData} jobDescription={resumeContext.jobDescription} onInterviewProgress={handleInterviewProgress} isDarkMode={isDarkMode}/>,
+      render: () => <MockInterview resumeId={resumeContext.resumeId} resumeData={resumeContext.resumeData} jobDescription={resumeContext.jobDescription} onInterviewProgress={handleInterviewProgress} onLogout={onLogout} isDarkMode={isDarkMode}/>,
       resetOnResumeChange: true,
     },
     jobs: {

@@ -478,6 +478,8 @@ async def call_model_chat(
     model: str,
     temperature: float = 0.7,
     max_tokens: int = 2000,
+    require_authorization_header: bool = False,
+    request_timeout_seconds: Optional[int] = None,
 ) -> str:
     """Call a chat model endpoint with explicit credentials and model routing."""
 
@@ -493,23 +495,25 @@ async def call_model_chat(
     api_key = api_key.strip()
     if api_key.lower().startswith("bearer "):
         api_key = api_key[7:].strip()
+    if not api_key:
+        raise AIServiceError("config", "API key is empty after normalization")
 
-    # Oxlo-style gateways can reject Authorization header format.
-    # Use API-key style headers first and avoid raw Authorization formats.
-    header_variants = [
+    auth_header_variants = [
+        {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        },
         {
             "Authorization": f"Bearer {api_key}",
             "x-api-key": api_key,
             "Content-Type": "application/json",
             "Accept": "application/json",
         },
+    ]
+    api_key_only_variants = [
         {
             "x-api-key": api_key,
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-        },
-        {
-            "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
             "Accept": "application/json",
         },
@@ -524,6 +528,9 @@ async def call_model_chat(
             "Accept": "application/json",
         },
     ]
+    # Quiz route should enforce Authorization-bearing headers only to avoid
+    # provider-side 401 "Missing Authorization header" responses.
+    header_variants = auth_header_variants[:1] if require_authorization_header else (auth_header_variants + api_key_only_variants)
     payload = {
         "model": model,
         "messages": messages,
@@ -532,13 +539,21 @@ async def call_model_chat(
     }
 
     last_response = None
-    timeout_seconds = max(15, min(45, int(getattr(settings, "API_TIMEOUT_SECONDS", 20)) * 2))
+    if request_timeout_seconds is not None:
+        timeout_seconds = max(12, min(90, int(request_timeout_seconds)))
+    else:
+        timeout_seconds = max(15, min(45, int(getattr(settings, "API_TIMEOUT_SECONDS", 20)) * 2))
     async with httpx.AsyncClient(timeout=timeout_seconds) as client:
         for headers in header_variants:
             for attempt in range(2):
                 try:
                     response = await client.post(endpoint, headers=headers, json=payload)
                 except Exception as e:
+                    if isinstance(e, (httpx.ReadTimeout, httpx.ConnectTimeout, httpx.TimeoutException)):
+                        if attempt == 0:
+                            await asyncio.sleep(0.35)
+                            continue
+                        raise AIServiceError("timeout", "AI API request timed out") from e
                     error_detail = str(e).strip() or e.__class__.__name__
                     raise AIServiceError("network", f"AI API request failed: {error_detail}") from e
 
@@ -546,9 +561,19 @@ async def call_model_chat(
                     last_response = response
                     break
 
+                response_text = (response.text or "")[:220]
+                missing_auth_header = (
+                    response.status_code in (401, 403)
+                    and "missing authorization header" in response_text.lower()
+                )
+
                 # Retry auth format on auth failures only.
                 if response.status_code in (401, 403):
                     last_response = response
+                    # If gateway explicitly requires Authorization, skip
+                    # api-key-only variants to avoid misleading final errors.
+                    if missing_auth_header and "Authorization" not in headers:
+                        continue
                     break
 
                 if response.status_code in (429, 502, 503, 504) and attempt == 0:
@@ -564,17 +589,19 @@ async def call_model_chat(
                     continue
 
                 if response.status_code == 429:
-                    raise AIServiceError("rate_limit", f"AI API rate limit exceeded: {response.text[:220]}")
+                    raise AIServiceError("rate_limit", f"AI API rate limit exceeded: {response_text}")
 
                 code = "http_error"
-                raise AIServiceError(code, f"AI API request failed: status={response.status_code}, body={response.text[:220]}")
+                raise AIServiceError(code, f"AI API request failed: status={response.status_code}, body={response_text}")
 
             if last_response and last_response.status_code == 200:
                 break
 
     if not last_response or last_response.status_code != 200:
-        body = last_response.text[:220] if last_response is not None else "No response body"
-        raise AIServiceError("auth", f"AI API request failed: status=401, body={body}")
+        status_code = last_response.status_code if last_response is not None else 0
+        body = (last_response.text or "")[:220] if last_response is not None else "No response body"
+        error_code = "auth" if status_code in (401, 403) else "http_error"
+        raise AIServiceError(error_code, f"AI API request failed: status={status_code}, body={body}")
 
     try:
         data = last_response.json()
@@ -639,6 +666,8 @@ async def _call_model_chat_with_fallback_key(
     route_name: str,
     temperature: float = 0.7,
     max_tokens: int = 2000,
+    require_authorization_header: bool = False,
+    request_timeout_seconds: Optional[int] = None,
 ) -> str:
     fallback_key = (fallback_api_key or "").strip().strip('"').strip("'")
     route_key = (api_key or "").strip().strip('"').strip("'")
@@ -684,6 +713,8 @@ async def _call_model_chat_with_fallback_key(
             model=model,
             temperature=temperature,
             max_tokens=max_tokens,
+            require_authorization_header=require_authorization_header,
+            request_timeout_seconds=request_timeout_seconds,
         )
     except Exception as primary_error:
         if not fallback_key or fallback_key == primary_key or not _should_retry_with_fallback_key(primary_error):
@@ -699,6 +730,8 @@ async def _call_model_chat_with_fallback_key(
             model=model,
             temperature=temperature,
             max_tokens=max_tokens,
+            require_authorization_header=require_authorization_header,
+            request_timeout_seconds=request_timeout_seconds,
         )
 
 
@@ -767,6 +800,8 @@ async def call_quiz_chat(
         route_name="quiz",
         temperature=temperature,
         max_tokens=max_tokens,
+        require_authorization_header=True,
+        request_timeout_seconds=getattr(settings, "QUIZ_API_TIMEOUT_SECONDS", 55),
     )
 
 
@@ -1361,8 +1396,8 @@ def build_quiz_fallback_questions(
 async def match_resume_to_jd(resume_text: str, jd_text: str, resume_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Match resume to job description with focus areas"""
 
-    resume_context = _build_resume_context_for_jd(resume_text, resume_data, max_chars=950)
-    cache_key = f"jd_match:v3:{_stable_hash(resume_context)}:{_stable_hash(jd_text[:1200])}"
+    resume_context = _build_resume_context_for_jd(resume_text, resume_data, max_chars=720)
+    cache_key = f"jd_match:v4:{_stable_hash(resume_context)}:{_stable_hash(jd_text[:900])}"
     cached_payload = await _cache_get_json(cache_key)
     if isinstance(cached_payload, dict):
         cached_payload["source"] = cached_payload.get("source", "model")
@@ -1390,36 +1425,56 @@ Resume:
 {resume_context}
 
 Job Description:
-{jd_text[:1200]}
+{jd_text[:900]}
 
 Return JSON with keys: match_percentage, hire_probability, matched_skills, missing_skills, focus_areas, interview_topics, strengths, weaknesses, suggestions"""
 
     prompt += "\nRules: Return ONLY JSON. No markdown. Max 5 focus_areas and max 5 suggestions. Keep strengths/weaknesses concise."
+    compact_prompt = f"""Analyze resume vs JD and return STRICT JSON only.
+
+Resume:
+{resume_context[:520]}
+
+JD:
+{jd_text[:700]}
+
+Keys:
+match_percentage, hire_probability, matched_skills, missing_skills, focus_areas, interview_topics, strengths, weaknesses, suggestions
+
+Rules:
+- focus_areas max 5, suggestions max 5
+- concise output
+- no markdown"""
     
     messages = [
         {"role": "system", "content": "You are an expert technical recruiter and career coach."},
         {"role": "user", "content": prompt}
     ]
     
-    try:
-        response = await call_jd_chat(messages, temperature=0.1, max_tokens=380)
-    except Exception as e:
-        should_fallback = _allow_rate_limit_fallback(e)
-        if isinstance(e, AIServiceError) and e.code in {"auth", "config", "network", "http_error", "parse"}:
-            should_fallback = True
-        if not should_fallback:
-            raise
-        fallback_payload = _build_jd_match_fallback(resume_text, jd_text, resume_data, str(e))
-        await _cache_set_json(cache_key, fallback_payload)
-        return fallback_payload
+    def _parse_and_normalize(response_text: str) -> Dict[str, Any]:
+        parsed = json.loads(_extract_json_block(response_text))
+        return _normalize_model_jd_payload(parsed)
 
     try:
-        parsed = json.loads(_extract_json_block(response))
-        normalized = _normalize_model_jd_payload(parsed)
+        response = await call_jd_chat(messages, temperature=0.05, max_tokens=260)
+        normalized = _parse_and_normalize(response)
         await _cache_set_json(cache_key, normalized)
         return normalized
-    except Exception as e:
-        raise ValueError(f"Failed to parse AI JD match response: {str(e)}")
+    except Exception as first_error:
+        retry_messages = [
+            {"role": "system", "content": "You are an expert technical recruiter and career coach."},
+            {"role": "user", "content": compact_prompt},
+        ]
+        try:
+            retry_response = await call_jd_chat(retry_messages, temperature=0.02, max_tokens=220)
+            normalized = _parse_and_normalize(retry_response)
+            await _cache_set_json(cache_key, normalized)
+            return normalized
+        except Exception as retry_error:
+            raise AIServiceError(
+                "jd_matching",
+                f"Model-only JD matching failed: {str(first_error)} | Retry failed: {str(retry_error)}",
+            ) from retry_error
 
 
 async def generate_roadmap(
@@ -1714,6 +1769,9 @@ Rules:
         await _cache_set_json(cache_key, normalized)
         return normalized
     except Exception as first_error:
+        if isinstance(first_error, AIServiceError) and first_error.code in {"auth", "config"}:
+            # Do not burn additional latency on known non-retriable auth/config failures.
+            raise
         # Retry once with a compact prompt and lower token budget.
         try:
             retry_messages = [
@@ -1906,10 +1964,10 @@ Focus area:
 {domain_prompt}
 
 Candidate resume context:
-{resume_text[:350]}
+{resume_text[:220]}
 
 Target JD context:
-{jd_text[:350]}
+{jd_text[:220]}
 
 Roadmap context (followed/planned):
 {chr(10).join(roadmap_snippets[:4]) if roadmap_snippets else 'No roadmap context provided'}
@@ -1941,8 +1999,8 @@ Return ONLY JSON array. For each object use keys:
 Context:
 - Domain: {domain}
 - Difficulty policy: {difficulty_instruction}
-- Resume: {resume_text[:280]}
-- JD: {jd_text[:280]}
+- Resume: {resume_text[:180]}
+- JD: {jd_text[:180]}
 - Roadmap: {chr(10).join(roadmap_snippets[:3]) if roadmap_snippets else 'No roadmap'}
 
 Each question object must include:
@@ -1958,42 +2016,19 @@ Return JSON array only."""
 
     last_model_questions: List[Dict[str, Any]] = []
 
-    async def _call_quiz_with_model_route_fallback(
+    async def _call_quiz_with_model_route(
         request_messages: List[Dict[str, str]],
         temperature: float,
         max_tokens: int,
     ) -> str:
-        """Prefer dedicated quiz route; fall back to ATS model route when provider rejects quiz route settings."""
-        try:
-            return await call_quiz_chat(request_messages, temperature=temperature, max_tokens=max_tokens)
-        except AIServiceError as quiz_error:
-            if quiz_error.code in {"auth", "config", "http_error", "network"}:
-                return await call_ats_chat(request_messages, temperature=temperature, max_tokens=max_tokens)
-            raise
-
-    def _build_and_cache_fallback(reason: str) -> List[Dict[str, Any]]:
-        if settings.QUIZ_STRICT_MODEL:
-            raise AIServiceError("quiz_generation", reason)
-        fallback_questions = _build_quiz_fallback_questions(
-            topic=topic,
-            difficulty=difficulty,
-            count=normalized_count,
-            domain=domain,
-            resume_text=resume_text,
-            jd_text=jd_text,
-            roadmap_context=roadmap_context,
-            reason=reason,
-        )
-        if isinstance(generation_meta, dict):
-            generation_meta["source"] = "quiz_fallback"
-            generation_meta["warning"] = reason
-        return fallback_questions
+        """Use dedicated quiz route for fastest model path and predictable latency."""
+        return await call_quiz_chat(request_messages, temperature=temperature, max_tokens=max_tokens)
 
     primary_error: Optional[Exception] = None
     try:
-        # 10 validated MCQs with options typically needs >900 output tokens.
-        primary_max_tokens = min(1400, max(700, 90 * normalized_count + 220))
-        response = await _call_quiz_with_model_route_fallback(messages, temperature=0.3, max_tokens=primary_max_tokens)
+        # Keep token budget tight for faster first response while still fitting 10 MCQs.
+        primary_max_tokens = min(720, max(420, 50 * normalized_count + 80))
+        response = await _call_quiz_with_model_route(messages, temperature=0.2, max_tokens=primary_max_tokens)
         parsed = json.loads(_extract_json_block(response))
         if isinstance(parsed, list):
             normalized_questions: List[Dict[str, Any]] = []
@@ -2014,13 +2049,16 @@ Return JSON array only."""
     except Exception as first_error:
         primary_error = first_error
 
+    if isinstance(primary_error, AIServiceError) and primary_error.code in {"auth", "config"}:
+        raise primary_error
+
     try:
         retry_messages = [
             {"role": "system", "content": "You are an expert technical interviewer creating highly relevant adaptive quizzes."},
             {"role": "user", "content": compact_prompt},
         ]
-        retry_max_tokens = min(1200, max(650, 80 * normalized_count + 180))
-        retry_response = await _call_quiz_with_model_route_fallback(retry_messages, temperature=0.2, max_tokens=retry_max_tokens)
+        retry_max_tokens = min(620, max(360, 44 * normalized_count + 70))
+        retry_response = await _call_quiz_with_model_route(retry_messages, temperature=0.15, max_tokens=retry_max_tokens)
         retry_parsed = json.loads(_extract_json_block(retry_response))
         if isinstance(retry_parsed, list):
             normalized_questions = []
@@ -2046,10 +2084,10 @@ Return JSON array only."""
             await _cache_set_json(cache_key, last_model_questions)
             return last_model_questions
 
-        fallback_reason = f"{str(primary_error or 'Primary model failed')} | Retry failed: {str(retry_error)}"
-        fallback_questions = _build_and_cache_fallback(fallback_reason)
-        await _cache_set_json(cache_key, fallback_questions)
-        return fallback_questions
+        raise AIServiceError(
+            "quiz_generation",
+            f"{str(primary_error or 'Primary model failed')} | Retry failed: {str(retry_error)}",
+        ) from retry_error
 
     if last_model_questions:
         if isinstance(generation_meta, dict):
@@ -2058,10 +2096,7 @@ Return JSON array only."""
         await _cache_set_json(cache_key, last_model_questions)
         return last_model_questions
 
-    fallback_reason = "Quiz generation returned insufficient unique validated questions from model after retry"
-    fallback_questions = _build_and_cache_fallback(fallback_reason)
-    await _cache_set_json(cache_key, fallback_questions)
-    return fallback_questions
+    raise AIServiceError("quiz_generation", "Quiz generation returned insufficient unique validated questions from model after retry")
 
 
 async def evaluate_quiz_answer(question: str, correct_answer: str, user_answer: str) -> Dict:
@@ -2329,17 +2364,8 @@ No duplicates."""
         {"role": "user", "content": prompt},
     ]
 
-    def _finalize_fallback(reason: str) -> List[Dict[str, Any]]:
-        if settings.INTERVIEW_STRICT_MODEL:
-            raise AIServiceError("interview_generation", reason)
-        fallback_output = _fill_with_fallback([], normalized_count)
-        if isinstance(generation_meta, dict):
-            generation_meta["source"] = "interview_fallback"
-            generation_meta["warning"] = reason
-        return fallback_output
-
     try:
-        response = await call_interview_chat(messages, temperature=0.2, max_tokens=900)
+        response = await call_interview_chat(messages, temperature=0.15, max_tokens=560)
         parsed = json.loads(_extract_json_block(response))
         if isinstance(parsed, list):
             normalized = []
@@ -2348,8 +2374,6 @@ No duplicates."""
                 if question:
                     normalized.append(question)
             normalized = _dedupe(normalized)
-            if not settings.INTERVIEW_STRICT_MODEL:
-                normalized = _fill_with_fallback(normalized, normalized_count)
             if len(normalized) >= normalized_count:
                 output = normalized[:normalized_count]
                 await _cache_set_json(cache_key, output)
@@ -2358,17 +2382,15 @@ No duplicates."""
                     generation_meta["warning"] = None
                 return output
     except Exception as first_error:
-        if isinstance(first_error, AIServiceError) and first_error.code in {"auth", "config", "network", "http_error", "parse"}:
-            output = _finalize_fallback(f"Primary model call failed without retry: {str(first_error)}")
-            await _cache_set_json(cache_key, output)
-            return output
+        if isinstance(first_error, AIServiceError) and first_error.code in {"auth", "config"}:
+            raise AIServiceError("interview_generation", f"Primary model call failed without retry: {str(first_error)}") from first_error
 
         try:
             retry_messages = [
                 {"role": "system", "content": "You are a senior interviewer generating realistic, candidate-specific interview questions."},
                 {"role": "user", "content": compact_prompt},
             ]
-            retry_response = await call_interview_chat(retry_messages, temperature=0.15, max_tokens=700)
+            retry_response = await call_interview_chat(retry_messages, temperature=0.12, max_tokens=420)
             retry_parsed = json.loads(_extract_json_block(retry_response))
             if isinstance(retry_parsed, list):
                 normalized = []
@@ -2377,8 +2399,6 @@ No duplicates."""
                     if question:
                         normalized.append(question)
                 normalized = _dedupe(normalized)
-                if not settings.INTERVIEW_STRICT_MODEL:
-                    normalized = _fill_with_fallback(normalized, normalized_count)
                 if len(normalized) >= normalized_count:
                     output = normalized[:normalized_count]
                     await _cache_set_json(cache_key, output)
@@ -2387,13 +2407,9 @@ No duplicates."""
                         generation_meta["warning"] = None
                     return output
         except Exception as retry_error:
-            output = _finalize_fallback(f"{str(first_error)} | Retry failed: {str(retry_error)}")
-            await _cache_set_json(cache_key, output)
-            return output
+            raise AIServiceError("interview_generation", f"{str(first_error)} | Retry failed: {str(retry_error)}") from retry_error
 
-    output = _finalize_fallback("Interview generation returned insufficient validated questions")
-    await _cache_set_json(cache_key, output)
-    return output
+    raise AIServiceError("interview_generation", "Interview generation returned insufficient validated questions")
 
 async def evaluate_interview_answer(
     question: str,
@@ -2430,10 +2446,10 @@ Question: {question}
 Candidate Answer: {answer}
 Expected Keywords: {json.dumps(keyword_context, ensure_ascii=True)}
 Job Description Context: {(jd_text or '')[:1600]}
-Resume Context: {(resume_text or '')[:1600]}
-Quiz Context: {json.dumps(quiz_context, ensure_ascii=True)[:1200]}
-Roadmap Context: {json.dumps(roadmap_context, ensure_ascii=True)[:1200]}
-Project Context: {json.dumps(project_context, ensure_ascii=True)[:900]}
+Resume Context: {(resume_text or '')[:900]}
+Quiz Context: {json.dumps(quiz_context, ensure_ascii=True)[:700]}
+Roadmap Context: {json.dumps(roadmap_context, ensure_ascii=True)[:700]}
+Project Context: {json.dumps(project_context, ensure_ascii=True)[:500]}
 
 Scoring dimensions:
 1) Relevance to question and role
@@ -2528,7 +2544,7 @@ Expected Keywords: {json.dumps(keyword_context, ensure_ascii=True)}"""
     ]
 
     try:
-        response = await call_interview_chat(messages, temperature=0.25, max_tokens=900)
+        response = await call_interview_chat(messages, temperature=0.2, max_tokens=520)
         parsed = json.loads(_extract_json_block(response))
         if isinstance(parsed, dict):
             return _normalize_feedback(parsed)
@@ -2538,7 +2554,7 @@ Expected Keywords: {json.dumps(keyword_context, ensure_ascii=True)}"""
                 {"role": "system", "content": "Return strict JSON only."},
                 {"role": "user", "content": compact_prompt},
             ]
-            retry_response = await call_interview_chat(retry_messages, temperature=0.2, max_tokens=600)
+            retry_response = await call_interview_chat(retry_messages, temperature=0.15, max_tokens=360)
             retry_parsed = json.loads(_extract_json_block(retry_response))
             if isinstance(retry_parsed, dict):
                 return _normalize_feedback(retry_parsed)

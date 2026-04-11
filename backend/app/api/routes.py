@@ -42,6 +42,102 @@ interview_sessions = {}
 interview_session_contexts = {}
 
 
+def _restore_interview_session_from_db(session_id: str) -> bool:
+    """Reload interview session from Supabase when in-memory cache is empty (e.g., after restart)."""
+    if session_id in interview_sessions:
+        return True
+
+    if not _supabase_enabled():
+        return False
+
+    ok, bundle, _ = supabase_service.get_interview_session_bundle(session_id)
+    if not ok or not isinstance(bundle, dict):
+        return False
+
+    session_row = bundle.get("session", {}) if isinstance(bundle.get("session"), dict) else {}
+    raw_questions = bundle.get("questions", []) if isinstance(bundle.get("questions"), list) else []
+
+    questions: List[InterviewQuestion] = []
+    for idx, row in enumerate(raw_questions):
+        if not isinstance(row, dict):
+            continue
+        order = row.get("question_order")
+        try:
+            order_num = int(order)
+        except Exception:
+            order_num = idx + 1
+
+        question_payload = {
+            "id": f"int-{order_num}",
+            "type": row.get("type", "Technical"),
+            "difficulty": row.get("difficulty", "Medium"),
+            "question": row.get("question", ""),
+            "expected_keywords": row.get("expected_keywords", []) or [],
+            "evaluation_criteria": row.get("evaluation_criteria", []) or [],
+        }
+        try:
+            questions.append(InterviewQuestion(**question_payload))
+        except Exception:
+            continue
+
+    if not questions:
+        return False
+
+    restored_session = InterviewSession(
+        session_id=session_id,
+        mode=str(session_row.get("mode", "Technical") or "Technical"),
+        questions=questions,
+        overall_score=float(session_row.get("score", 0) or 0) if session_row.get("score") is not None else None,
+        readiness=str(session_row.get("readiness", "") or "") or None,
+    )
+    interview_sessions[session_id] = restored_session
+    interview_session_contexts[session_id] = {
+        "job_description": str(bundle.get("job_description", "") or ""),
+        "resume_text": "",
+        "quiz_context": session_row.get("quiz_context", {}) if isinstance(session_row.get("quiz_context"), dict) else {},
+        "roadmap_context": session_row.get("roadmap_context", []) if isinstance(session_row.get("roadmap_context"), list) else [],
+        "project_context": [],
+        "mode": restored_session.mode,
+    }
+    return True
+
+
+def _resolve_interview_question(session: InterviewSession, question_id: str) -> Optional[InterviewQuestion]:
+    """Resolve question by exact id, normalized id, numeric suffix, or next unanswered fallback."""
+    questions = session.questions or []
+    if not questions:
+        return None
+
+    qid = str(question_id or "").strip()
+    if not qid:
+        return None
+
+    exact_match = next((q for q in questions if str(q.id) == qid), None)
+    if exact_match:
+        return exact_match
+
+    normalized_qid = qid.lower()
+    case_match = next((q for q in questions if str(q.id).strip().lower() == normalized_qid), None)
+    if case_match:
+        return case_match
+
+    match = re.search(r"(\d+)$", qid)
+    if match:
+        try:
+            index = int(match.group(1)) - 1
+            if 0 <= index < len(questions):
+                return questions[index]
+        except Exception:
+            pass
+
+    answered_ids = {str(item.question_id).strip().lower() for item in (session.answers or [])}
+    for question in questions:
+        if str(question.id).strip().lower() not in answered_ids:
+            return question
+
+    return questions[0]
+
+
 def _normalize_user_api_key(raw_key: str) -> str:
     value = str(raw_key or "").strip().strip('"').strip("'")
     if value.lower().startswith("bearer "):
@@ -883,6 +979,8 @@ async def match_jd(
         
         return result.dict()
         
+    except ai_service.AIServiceError as e:
+        raise HTTPException(503, f"JD model unavailable: {str(e)}")
     except Exception as e:
         raise HTTPException(500, f"Error matching JD: {str(e)}")
 
@@ -1045,37 +1143,9 @@ async def generate_quiz(
         
     except Exception as e:
         is_rate_limited = isinstance(e, ai_service.AIServiceError) and e.code == "rate_limit"
-        if settings.QUIZ_STRICT_MODEL:
-            if is_rate_limited:
-                raise HTTPException(429, "Quiz API is rate-limited right now. Please wait a few seconds and retry.")
-            raise HTTPException(503, f"Quiz model unavailable: {str(e)}")
-        fallback_questions = ai_service.build_quiz_fallback_questions(
-            topic=topic,
-            difficulty=difficulty,
-            count=normalized_count,
-            domain=domain,
-            resume_text=resume_text,
-            jd_text=job_description,
-            roadmap_context=roadmap_context,
-            reason=str(e),
-        )
-        study_materials = _build_quiz_study_materials(fallback_questions, roadmap_context)
-        return {
-            "domain": domain,
-            "difficulty": difficulty,
-            "generation_source": "quiz_fallback_route",
-            "passing_percentage": 80,
-            "rules": [
-                "Read every question carefully before selecting an answer.",
-                "No tab switching or external assistance during the quiz.",
-                "Each section contains 10 questions.",
-                "Passing criteria is 80% or higher.",
-                "Review explanations after submission to improve weak areas.",
-            ],
-            "study_materials": study_materials,
-            "questions": [q for q in fallback_questions[:normalized_count]],
-            "generation_warning": str(e),
-        }
+        if is_rate_limited:
+            raise HTTPException(429, "Quiz API is rate-limited right now. Please wait a few seconds and retry.")
+        raise HTTPException(503, f"Quiz model unavailable: {str(e)}")
 
 @router.post("/api/quiz/evaluate")
 async def evaluate_quiz(answers: List[QuizAnswer]):
@@ -1255,13 +1325,13 @@ async def evaluate_interview_answer(
 ):
     """Evaluate interview answer"""
     try:
-        if session_id not in interview_sessions:
+        if session_id not in interview_sessions and not _restore_interview_session_from_db(session_id):
             raise HTTPException(404, "Interview session not found")
         
         session = interview_sessions[session_id]
         
         # Find question
-        question = next((q for q in session.questions if q.id == question_id), None)
+        question = _resolve_interview_question(session, question_id)
         if not question:
             raise HTTPException(404, "Question not found")
         
@@ -1319,7 +1389,7 @@ async def evaluate_interview_answer(
 @router.get("/api/interview/session/{session_id}")
 async def get_interview_session(session_id: str):
     """Get interview session details"""
-    if session_id not in interview_sessions:
+    if session_id not in interview_sessions and not _restore_interview_session_from_db(session_id):
         raise HTTPException(404, "Interview session not found")
     
     return interview_sessions[session_id].dict()

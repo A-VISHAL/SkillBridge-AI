@@ -238,6 +238,62 @@ class SupabaseService:
 
         return self._insert_many("interview_questions", question_rows)
 
+    def get_interview_session_bundle(
+        self,
+        session_id: str,
+    ) -> Tuple[bool, Optional[Dict[str, Any]], str]:
+        """Load persisted interview session with ordered questions and optional JD text."""
+        if not self._client:
+            return False, None, "Supabase is not configured"
+
+        try:
+            session_response = (
+                self._client
+                .table("interview_sessions")
+                .select("id, mode, score, readiness, quiz_context, roadmap_context, job_description_id")
+                .eq("id", session_id)
+                .limit(1)
+                .execute()
+            )
+            session_rows = getattr(session_response, "data", None) or []
+            if not session_rows:
+                return False, None, "Interview session not found"
+
+            session_row = session_rows[0] if isinstance(session_rows[0], dict) else {}
+
+            questions_response = (
+                self._client
+                .table("interview_questions")
+                .select("question_order, type, difficulty, question, expected_keywords, evaluation_criteria")
+                .eq("interview_session_id", session_id)
+                .order("question_order")
+                .execute()
+            )
+            question_rows = getattr(questions_response, "data", None) or []
+
+            jd_text = ""
+            jd_id = str(session_row.get("job_description_id") or "").strip()
+            if jd_id:
+                jd_response = (
+                    self._client
+                    .table("job_descriptions")
+                    .select("raw_text")
+                    .eq("id", jd_id)
+                    .limit(1)
+                    .execute()
+                )
+                jd_rows = getattr(jd_response, "data", None) or []
+                if jd_rows and isinstance(jd_rows[0], dict):
+                    jd_text = str(jd_rows[0].get("raw_text", "") or "")
+
+            return True, {
+                "session": session_row,
+                "questions": question_rows,
+                "job_description": jd_text,
+            }, ""
+        except Exception as exc:
+            return False, None, str(exc)
+
     def save_runtime_api_key(
         self,
         scope_key: str,

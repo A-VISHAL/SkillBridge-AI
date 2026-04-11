@@ -17,11 +17,18 @@ const roleLabels = {
   },
 };
 
-const flowNodes = [
+const studentFlowNodes = [
   { key: 'resume', label: 'Resume Upload', hint: 'Extract profile', color: '#60a5fa', step: '1/4' },
   { key: 'match', label: 'JD Match', hint: 'Measure fit score', color: '#22d3ee', step: '2/4' },
   { key: 'roadmap', label: 'Roadmap', hint: 'Personalized plan', color: '#34d399', step: '3/4' },
   { key: 'interview', label: 'Interview', hint: 'Practice + feedback', color: '#fbbf24', step: '4/4' },
+];
+
+const adminFlowNodes = [
+  { key: 'students', label: 'Student Management', hint: 'Review user profiles', color: '#f87171', step: '1/4' },
+  { key: 'rules', label: 'Screening Rules', hint: 'Set ATS criteria', color: '#a78bfa', step: '2/4' },
+  { key: 'analytics', label: 'Platform Analytics', hint: 'Review metrics', color: '#fb923c', step: '3/4' },
+  { key: 'jobs', label: 'Job Database', hint: 'Manage listings', color: '#f472b6', step: '4/4' },
 ];
 
 // Starfield background component
@@ -88,8 +95,9 @@ function DotGrid() {
   );
 }
 
-function CareerFlowPanel() {
+function CareerFlowPanel({ role = 'student' }) {
   const [hoveredIndex, setHoveredIndex] = useState(null);
+  const nodes = role === 'admin' ? adminFlowNodes : studentFlowNodes;
 
   return (
     <div style={{ 
@@ -114,7 +122,7 @@ function CareerFlowPanel() {
           color: 'rgba(0, 229, 196, 0.8)', 
           fontWeight: 700 
         }}>
-          CAREER PIPELINE
+          {role === 'admin' ? 'ADMIN CONTROLS' : 'CAREER PIPELINE'}
         </div>
         <div style={{ 
           display: 'flex', 
@@ -141,7 +149,7 @@ function CareerFlowPanel() {
       </div>
 
       <div style={{ display: 'grid', gap: 12 }}>
-        {flowNodes.map((node, index) => (
+        {nodes.map((node, index) => (
           <motion.div
             key={node.key}
             initial={{ opacity: 0, x: -20 }}
@@ -259,10 +267,10 @@ export function AuthPage({ onLogin }) {
         zIndex: 1, 
         minHeight: '100vh', 
         display: 'grid', 
-        gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 500px), 1fr))',
-        gap: 40,
-        padding: '40px clamp(20px, 5vw, 60px)',
-        maxWidth: 1600,
+        gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 400px), 1fr))',
+        gap: 30,
+        padding: '20px clamp(20px, 5vw, 60px)',
+        maxWidth: 1500,
         margin: '0 auto',
       }}>
         {/* LEFT SECTION - Hero */}
@@ -274,7 +282,9 @@ export function AuthPage({ onLogin }) {
             display: 'flex', 
             flexDirection: 'column', 
             justifyContent: 'center',
-            gap: 32,
+            gap: 24,
+            paddingTop: '20px',
+            paddingBottom: '20px',
           }}
         >
           {/* Logo */}
@@ -334,14 +344,14 @@ export function AuthPage({ onLogin }) {
               WebkitTextFillColor: 'transparent',
               backgroundClip: 'text',
             }}>
-              Start your career{' '}
+              {role === 'admin' ? 'Empower student ' : 'Start your career '}
               <span style={{ 
                 background: 'linear-gradient(135deg, #ffffff 0%, #22d3ee 100%)',
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent',
                 backgroundClip: 'text',
               }}>
-                mission.
+                {role === 'admin' ? 'success.' : 'mission.'}
               </span>
             </h1>
             <p style={{ 
@@ -351,13 +361,14 @@ export function AuthPage({ onLogin }) {
               color: 'rgba(255, 255, 255, 0.7)',
               maxWidth: 540,
             }}>
-              Upload resumes, compare job descriptions, generate roadmaps, and practice interviews from a single student workspace.
+              {role === 'admin'
+                ? 'Manage eligibility rules, track ATS analytics, monitor student progress, and oversee job placements from the admin control center.'
+                : 'Upload resumes, compare job descriptions, generate roadmaps, and practice interviews from a single student workspace.'}
             </p>
           </div>
 
-          {/* Career Pipeline Card */}
           <div style={{ maxWidth: 560 }}>
-            <CareerFlowPanel />
+            <CareerFlowPanel role={role} />
           </div>
 
           {/* Feature badges */}
@@ -404,8 +415,9 @@ export function AuthPage({ onLogin }) {
         {/* RIGHT SECTION - Login Panel */}
         <div style={{ 
           display: 'grid', 
-          placeItems: 'center',
-          padding: '20px 0',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '0 0 40px 0',
         }}>
           <motion.div
             initial={{ opacity: 0, y: 30, scale: 0.95 }}
@@ -413,8 +425,9 @@ export function AuthPage({ onLogin }) {
             transition={{ duration: 0.8, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
             style={{ 
               width: '100%', 
-              maxWidth: 460,
+              maxWidth: 440,
               position: 'relative',
+              marginTop: '-40px', // moves it slightly up as requested
             }}
           >
             {/* Animated glow behind card */}
