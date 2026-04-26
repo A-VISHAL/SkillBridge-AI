@@ -483,20 +483,11 @@ See the `LICENSE` file for full details.
 
 ## Hackathon Submission
 
-This project was built as part of the **Oxlo.ai Hackathon**.  
-All AI model inference and processing are powered by **Oxlo.ai**.
+This project was built as part of the Quantum Sprint – For Social Good Hackathon organized by the Quantum Club.
 
 ---
 
-## Registration Details
 
-The following email IDs were used for Oxlo.ai hackathon registration:
-
-- lukizerk3@gmail.com  
-- lukizerk4@gmail.com  
-- lukizerk6@gmail.com  
-- lukizerk7@gmail.com  
----
 
 <div align="center">
 
